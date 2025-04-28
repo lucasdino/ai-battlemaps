@@ -1,0 +1,105 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  font-family: 'Consolas', monospace;
+  background-color: #1a1a1a;
+  color: #e0e0e0;
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Hide overflow to prevent scrollbars */
+}
+
+.app-container {
+  width: 100%;
+  min-height: 100vh;
+  max-height: 100vh; /* Limit height to prevent scrolling */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Hide overflow to prevent scrollbars */
+}
+
+.content {
+  flex: 1;
+  width: 100%;
+  padding: 2rem;
+  padding-top: calc(60px + 2rem); /* Account for navbar height plus padding */
+  background-color: #1a1a1a;
+  margin: 0 auto;
+  overflow: hidden; /* Hide overflow by default */
+  position: relative; /* Allow positioning of child elements */
+}
+
+/* Add a media query for small screens */
+@media (max-height: 600px) {
+  .content {
+    overflow: auto; /* Allow scrolling on very small screens */
+  }
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #ff5e3a;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+p {
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  background: #2d1e13;
+}
+::-webkit-scrollbar-thumb {
+  background: #a67c52;
+  border-radius: 8px;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
