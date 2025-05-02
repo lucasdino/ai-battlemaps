@@ -7,6 +7,7 @@ oh, btw we'll be totally abusing AI coding tools to assist with building the UI.
 ## Project Structure
 
 ```
+| website/                 # Where the final external interface will live
 ├── backend/               # Node.js server
 │   ├── assets/            # Default 3D models
 │   ├── uploads/           # User uploaded models
@@ -21,6 +22,9 @@ oh, btw we'll be totally abusing AI coding tools to assist with building the UI.
         │   └── ViewAssets.jsx            # Asset management UI
         ├── theme.js       # UI theme configuration
         └── App.jsx        # Main application component
+
+| engine/                  # Main folder where we'll have various python notebooks / functions related to building / testing the system
+
 ```
 
 ## Getting Started
@@ -35,7 +39,7 @@ To set up the project locally, follow these steps:
 
 2. **Set up the Backend:**
    ```bash
-   cd backend
+   cd website/backend
    npm install
    ```
 
@@ -48,13 +52,13 @@ To set up the project locally, follow these steps:
 4. **Run the Application:**
    * **Start the Backend:**
      ```bash
-     cd ../backend
+     cd website/backend
      node server.js
      ```
      (The backend will run on http://localhost:3001)
    * **Start the Frontend (in a separate terminal):**
      ```bash
-     cd ../frontend
+     cd website/frontend
      npm run dev
      ```
      (The frontend will be accessible at the URL provided by Vite, usually http://localhost:5173)
