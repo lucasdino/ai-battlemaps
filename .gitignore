@@ -1,3 +1,6 @@
+# User-Specific Folders / etc. (for Infinigen since compatability issues between Mac/Linux/Windows)
+lucas_windows/
+
 # Logs
 logs
 *.log
