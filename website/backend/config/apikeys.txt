@@ -1,0 +1,45 @@
+# How to set up your apiKeys.js file
+
+This file explains how to configure your API keys for image generation services.
+
+1. **Copy the Example File**
+   - If you have an `apiKeys.js.example` file, copy it to `apiKeys.js` in this directory.
+   - If not, create a new file called `apiKeys.js` in this folder.
+
+2. **Edit `apiKeys.js`**
+   - The file should export an object with your API keys, like this:
+
+```js
+const API_KEYS = {
+  OPENAI: 'your_openai_api_key_here',
+  STABILITY: 'your_stability_api_key_here',
+  GOOGLE: 'your_google_api_key_here',
+  GOOGLE_IMAGEN_ENDPOINT: 'your_google_imagen_endpoint_url_here'
+};
+
+module.exports = API_KEYS;
+```
+
+3. **Environment Variables (Optional)**
+   - You can also use environment variables instead of hardcoding your keys:
+
+```js
+const API_KEYS = {
+  OPENAI: process.env.OPENAI_API_KEY,
+  STABILITY: process.env.STABILITY_API_KEY,
+  GOOGLE: process.env.GOOGLE_API_KEY,
+  GOOGLE_IMAGEN_ENDPOINT: process.env.GOOGLE_IMAGEN_ENDPOINT
+};
+
+module.exports = API_KEYS;
+```
+
+4. **Security**
+   - **Never commit your real `apiKeys.js` file to version control!**
+   - Add `config/apiKeys.js` to your `.gitignore` file to keep your keys private.
+
+5. **Required Keys**
+   - At minimum, you should provide an OpenAI key for DALL-E image generation.
+   - Other keys are optional unless you use those providers.
+
+If you have any questions, check the README or ask the project maintainer. 

@@ -3,8 +3,15 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import THEME from '../theme';
+import styles, { getButtonStyle, getLoadingOverlayStyle, KEYFRAMES } from '../styles/ModelViewer';
 
-const ModelViewer = ({ modelUrl, onError }) => {
+const ModelViewer = ({ 
+  modelUrl, 
+  modelName, 
+  modelId,
+  onError,
+  onModelNameChange 
+}) => {
   const containerRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
@@ -18,27 +25,29 @@ const ModelViewer = ({ modelUrl, onError }) => {
   const [instanceId] = useState(() => Math.random().toString(36).substring(2, 9)); // Unique instance ID for debugging
   const [hoveredButton, setHoveredButton] = useState(null);
   const [activeButton, setActiveButton] = useState(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editableName, setEditableName] = useState(modelName || '');
+
+  // Update editable name when model changes
+  useEffect(() => {
+    setEditableName(modelName || '');
+  }, [modelName]);
 
   // Clear all THREE.js resources and DOM elements
   const clearScene = () => {
-    console.log(`[${instanceId}] Clearing scene resources`);
-
     // Stop animation loop
     if (animationIdRef.current) {
-      console.log(`[${instanceId}] Cancelling animation frame: ${animationIdRef.current}`);
       cancelAnimationFrame(animationIdRef.current);
       animationIdRef.current = null;
     }
 
     // Clear existing model
     if (modelRef.current && sceneRef.current) {
-      console.log(`[${instanceId}] Removing model from scene`);
       sceneRef.current.remove(modelRef.current);
       
       // Dispose geometries and materials
       modelRef.current.traverse((child) => {
         if (child.isMesh) {
-          console.log(`[${instanceId}] Disposing of mesh resources`);
           if (child.geometry) {
             child.geometry.dispose();
           }
@@ -58,21 +67,18 @@ const ModelViewer = ({ modelUrl, onError }) => {
     
     // Dispose of controls
     if (controlsRef.current) {
-      console.log(`[${instanceId}] Disposing of controls`);
       controlsRef.current.dispose();
       controlsRef.current = null;
     }
     
     // Dispose of renderer
     if (rendererRef.current) {
-      console.log(`[${instanceId}] Disposing of renderer`);
       rendererRef.current.dispose();
       rendererRef.current = null;
     }
     
     // Clear container's DOM elements
     if (containerRef.current) {
-      console.log(`[${instanceId}] Clearing container DOM elements`);
       while (containerRef.current.firstChild) {
         containerRef.current.removeChild(containerRef.current.firstChild);
       }
@@ -80,7 +86,6 @@ const ModelViewer = ({ modelUrl, onError }) => {
     
     // Clear scene
     if (sceneRef.current) {
-      console.log(`[${instanceId}] Clearing scene`);
       // Dispose of all textures, materials, and geometries in the scene
       sceneRef.current.traverse((object) => {
         if (object.geometry) {
@@ -118,8 +123,6 @@ const ModelViewer = ({ modelUrl, onError }) => {
     
     // Clear camera reference
     cameraRef.current = null;
-    
-    console.log(`[${instanceId}] Scene clearing complete`);
   };
 
   // Handle errors by notifying parent component if needed
@@ -132,14 +135,12 @@ const ModelViewer = ({ modelUrl, onError }) => {
   // Clean up on unmount
   useEffect(() => {
     return () => {
-      console.log(`[${instanceId}] Component unmounting, cleaning up resources`);
       clearScene();
     };
-  }, [instanceId]);
+  }, []);
 
   // Initialize scene when component mounts or modelUrl changes
   useEffect(() => {
-    console.log(`[${instanceId}] ModelUrl changed: ${modelUrl}`);
     if (!containerRef.current || !modelUrl) return;
     
     // Reset state
@@ -153,8 +154,6 @@ const ModelViewer = ({ modelUrl, onError }) => {
     // Function to initialize scene
     const setupScene = () => {
       try {
-        console.log(`[${instanceId}] Setting up new scene`);
-        
         // Create new scene
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a1a1a);
@@ -168,15 +167,32 @@ const ModelViewer = ({ modelUrl, onError }) => {
         camera.position.x = 2;
         cameraRef.current = camera;
         
-        // Create renderer
-        const renderer = new THREE.WebGLRenderer({ 
-          antialias: true,
-          alpha: true,
-          preserveDrawingBuffer: true,
-          powerPreference: 'high-performance'
-        });
+        // Try to create WebGL renderer with fallback options
+        let renderer;
+        
+        try {
+          // First try with best quality settings
+          renderer = new THREE.WebGLRenderer({ 
+            antialias: true,
+            alpha: true,
+            preserveDrawingBuffer: true,
+            powerPreference: 'default'
+          });
+        } catch (err) {
+          try {
+            // Fallback to basic settings
+            renderer = new THREE.WebGLRenderer({ 
+              antialias: false,
+              alpha: true,
+              preserveDrawingBuffer: true
+            });
+          } catch (fallbackErr) {
+            throw new Error('WebGL is not supported in your browser');
+          }
+        }
+        
         renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limit pixel ratio for performance
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -266,7 +282,7 @@ const ModelViewer = ({ modelUrl, onError }) => {
         const addControlsHelp = () => {
           const helpText = document.createElement('div');
           helpText.style.position = 'absolute';
-          helpText.style.top = '10px';
+          helpText.style.bottom = '10px';
           helpText.style.left = '10px';
           helpText.style.color = THEME.textSecondary;
           helpText.style.fontSize = '12px';
@@ -280,7 +296,6 @@ const ModelViewer = ({ modelUrl, onError }) => {
         // Setup animation loop
         const animate = () => {
           if (!controlsRef.current || !rendererRef.current || !sceneRef.current || !cameraRef.current) {
-            console.warn(`[${instanceId}] Animation loop stopping due to missing resources`);
             return;
           }
           
@@ -289,7 +304,6 @@ const ModelViewer = ({ modelUrl, onError }) => {
           rendererRef.current.render(sceneRef.current, cameraRef.current);
         };
         
-        console.log(`[${instanceId}] Starting animation loop`);
         animate();
         
         // Handle window resize
@@ -307,7 +321,6 @@ const ModelViewer = ({ modelUrl, onError }) => {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
       } catch (err) {
-        console.error(`[${instanceId}] Error initializing Three.js scene:`, err);
         setError('Could not initialize 3D viewer. Please ensure WebGL is enabled in your browser.');
         setIsLoading(false);
         return null;
@@ -317,11 +330,10 @@ const ModelViewer = ({ modelUrl, onError }) => {
     // Load the 3D model
     const loadModel = () => {
       if (!sceneRef.current) {
-        console.error(`[${instanceId}] Cannot load model: scene not initialized`);
+        setError('Cannot load model: scene not initialized');
         return;
       }
       
-      console.log(`[${instanceId}] Loading model: ${modelUrl}`);
       const loader = new GLTFLoader();
       
       try {
@@ -329,7 +341,6 @@ const ModelViewer = ({ modelUrl, onError }) => {
           modelUrl,
           (gltf) => {
             try {
-              console.log(`[${instanceId}] Model loaded successfully`);
               const model = gltf.scene;
               modelRef.current = model;
               
@@ -380,8 +391,6 @@ const ModelViewer = ({ modelUrl, onError }) => {
               model.position.y = -center.y;
               model.position.z = -center.z;
               
-              console.log(`[${instanceId}] Model positioned, size:`, size);
-              
               // Calculate camera position to frame the model to fill 90% of the view
               const camera = cameraRef.current;
               const aspect = camera.aspect;
@@ -428,9 +437,7 @@ const ModelViewer = ({ modelUrl, onError }) => {
               // Update state
               setIsLoading(false);
               setLoadingProgress(100);
-              console.log(`[${instanceId}] Model fully setup and rendered`);
             } catch (err) {
-              console.error(`[${instanceId}] Error processing loaded model:`, err);
               setError('Error displaying the model. The file may be corrupted.');
               setIsLoading(false);
             }
@@ -440,13 +447,11 @@ const ModelViewer = ({ modelUrl, onError }) => {
             setLoadingProgress(progress);
           },
           (errorEvent) => {
-            console.error(`[${instanceId}] Error loading model:`, errorEvent);
             setError('Failed to load 3D model. The file might be inaccessible or corrupted.');
             setIsLoading(false);
           }
         );
       } catch (err) {
-        console.error(`[${instanceId}] Error setting up model loader:`, err);
         setError('Could not load the 3D model. Please try again later.');
         setIsLoading(false);
       }
@@ -456,17 +461,15 @@ const ModelViewer = ({ modelUrl, onError }) => {
     setupScene();
     loadModel();
     
-  }, [modelUrl, instanceId]);
+  }, [modelUrl]);
   
   // Function to handle PNG download
   const handleDownloadPNG = () => {
     if (!rendererRef.current || !sceneRef.current || !cameraRef.current) {
-      console.error(`[${instanceId}] Download failed: renderer, scene, or camera not available`);
       return;
     }
     
     try {
-      console.log(`[${instanceId}] Generating PNG download`);
       // Render the current view to ensure it's up to date
       rendererRef.current.render(sceneRef.current, cameraRef.current);
       
@@ -479,9 +482,7 @@ const ModelViewer = ({ modelUrl, onError }) => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      console.log(`[${instanceId}] PNG download complete`);
     } catch (err) {
-      console.error(`[${instanceId}] Error generating PNG:`, err);
       setError("Could not generate PNG image.");
     }
   };
@@ -489,13 +490,10 @@ const ModelViewer = ({ modelUrl, onError }) => {
   // Function to handle GLB download
   const handleDownloadGLB = () => {
     if (!modelUrl) {
-      console.error(`[${instanceId}] Download GLB failed: model URL not available`);
       return;
     }
     
     try {
-      console.log(`[${instanceId}] Initiating GLB download from: ${modelUrl}`);
-      
       // Create a link to download the original GLB file
       const link = document.createElement('a');
       link.href = modelUrl;
@@ -507,181 +505,232 @@ const ModelViewer = ({ modelUrl, onError }) => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      console.log(`[${instanceId}] GLB download initiated`);
     } catch (err) {
-      console.error(`[${instanceId}] Error downloading GLB:`, err);
       setError("Could not download the GLB file.");
     }
   };
   
-  // Button style with animation
-  const getButtonStyle = (buttonId) => {
-    const isHovered = hoveredButton === buttonId;
-    const isActive = activeButton === buttonId;
-    // Use the same fire red and hover color as upload button
-    return {
-      backgroundColor: isHovered ? '#ff3b1c' : '#ff5e3a',
-      color: 'white',
-      border: 'none',
-      padding: '10px 15px',
-      margin: '10px',
-      borderRadius: '4px',
-      cursor: 'pointer',
-      fontSize: '14px',
-      fontWeight: 'bold',
-      transition: 'all 0.3s ease',
-      boxShadow: isHovered && !isActive 
-        ? '0 4px 8px rgba(255, 59, 28, 0.5)'
-        : '0 2px 5px rgba(255, 94, 58, 0.3)',
-      transform: isActive 
-        ? 'translateY(1px)' 
-        : isHovered 
-          ? 'translateY(-2px)' 
-          : 'translateY(0)',
-      position: 'relative',
-      overflow: 'hidden',
-      outline: 'none',
-    };
-  };
-  
-  // Create canvas container styling with explicit outline prevention
-  const canvasContainerStyle = {
-    width: '100%', 
-    flexGrow: 1,
-    position: 'relative',
-    borderRadius: '4px',
-    overflow: 'hidden',
-    outline: 'none', // Prevent outline
-    border: '1px solid transparent', // Remove any colored border
-  };
-  
-  // Loading overlay styles
-  const loadingStyles = {
-    overlay: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: 'rgba(25, 25, 25, 0.8)',
-      zIndex: 10,
-      pointerEvents: isLoading ? 'auto' : 'none',
-      opacity: isLoading ? 1 : 0,
-      transition: 'opacity 0.3s ease',
-    },
-    progress: {
-      width: '60%',
-      height: '8px',
-      backgroundColor: THEME.bgActive,
-      borderRadius: '4px',
-      overflow: 'hidden',
-      marginTop: '15px',
-    },
-    progressBar: {
-      height: '100%',
-      width: `${loadingProgress}%`,
-      backgroundColor: THEME.accentPrimary,
-      transition: 'width 0.3s ease',
-    },
-    text: {
-      color: THEME.textPrimary,
-      fontSize: '16px',
-      marginBottom: '8px',
-    },
-    percentage: {
-      color: THEME.accentPrimary,
-      fontSize: '14px',
-      marginTop: '8px',
-    },
-    error: {
-      color: THEME.errorText,
-      backgroundColor: THEME.errorBg,
-      padding: '10px 15px',
-      borderRadius: '4px',
-      margin: '15px',
-      textAlign: 'center',
+  // Function to reset the camera view
+  const resetView = () => {
+    if (!cameraRef.current || !controlsRef.current || !modelRef.current) return;
+    
+    try {
+      // Get model dimensions
+      const box = new THREE.Box3().setFromObject(modelRef.current);
+      const size = box.getSize(new THREE.Vector3());
+      
+      // Calculate ideal camera distance
+      const camera = cameraRef.current;
+      const aspect = camera.aspect;
+      const vfov = camera.fov * (Math.PI / 180);
+      
+      const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect);
+      const distanceForHeight = size.y / (1.8 * Math.tan(vfov / 2));
+      const distanceForWidth = size.x / (1.8 * Math.tan(hfov / 2));
+      const distanceForDepth = size.z / (1.8 * Math.tan(hfov / 2));
+      
+      let cameraZ = Math.max(distanceForHeight, distanceForWidth, distanceForDepth);
+      cameraZ = cameraZ * 0.9; // 90% to fill view
+      cameraZ = cameraZ + Math.max(size.z * 0.1, 0.5); // Add buffer
+      cameraZ = Math.max(cameraZ, 2); // Minimum distance
+      
+      // Set camera to initial position
+      const cameraDistance = cameraZ * 1.1;
+      camera.position.set(
+        cameraDistance * 0.7,  // X position
+        cameraDistance * 0.4,  // Y position
+        cameraDistance * 0.7   // Z position
+      );
+      
+      // Reset controls target
+      controlsRef.current.target.set(0, 0, 0);
+      controlsRef.current.update();
+      
+      // Apply initial rotation
+      modelRef.current.rotation.y = Math.PI / 8; // 22.5 degrees
+    } catch (err) {
+      // Silently fail - not critical
     }
   };
   
+  // Save name change and exit edit mode
+  const saveModelName = () => {
+    if (onModelNameChange && editableName !== modelName) {
+      onModelNameChange(editableName);
+    }
+    setIsEditingName(false);
+  };
+
+  // Handle key press in the input
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      saveModelName();
+    }
+  };
+  
+  // Function to get button style with hover state
+  const getActionButtonStyle = (isHovered, isActive, isPrimary = false) => {
+    return {
+      background: isPrimary 
+        ? (isHovered ? '#4dabf7' : THEME.primary) 
+        : (isHovered ? '#f3a653' : '#e67e22'),
+      border: isPrimary ? '2px solid white' : 'none',
+      color: 'white',
+      padding: '8px 12px',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      fontSize: '12px',
+      fontWeight: '500',
+      marginLeft: '6px',
+      transition: 'none',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+    };
+  };
+  
+  // Update loading progress bar style
+  const loadingProgressBarStyle = {
+    ...styles.loadingProgressBar,
+    width: `${loadingProgress}%`
+  };
+  
   return (
-    <div 
-      style={{
-        width: '100%',
-        height: '100%',
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column'
-      }}
-    >
-      <div 
-        ref={containerRef}
-        style={canvasContainerStyle}
-        tabIndex="-1" // Make it unfocusable
-      >
-        {/* Loading Overlay */}
-        <div style={loadingStyles.overlay}>
-          {error ? (
-            <div style={loadingStyles.error}>{error}</div>
+    <div style={styles.container}>
+      {/* Model Name Header */}
+      {!isLoading && !error && (
+        <div style={{
+          position: 'absolute',
+          top: '10px',
+          left: '0',
+          right: '0',
+          textAlign: 'center',
+          zIndex: 10,
+          pointerEvents: 'auto'
+        }}>
+          {isEditingName ? (
+            <div style={{
+              display: 'inline-block',
+              background: 'rgba(0,0,0,0.6)',
+              padding: '5px 10px',
+              borderRadius: '4px'
+            }}>
+              <input 
+                type="text"
+                value={editableName}
+                onChange={(e) => setEditableName(e.target.value)}
+                onBlur={saveModelName}
+                onKeyPress={handleKeyPress}
+                autoFocus
+                style={{
+                  background: 'transparent',
+                  border: `1px solid ${THEME.primary}`,
+                  color: THEME.textPrimary,
+                  padding: '5px 8px',
+                  borderRadius: '3px',
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  minWidth: '200px',
+                }}
+              />
+            </div>
           ) : (
-            <>
-              <div style={loadingStyles.text}>Loading 3D Model</div>
-              <div style={loadingStyles.progress}>
-                <div style={loadingStyles.progressBar}></div>
-              </div>
-              <div style={loadingStyles.percentage}>{Math.round(loadingProgress)}%</div>
-            </>
+            <div 
+              onClick={() => setIsEditingName(true)}
+              style={{
+                display: 'inline-block',
+                background: 'rgba(0,0,0,0.6)',
+                padding: '5px 15px',
+                borderRadius: '4px',
+                color: THEME.textPrimary,
+                fontSize: '16px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+              title="Click to edit model name"
+            >
+              {modelName || 'Unnamed Model'} ✏️
+            </div>
           )}
         </div>
-      </div>
-      {/* Download Buttons */} 
+      )}
+      
+      {/* Action Buttons - Reset View, Download PNG, Download GLB */}
       {!isLoading && !error && (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          marginTop: '10px' 
+        <div style={{
+          position: 'absolute',
+          bottom: '10px',
+          right: '10px',
+          zIndex: 10,
+          display: 'flex',
+          justifyContent: 'flex-end'
         }}>
           <button
-            onClick={handleDownloadPNG}
-            style={getButtonStyle('png')}
-            className="custom-download-btn"
-            onMouseEnter={() => setHoveredButton('png')}
-            onMouseLeave={() => {
+            onClick={resetView}
+            style={getActionButtonStyle(hoveredButton === 'reset', activeButton === 'reset', true)}
+            onMouseEnter={() => setHoveredButton('reset')}
+            onMouseLeave={() => setHoveredButton(null)}
+            onMouseDown={() => setActiveButton('reset')}
+            onMouseUp={() => setActiveButton(null)}
+            onBlur={() => {
               setHoveredButton(null);
               setActiveButton(null);
             }}
+            title="Reset camera view"
+          >
+            Reset View
+          </button>
+          <button
+            onClick={handleDownloadPNG}
+            style={getActionButtonStyle(hoveredButton === 'png', activeButton === 'png')}
+            onMouseEnter={() => setHoveredButton('png')}
+            onMouseLeave={() => setHoveredButton(null)}
             onMouseDown={() => setActiveButton('png')}
             onMouseUp={() => setActiveButton(null)}
             onBlur={() => {
               setHoveredButton(null);
               setActiveButton(null);
             }}
+            title="Download as PNG image"
           >
             Download PNG
           </button>
           <button
             onClick={handleDownloadGLB}
-            style={getButtonStyle('glb')}
-            className="custom-download-btn"
+            style={getActionButtonStyle(hoveredButton === 'glb', activeButton === 'glb')}
             onMouseEnter={() => setHoveredButton('glb')}
-            onMouseLeave={() => {
-              setHoveredButton(null);
-              setActiveButton(null);
-            }}
+            onMouseLeave={() => setHoveredButton(null)}
             onMouseDown={() => setActiveButton('glb')}
             onMouseUp={() => setActiveButton(null)}
             onBlur={() => {
               setHoveredButton(null);
               setActiveButton(null);
             }}
+            title="Download GLB model file"
           >
             Download GLB
           </button>
         </div>
       )}
+      
+      <div 
+        ref={containerRef}
+        style={styles.canvasContainer}
+        tabIndex="-1" // Make it unfocusable
+      >
+        {/* Loading Overlay */}
+        <div style={getLoadingOverlayStyle(isLoading)}>
+          {error ? (
+            <div style={styles.loadingError}>{error}</div>
+          ) : (
+            <>
+              <div style={styles.loadingText}>Loading 3D Model</div>
+              <div style={styles.loadingProgress}>
+                <div style={loadingProgressBarStyle}></div>
+              </div>
+              <div style={styles.loadingPercentage}>{Math.round(loadingProgress)}%</div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

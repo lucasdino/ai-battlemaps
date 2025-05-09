@@ -1,0 +1,15 @@
+/**
+ * API Keys for Image Generation Services - EXAMPLE FILE
+ * 
+ * Copy this file to apiKeys.js and replace the placeholder values with your actual API keys.
+ * The apiKeys.js file should be included in .gitignore to prevent accidental commits of secrets.
+ */
+
+const API_KEYS = {
+  OPENAI: 'your_openai_api_key_here',
+  STABILITY: 'your_stability_api_key_here',
+  GOOGLE: 'your_google_api_key_here',
+  GOOGLE_IMAGEN_ENDPOINT: 'https://api.googleapis.com/v1/projects/{projectId}/locations/{location}/publishers/google/models/imagegeneration:generateImage'
+};
+
+module.exports = API_KEYS; 

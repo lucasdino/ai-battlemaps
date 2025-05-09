@@ -1,339 +1,77 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useDropzone } from 'react-dropzone';
 import THEME from '../theme';
 import ModelViewer from './ModelViewer';
-import ThumbnailRenderer from './ThumbnailRenderer';
+import AssetCreationPopup from './AssetCreationPopup';
+import CONFIG from '../config';
+import styles, { getMobileStyles, MOBILE_BREAKPOINT, SINGLE_COLUMN_BREAKPOINT } from '../styles/ViewAssets';
+import addGlobalAnimations from '../styles/animations';
+import { Button } from './common';
 
-// Media query breakpoint
-const MOBILE_BREAKPOINT = 768;
-const SINGLE_COLUMN_BREAKPOINT = 480;
+// Constants
+const ASSETS_PER_PAGE = 9; // Number of assets to display per page
 
-// Add global keyframe animations
-const addGlobalStyle = () => {
-  useEffect(() => {
-    // Create a style element for animations
-    const styleEl = document.createElement('style');
-    styleEl.innerHTML = `
-      @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-10px) translateX(-50%); }
-        to { opacity: 1; transform: translateY(0) translateX(-50%); }
-      }
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-      @keyframes thumbnailSpin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-    `;
-    document.head.appendChild(styleEl);
-    
-    // Cleanup function
-    return () => {
-      document.head.removeChild(styleEl);
-    };
-  }, []);
-};
+// Define the steps we'll use in this component
+const GENERATION_STEPS = [
+  { id: 'preprocessing', label: 'Preprocessing' },
+  { id: 'rendering_video', label: 'Rendering Video' },
+  { id: 'generating_model', label: 'Generating 3D Asset' }
+];
 
-// CSS for styling
-const styles = {
-  container: {
-    display: 'flex',
-    height: 'calc(100vh - 60px)', // Full height minus navbar
-    overflow: 'hidden', // Prevent scrolling on the container itself
-    backgroundColor: THEME.bgPrimary,
-    maxHeight: 'calc(100vh - 60px)', // Enforce maximum height
-    position: 'fixed', // Fix position to avoid spacing issues
-    width: '100%',
-    top: '60px', // Position right below the navbar
-    left: 0,
-  },
-  // Left panel - 2/3 width for model visualization
-  visualizationPanel: {
-    flex: '2',
-    padding: '20px',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: THEME.bgSecondary,
-    position: 'relative',
-    overflow: 'hidden',
-    height: '100%', // Fill the height of the parent container
-  },
-  // Right panel - 1/3 width for asset list
-  assetListPanel: {
-    flex: '1',
-    padding: '20px',
-    backgroundColor: THEME.bgPrimary,
-    borderLeft: THEME.border,
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%', // Fill the height of the parent container
-    minWidth: '250px', // Ensure panel doesn't get too narrow
-    maxWidth: '400px', // Limit maximum width
-  },
-  assetListHeader: {
-    marginBottom: '15px',
-    color: THEME.accentPrimary,
-    fontSize: '20px',
-    fontWeight: 'bold',
-  },
-  assetListContainer: {
-    overflowY: 'auto',
-    flex: 1,
-    marginBottom: '15px',
-    padding: '5px',
-    maxHeight: 'calc(100% - 120px)', // Leave space for header and button
-  },
-  assetGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)', // 2 columns by default
-    gap: '12px',
-    width: '100%',
-  },
-  assetGridSingleColumn: {
-    gridTemplateColumns: '1fr', // 1 column for small screens
-  },
-  assetItem: {
-    padding: '12px',
-    borderRadius: '8px',
-    backgroundColor: THEME.bgSecondary,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    boxShadow: THEME.boxShadow,
-    border: `1px solid transparent`,
-    transition: 'all 0.2s ease',
-    cursor: 'pointer',
-    outline: 'none',
-  },
-  assetItemHover: {
-    transform: 'translateY(-2px)',
-    boxShadow: '0 6px 10px rgba(0, 0, 0, 0.3)',
-    border: `1px solid ${THEME.accentPrimary}`,
-    outline: 'none',
-  },
-  assetItemSelected: {
-    border: `1px solid ${THEME.accentPrimary}`,
-    backgroundColor: THEME.bgActive,
-    outline: 'none',
-  },
-  assetThumbnail: {
-    width: '60px',
-    height: '60px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: THEME.bgActive,
-    borderRadius: '8px',
-    marginBottom: '8px',
-    fontSize: '32px',
-    color: THEME.accentPrimary,
-    backgroundSize: 'contain',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
-    overflow: 'hidden',
-    position: 'relative', // For loading indicator positioning
-  },
-  thumbnailLoading: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(25, 25, 25, 0.7)',
-    fontSize: '10px',
-    color: THEME.textSecondary,
-  },
-  thumbnailSpinner: {
-    width: '20px',
-    height: '20px',
-    border: `2px solid ${THEME.bgActive}`,
-    borderTop: `2px solid ${THEME.accentPrimary}`,
-    borderRadius: '50%',
-    animation: 'thumbnailSpin 1s linear infinite',
-  },
-  '@keyframes thumbnailSpin': undefined, // Use global animation instead
-  assetName: {
-    fontSize: '12px',
-    color: THEME.textPrimary,
-    textAlign: 'center',
-    width: '100%',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  dropzone: {
-    border: `2px dashed ${THEME.accentPrimary}`,
-    borderRadius: '8px',
-    padding: '40px',
-    textAlign: 'center',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    backgroundColor: 'rgba(37, 37, 37, 0.7)',
-    boxShadow: THEME.boxShadow,
-    width: '100%',
-    maxWidth: '500px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dropzoneActive: {
-    borderColor: THEME.accentSecondary,
-    backgroundColor: 'rgba(51, 51, 51, 0.7)',
-  },
-  uploadIcon: {
-    fontSize: '48px',
-    color: THEME.accentPrimary,
-    marginBottom: '15px',
-  },
-  dropzoneText: {
-    fontSize: '18px',
-    color: THEME.textPrimary,
-    marginBottom: '10px',
-    fontWeight: 'bold',
-  },
-  dropzoneSubText: {
-    fontSize: '14px',
-    color: THEME.textSecondary,
-    marginTop: '5px',
-  },
-  uploadButton: {
-    backgroundColor: '#ff5e3a', // Fire orange
-    color: 'white',
-    border: 'none',
-    padding: '12px 24px',
-    borderRadius: '4px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 2px 5px rgba(255, 94, 58, 0.3)',
-    alignSelf: 'stretch',
-    textAlign: 'center',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 'auto', // Push to bottom of flex container
-  },
-  uploadButtonHover: {
-    backgroundColor: '#ff3b1c', // Brighter orange/red when hovering
-    boxShadow: '0 4px 8px rgba(255, 59, 28, 0.5)',
-    transform: 'translateY(-2px)',
-  },
-  message: {
-    position: 'absolute',
-    top: '20px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    zIndex: 10,
-    padding: '10px 20px',
-    borderRadius: '4px',
-    fontSize: '14px',
-    animation: 'fadeIn 0.3s ease-in-out',
-    maxWidth: '90%',
-  },
-  success: {
-    backgroundColor: THEME.successBg,
-    color: THEME.successText,
-    border: `1px solid ${THEME.successBorder}`,
-  },
-  error: {
-    backgroundColor: THEME.errorBg,
-    color: THEME.errorText,
-    border: `1px solid ${THEME.errorBorder}`,
-  },
-  modelViewer: {
-    width: '100%',
-    height: '100%',
-    borderRadius: '4px',
-    overflow: 'hidden',
-  },
-  '@keyframes fadeIn': undefined, // Use global animation instead
-  loadingContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100%',
-    width: '100%',
-  },
-  spinner: {
-    border: `4px solid ${THEME.bgActive}`,
-    borderTop: `4px solid ${THEME.accentPrimary}`,
-    borderRadius: '50%',
-    width: '40px',
-    height: '40px',
-    animation: 'spin 1s linear infinite',
-    marginBottom: '20px',
-  },
-  '@keyframes spin': undefined,   // Use global animation instead
-  loadingText: {
-    color: THEME.textSecondary,
-  }
-};
-
-// Responsive styles for mobile/small screens
-const getMobileStyles = (windowWidth) => {
-  const styles = {};
-  
-  if (windowWidth <= MOBILE_BREAKPOINT) {
-    styles.container = {
-      flexDirection: 'column',
-      overflow: 'auto',
-    };
-    styles.visualizationPanel = {
-      flex: 'none',
-      height: 'auto',
-      minHeight: '50vh',
-    };
-    styles.assetListPanel = {
-      flex: 'none',
-      minHeight: '40vh',
-      borderLeft: 'none',
-      borderTop: THEME.border,
-      maxWidth: '100%',
-    };
-  }
-  
-  if (windowWidth <= SINGLE_COLUMN_BREAKPOINT) {
-    styles.assetGrid = {
-      gridTemplateColumns: '1fr', // Switch to single column
-    };
-  }
-  
-  return styles;
-};
+// 1. Define granular steps for progress tracking
+const PROGRESS_STEPS = [
+  { id: 'preprocessing', label: 'Preprocessing' },
+  { id: 'rendering_video', label: 'Rendering Video' },
+  { id: 'generating_model', label: 'Generating 3D Asset' }
+];
+const MAJOR_STEPS = [
+  { id: 'preprocessing', label: 'Preprocessing', count: 2 },
+  { id: 'rendering_video', label: 'Rendering Video', count: 3 },
+  { id: 'generating_model', label: 'Generating GLB', count: 2 },
+];
 
 const ViewAssets = () => {
-  // Add the global animations
-  addGlobalStyle();
+  // Initialize global animations
+  useEffect(() => {
+    const cleanup = addGlobalAnimations();
+    return cleanup;
+  }, []);
   
+  // Main state
   const [assets, setAssets] = useState([]);
   const [error, setError] = useState(null);
-  const [uploadError, setUploadError] = useState(null);
-  const [uploadSuccess, setUploadSuccess] = useState(null);
+  const [notification, setNotification] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedModel, setSelectedModel] = useState(null);
-  const [hoverIndex, setHoverIndex] = useState(null);
-  const [isUploadButtonHover, setIsUploadButtonHover] = useState(false);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [isCreationPopupOpen, setIsCreationPopupOpen] = useState(false);
   const fileInputRef = useRef(null);
-  const [thumbnails, setThumbnails] = useState({});
-  const [thumbnailsRendering, setThumbnailsRendering] = useState({});
+  const [generationStatus, setGenerationStatus] = useState({
+    inProgress: false,
+    error: false,
+    errorMessage: '',
+    message: '',
+    progress: 0,
+    previewUrl: null,
+    assetName: null
+  });
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // 2. Add a state to track the current sub-step index
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+
+  // Track number of progress messages
+  const [progressCount, setProgressCount] = useState(0);
+  // Track video preview and temp model for action steps
+  const [actionVideoUrl, setActionVideoUrl] = useState(null);
+  const [actionModel, setActionModel] = useState(null);
 
   // Handle window resize
   useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-    };
-    
+    const handleResize = () => setWindowWidth(window.innerWidth);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -341,193 +79,535 @@ const ViewAssets = () => {
   // Get responsive styles
   const mobileStyles = getMobileStyles(windowWidth);
 
-  // Clear messages after 3 seconds
+  // Clear notifications after timeout
   useEffect(() => {
-    if (uploadError || uploadSuccess) {
-      const timer = setTimeout(() => {
-        setUploadError(null);
-        setUploadSuccess(null);
-      }, 3000);
-      
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 3000);
       return () => clearTimeout(timer);
     }
-  }, [uploadError, uploadSuccess]);
+  }, [notification]);
 
-  // Fetch assets function
-  const fetchAssets = useCallback(() => {
-    setIsLoading(true);
-    console.log('Fetching assets from:', 'http://localhost:3001/api/assets');
-    
-    fetch('http://localhost:3001/api/assets')
-      .then(response => {
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-          throw new Error(`Network response was not ok: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(data => {
-        console.log('Received assets data:', data);
-        setAssets(data);
-        setError(null);
-      })
-      .catch(error => {
-        console.error('Error fetching assets:', error);
-        setError('Failed to load assets. Is the backend running?');
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
+  // Generic API fetch function
+  const fetchFromApi = useCallback(async (endpoint, errorMsg) => {
+    try {
+      const response = await fetch(`${CONFIG.API.BASE_URL}${endpoint}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+      return await response.json();
+    } catch (err) {
+      console.error(`${errorMsg}:`, err);
+      setError(`${errorMsg}: ${err.message}`);
+      return null;
+    }
   }, []);
 
+  // Fetch videos for models
+  const fetchModelVideos = useCallback(async () => {
+    const data = await fetchFromApi(
+      CONFIG.API.ENDPOINTS.MODELS.VIDEOS, 
+      'Failed to fetch model videos'
+    );
+    
+    if (data && data.videoMapping) {
+      // Ensure all video paths are properly formatted and use asset_videos
+      const formattedMapping = {};
+      
+      // Process each video mapping entry
+      Object.entries(data.videoMapping).forEach(([modelId, videoPath]) => {
+        // Make sure the path starts with a slash
+        let normalizedPath = videoPath;
+        if (!normalizedPath.startsWith('/')) {
+          normalizedPath = `/${normalizedPath}`;
+        }
+        
+        // Make sure we're using asset_videos path
+        if (!normalizedPath.includes('asset_videos')) {
+          const filename = normalizedPath.split('/').pop();
+          if (filename) {
+            normalizedPath = `/assets/asset_videos/${filename}`;
+          }
+        }
+        
+        // Store the normalized path
+        formattedMapping[modelId] = normalizedPath;
+      });
+      
+      setAssets(prevAssets => 
+        prevAssets.map(asset => {
+          if (asset.id && formattedMapping[asset.id]) {
+            return {
+              ...asset,
+              videoUrl: formattedMapping[asset.id]
+            };
+          }
+          return asset;
+        })
+      );
+    }
+  }, [fetchFromApi]);
+
+  // Fetch all assets
+  const fetchAssets = useCallback(async () => {
+    setIsLoading(true);
+    
+    try {
+      const data = await fetchFromApi(
+        CONFIG.API.ENDPOINTS.MODELS.BASE, 
+        'Failed to fetch assets'
+      );
+      
+      if (!data) {
+        setIsLoading(false);
+        return;
+      }
+      
+      // Process the assets array
+      const assetArray = Array.isArray(data.models) ? data.models : (Array.isArray(data) ? data : []);
+      
+      if (assetArray.length === 0) {
+        setIsLoading(false);
+        return;
+      }
+      
+      // Filter out invalid assets (must have a GLB file)
+      const validAssets = assetArray.filter(asset => {
+        const hasGlbFile = asset.id?.toLowerCase().endsWith('.glb') || 
+                          asset.modelFile || 
+                          asset.modelPath?.includes('.glb');
+        
+        if (!hasGlbFile) {
+          console.warn(`Excluding invalid asset without GLB file:`, asset);
+        }
+        
+        return hasGlbFile;
+      });
+      
+      // Map assets with enhanced properties
+      const mapped = validAssets.map(asset => {
+        // Ensure icon paths are properly formatted
+        let thumbnailUrl = asset.icon;
+        if (thumbnailUrl && !thumbnailUrl.startsWith('http') && !thumbnailUrl.startsWith('/')) {
+          thumbnailUrl = `/${thumbnailUrl}`;
+        }
+        
+        // Ensure video paths are properly formatted
+        let videoUrl = asset.video?.path || asset.video;
+        if (videoUrl && !videoUrl.startsWith('http') && !videoUrl.startsWith('/')) {
+          videoUrl = `/${videoUrl}`;
+        }
+        
+        // Ensure we're not using asset_videos paths for icons
+        if (thumbnailUrl && thumbnailUrl.includes('asset_videos')) {
+          console.warn(`Found asset_videos in icon path: ${thumbnailUrl} - clearing it`);
+          thumbnailUrl = null;
+        }
+        
+        return {
+          ...asset,
+          id: asset.id || asset.name,
+          displayName: asset.displayName || formatFileName(asset.name || asset.id),
+          thumbnailUrl: thumbnailUrl,
+          videoUrl: videoUrl,
+          creationDate: asset.created
+        };
+      });
+      
+      setAssets(mapped);
+      
+      // Update pagination
+      setTotalPages(data.totalPages || Math.max(1, Math.ceil(mapped.length / ASSETS_PER_PAGE)));
+      if (data.currentPage) setCurrentPage(data.currentPage);
+      
+      setError(null);
+      
+      // Ensure all assets have icons by requesting them if needed
+      mapped.forEach(async (asset) => {
+        if (!asset.thumbnailUrl) {
+          try {
+            const response = await fetch(`${CONFIG.API.BASE_URL}/api/models/${asset.id}/icon`);
+            if (response.ok) {
+              const iconData = await response.json();
+              if (iconData.iconPath) {
+                setAssets(prevAssets => 
+                  prevAssets.map(a => 
+                    a.id === asset.id 
+                      ? { ...a, thumbnailUrl: iconData.iconPath } 
+                      : a
+                  )
+                );
+              }
+            }
+          } catch (err) {
+            // Ignore any errors - this is just a background icon generation
+          }
+        }
+      });
+    } catch (err) {
+      console.error('Error in fetchAssets:', err);
+      setError(`Failed to fetch assets: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchFromApi]);
+
+  // Initial fetch and reconnection attempts
   useEffect(() => {
     fetchAssets();
     
-    // Set up polling to check for server availability
-    const interval = setInterval(() => {
-      if (error) {
-        console.log('Retrying connection to server...');
-        fetchAssets();
-      }
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, [fetchAssets, error]);
-
-  // Upload logic
-  const onDrop = useCallback(acceptedFiles => {
-    setUploadError(null);
-    setUploadSuccess(null);
-    const file = acceptedFiles[0];
-    if (!file) return;
-
-    // Basic validation
-    if (!file.name.toLowerCase().endsWith('.glb')) {
-      setUploadError('Only .glb files are allowed.');
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('asset', file);
-
-    console.log('Uploading file:', file.name);
-    
-    fetch('http://localhost:3001/upload', {
-      method: 'POST',
-      body: formData,
-    })
-    .then(response => {
-        console.log('Upload response status:', response.status);
-        if (!response.ok) {
-            return response.json().then(errData => {
-                throw new Error(errData.error || `HTTP error! status: ${response.status}`);
-            }).catch(() => {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            });
-        }
-        return response.json();
-    })
-    .then(data => {
-      console.log('Upload successful:', data);
-      setUploadSuccess(`Successfully uploaded ${file.name}!`);
-      fetchAssets();
-    })
-    .catch(error => {
-      console.error('Error uploading asset:', error);
-      setUploadError(`Upload failed: ${error.message}`);
-    });
+    // Retry connection if error occurred
+    const interval = error ? setInterval(fetchAssets, 5000) : null;
+    return () => interval && clearInterval(interval);
   }, [fetchAssets]);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: '.glb',
-    multiple: false
-  });
-
-  // Get URL for model based on its source directory
-  const getModelUrl = (asset) => {
-    return `http://localhost:3001/${asset.source}/${asset.name}`;
-  };
-
-  // Handle thumbnail rendering completion
-  const handleThumbnailRendered = (assetName, thumbnailUrl) => {
-    console.log(`Thumbnail generated for ${assetName}`);
-    setThumbnails(prev => ({
-      ...prev,
-      [assetName]: thumbnailUrl
-    }));
-    setThumbnailsRendering(prev => ({
-      ...prev,
-      [assetName]: false
-    }));
-  };
-
-  // Handle thumbnail rendering error
-  const handleThumbnailError = (assetName, error) => {
-    console.error(`Error generating thumbnail for ${assetName}:`, error);
-    setThumbnailsRendering(prev => ({
-      ...prev,
-      [assetName]: false
-    }));
-  };
+  
+  // Fetch model videos separately
+  useEffect(() => {
+    if (!isLoading && assets.length > 0) {
+      fetchModelVideos();
+    }
+    // Only run when assets are first loaded, not on every assets change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchModelVideos, isLoading]);
 
   // Format filename without extension
   const formatFileName = (fileName) => {
-    return fileName.replace(/\.glb$/i, '');
+    return fileName.replace(/\.glb$/i, '').replace(/_[a-f0-9]{8}$/i, '');
   };
 
-  // Handle upload button click
-  const handleUploadButtonClick = () => {
-    fileInputRef.current.click();
+  // Get URL for model
+  const getModelUrl = (asset) => {
+    const modelId = asset.id || asset.name;
+    const url = `${CONFIG.API.BASE_URL}/${CONFIG.API.ASSET_PATHS.MODELS}/${modelId}`;
+    return url;
   };
 
-  // Handle file input change
-  const handleFileInputChange = (event) => {
-    const files = event.target.files;
-    if (files.length > 0) {
-      onDrop([files[0]]);
+  // Handle file upload
+  const handleFileUpload = useCallback(async (file) => {
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.name.toLowerCase().endsWith('.glb')) {
+      setNotification({ type: 'error', message: 'Only .glb files are allowed.' });
+      return;
     }
-  };
 
-  // Add this function after getModelUrl to handle model loading errors
+    // Create form data
+    const formData = new FormData();
+    formData.append('model', file);
+    
+    try {
+      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.MODELS.UPLOAD}`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Upload failed: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setNotification({ type: 'success', message: `Successfully uploaded ${file.name}!` });
+      setCurrentPage(1);
+      fetchAssets();
+    } catch (err) {
+      console.error('Error uploading asset:', err);
+      setNotification({ type: 'error', message: err.message });
+    }
+  }, [fetchAssets]);
+
+  // Dropzone integration
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: acceptedFiles => handleFileUpload(acceptedFiles[0]),
+    accept: {
+      'model/gltf-binary': ['.glb']
+    },
+    multiple: false
+  });
+
+  // Handle model loading error
   const handleModelError = (errorMessage) => {
-    console.error('Model loading error:', errorMessage);
-    setError(`Failed to load model: ${errorMessage}`);
-    // Optionally reset the selected model after a short delay
+    setNotification({ type: 'error', message: `Failed to load model: ${errorMessage}` });
     setTimeout(() => {
       setSelectedModel(null);
-      setError(null);
     }, 3000);
   };
 
-  // Queue thumbnails for rendering when assets change
-  useEffect(() => {
-    if (assets.length > 0) {
-      // Mark all thumbnails as being rendered
-      const renderingState = {};
-      assets.forEach(asset => {
-        // Only start rendering if we don't already have this thumbnail
-        if (!thumbnails[asset.name]) {
-          renderingState[asset.name] = true;
-        }
-      });
-      setThumbnailsRendering(renderingState);
+  // Handle model loading error for the action model preview
+  const handleActionModelError = (errorMessage) => {
+    setNotification({ type: 'error', message: `Failed to load preview model: ${errorMessage}` });
+    setActionModel(null); // Clear the action model on error
+  };
+
+  // Helper: map backend info to sub-step index
+  const getStepIndexFromBackend = (info) => {
+    console.log('[DEBUG-STEP-INDEX] Determining step index from:', info);
+    // You may want to refine this mapping based on backend messages
+    const msg = (info.message || '').toLowerCase();
+    const step = (info.step || '').toLowerCase();
+    if (step.includes('preprocess')) {
+      if (msg.includes('1') || msg.includes('start')) return 0;
+      return 1;
     }
-  }, [assets, thumbnails]);
+    if (step.includes('rendering video')) {
+      if (msg.includes('1') || msg.includes('start')) return 2;
+      if (msg.includes('2')) return 3;
+      return 4;
+    }
+    if (step.includes('generating glb') || step.includes('generating 3d asset')) {
+      if (msg.includes('1') || msg.includes('mesh')) return 5;
+      return 6;
+    }
+    // fallback: use progress
+    if (info.progress !== undefined) {
+      return Math.floor((info.progress / 100) * (PROGRESS_STEPS.length - 1));
+    }
+    return 0;
+  };
+
+  // Handle asset creation events from AssetCreationPopup
+  const handleAssetCreated = (info) => {
+    if (info.formData && info.apiUrl) {
+      setProgressCount(0); // Reset on new generation
+      setActionVideoUrl(null);
+      setActionModel(null);
+      initiateAssetGeneration(info);
+      return;
+    }
+    // Handle 'action' status messages
+    if (info.status === 'action') {
+      let isMounted = true;
+      setTimeout(() => { isMounted = false; }, 10000); // 10s safety window
+      if (info.step === 'video saved' && info.modelId) {
+        setActionModel(null); // Clear model preview immediately
+        // Use modelId from backend for video fetch
+        fetch(`${CONFIG.API.BASE_URL}/api/models/${info.modelId}/video`)
+          .then(res => res.json())
+          .then(data => {
+            if (isMounted && data.videoPath) {
+              // Ensure the video path is absolute or correctly prefixed
+              let videoSrc = data.videoPath;
+              if (!videoSrc.startsWith('http') && !videoSrc.startsWith('/')) {
+                videoSrc = `/${videoSrc}`;
+              }
+              if (!videoSrc.startsWith('http')) {
+                videoSrc = `${CONFIG.API.BASE_URL}${videoSrc}`;
+              }
+              setActionVideoUrl(videoSrc);
+            }
+          })
+          .catch(err => {
+            console.error("Error fetching action video:", err);
+            if (isMounted) setNotification({ type: 'error', message: 'Could not load preview video.' });
+          });
+      } else if (info.step === 'glb saved' && info.modelId) {
+        setActionVideoUrl(null); // Clear video preview immediately
+        // Use modelId from backend for model fetch
+        fetch(`${CONFIG.API.BASE_URL}/api/models/${info.modelId}`)
+          .then(res => res.json())
+          .then(data => {
+            if (isMounted && data) { // Check if data is not null/undefined
+              setActionModel({
+                id: data.id, // Ensure id is present
+                name: data.name,
+                displayName: data.displayName || data.name, // Use displayName if available
+                ...data
+              });
+            } else if (isMounted) {
+              throw new Error("Model data not found after GLB saved.");
+            }
+          })
+          .catch(err => {
+            console.error("Error fetching action model:", err);
+            if (isMounted) {
+              setNotification({ type: 'error', message: 'Could not load preview model.' });
+              setActionModel(null); // Ensure model is cleared on error
+            }
+          });
+      }
+    }
+    // If this is a progress message, increment the count (max 7)
+    if (info.inProgress && info.message && info.error !== true && info.success !== true && info.status === 'progress') {
+      setProgressCount(prev => Math.min(prev + 1, 7));
+    }
+    setGenerationStatus(prev => ({
+      ...prev,
+      inProgress: info.inProgress || (!info.success && !info.error),
+      error: !!info.error,
+      errorMessage: info.errorMessage || '',
+      message: info.message || '',
+      progress: info.progress !== undefined ? info.progress : prev.progress,
+      previewUrl: info.videoUrl || prev.previewUrl,
+      assetName: info.assetName || prev.assetName,
+      status: info.status,
+      step: info.step
+    }));
+    if (info.success) {
+      setNotification({ type: 'success', message: '3D Asset generated successfully!' });
+      setIsCreationPopupOpen(false);
+      setTimeout(fetchAssets, 1000);
+    } else if (info.error) {
+      setNotification({ type: 'error', message: info.errorMessage || 'Asset generation failed' });
+    }
+  };
+
+  // Streaming handler: just update progress/message as they come in
+  const initiateAssetGeneration = async ({ formData, apiUrl, abortController }) => {
+    try {
+      const response = await fetch(apiUrl, { method: 'POST', body: formData, signal: abortController?.signal });
+      if (!response.ok) throw new Error((await response.json()).message || response.statusText);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        // Try to extract JSON from buffer (very simple, expects one JSON per chunk)
+        const matches = buffer.match(/\{[\s\S]*?\}/g);
+        if (matches) {
+          matches.forEach(jsonStr => {
+            try {
+              const data = JSON.parse(jsonStr);
+              handleAssetCreated({
+                inProgress: data.status === 'progress',
+                error: data.status === 'error',
+                errorMessage: data.status === 'error' ? data.message : '',
+                message: data.message,
+                progress: undefined, // progress is now handled by progressCount
+                videoUrl: data.videoUrl,
+                assetName: data.glbFile,
+                status: data.status
+              });
+            } catch {}
+          });
+          buffer = '';
+        }
+      }
+    } catch (error) {
+      handleAssetCreated({ error: true, errorMessage: error.message });
+    }
+  };
+
+  // Handle page change
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
+      setCurrentPage(newPage);
+    }
+  };
+
+  // Get paginated assets
+  const getPaginatedAssets = useMemo(() => {
+    if (Array.isArray(assets)) {
+      const startIndex = (currentPage - 1) * ASSETS_PER_PAGE;
+      const endIndex = startIndex + ASSETS_PER_PAGE;
+      return assets.slice(startIndex, endIndex);
+    }
+    return [];
+  }, [assets, currentPage]);
+
+  // Update model name
+  const handleModelNameChange = useCallback(async (newName) => {
+    if (!selectedModel) return;
+    
+    try {
+      // Create update data
+      const updateData = {
+        name: newName
+      };
+      
+      // Send update to backend
+      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.MODELS.BASE}/${selectedModel.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+      
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Update failed: ${response.status}`);
+      }
+      
+      // Update the local state
+      setAssets(prevAssets => 
+        prevAssets.map(asset => {
+          if (asset.id === selectedModel.id) {
+            return { 
+              ...asset, 
+              name: newName,
+              displayName: newName
+            };
+          }
+          return asset;
+        })
+      );
+      
+      // Update selected model
+      setSelectedModel(prev => ({
+        ...prev,
+        name: newName,
+        displayName: newName
+      }));
+      
+      setNotification({ type: 'success', message: 'Model name updated' });
+    } catch (err) {
+      console.error('Error updating model name:', err);
+      setNotification({ type: 'error', message: err.message });
+    }
+  }, [selectedModel]);
+
+  // Render asset thumbnail with explicit debugging
+  const renderAssetThumbnail = (asset) => { 
+    if (asset.thumbnailUrl) {
+      let thumbnailSrc;
+      if (asset.thumbnailUrl.startsWith('http') || asset.thumbnailUrl.startsWith('data:')) {
+        thumbnailSrc = asset.thumbnailUrl;
+      } else {
+        // Ensure leading slash for relative paths
+        thumbnailSrc = `${CONFIG.API.BASE_URL}${asset.thumbnailUrl.startsWith('/') ? '' : '/'}${asset.thumbnailUrl}`;
+      }
+      
+      return (
+        <div style={styles.assetThumbnail}>
+          <img 
+            src={thumbnailSrc}
+            alt={asset.displayName || asset.name || asset.id}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={(e) => {
+              e.currentTarget.dataset.thumbnailError = 'true';
+              e.target.onerror = null; 
+              const parent = e.currentTarget.parentNode;
+              if (parent) {
+                parent.innerHTML = '<span style="font-size: 24px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">📦</span>';
+              }
+            }}
+          />
+        </div>
+      );
+    }
+
+    // Priority 2: Default placeholder icon if no image thumbnail is available
+    // Video is not used as a fallback for the static grid icon.
+    return (
+      <div style={styles.assetThumbnail}>
+        <span style={{ fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>📦</span>
+      </div>
+    );
+  };
 
   return (
     <div style={{...styles.container, ...mobileStyles.container}}>
       {/* Left panel - Visualization */}
       <div style={{...styles.visualizationPanel, ...mobileStyles.visualizationPanel}}>
-        {/* Messages - Notifications */}
-        {uploadError && (
-          <div style={{...styles.message, ...styles.error}}>
-            {uploadError}
-          </div>
-        )}
-        {uploadSuccess && (
-          <div style={{...styles.message, ...styles.success}}>
-            {uploadSuccess}
+        {/* Notification message */}
+        {notification && (
+          <div style={{
+            ...styles.message, 
+            ...(notification.type === 'error' ? styles.error : styles.success)
+          }}>
+            {notification.message}
           </div>
         )}
 
@@ -536,11 +616,100 @@ const ViewAssets = () => {
             <div style={styles.spinner}></div>
             <p style={styles.loadingText}>Loading assets...</p>
           </div>
+        ) : generationStatus.inProgress || generationStatus.error ? (
+          /* Generation Progress Display */
+          <div style={styles.generationContainer}>
+            <div style={styles.generationHeader}>
+              {!generationStatus.error && <div style={styles.generationSpinner}></div>}
+              <h3 style={styles.generationTitle}>
+                {generationStatus.error ? 'Generation Failed' : 'Generating 3D Asset'}
+              </h3>
+            </div>
+            {generationStatus.error ? (
+              <>
+                <div style={styles.generationError}>
+                  {generationStatus.errorMessage || 'An error occurred during generation'}
+                </div>
+                <Button 
+                  variant="secondary"
+                  onClick={() => {
+                    setGenerationStatus({ 
+                      inProgress: false, error: false, errorMessage: '', 
+                      message: '', progress: 0, previewUrl: null, assetName: null 
+                    });
+                    setActionVideoUrl(null);
+                    setActionModel(null);
+                  }}
+                >
+                  Close
+                </Button>
+              </>
+            ) : (
+              <>
+                {/* Progress Bar */}
+                <div style={styles.progress.stepsContainer}>
+                  <div style={styles.progress.progressLine}></div>
+                  <div 
+                    style={{
+                      ...styles.progress.progressFill,
+                      width: `${(progressCount / 7) * 100}%`,
+                      transition: 'width 0.7s cubic-bezier(.4,1.4,.6,1)',
+                      boxShadow: '0 0 16px 2px #00aaff88',
+                    }}
+                  ></div>
+                </div>
+                <div style={styles.progress.statusMessage}>
+                  {generationStatus.message || 'Processing...'}
+                </div>
+                {/* Render video if available from action */}
+                {actionVideoUrl && !actionModel && (
+                  <div style={styles.generationPreviewContainer}>
+                    <video 
+                      src={actionVideoUrl}
+                      style={styles.generationPreviewVideo}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      controls
+                    />
+                  </div>
+                )}
+                {/* Render model viewer if GLB saved and model data is available */}
+                {actionModel && (
+                  <ModelViewer 
+                    modelUrl={getModelUrl(actionModel)} // Use getModelUrl for consistency
+                    modelName={actionModel.displayName || actionModel.name}
+                    modelId={actionModel.id}
+                    onError={handleActionModelError} // Use dedicated error handler
+                    // onModelNameChange is not needed for this temporary preview
+                  />
+                )}
+                {/* Fallback to previewUrl if present and not overridden by action video or model */}
+                {!actionVideoUrl && !actionModel && generationStatus.previewUrl && (
+                  <div style={styles.generationPreviewContainer}>
+                    <video 
+                      src={generationStatus.previewUrl}
+                      style={styles.generationPreviewVideo}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      controls
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         ) : selectedModel ? (
           /* 3D Model Viewer */
           <ModelViewer 
             modelUrl={getModelUrl(selectedModel)} 
+            modelName={selectedModel.displayName || selectedModel.name}
+            modelId={selectedModel.id}
             onError={handleModelError}
+            onModelNameChange={handleModelNameChange}
           />
         ) : (
           /* Dropzone when no model is selected */
@@ -558,9 +727,7 @@ const ViewAssets = () => {
             ) : (
               <>
                 <p style={styles.dropzoneText}>
-                  {assets.length > 0 
-                    ? "Click an asset or upload here" 
-                    : "Upload some assets here!"}
+                  {assets.length > 0 ? "Click an asset or upload here" : "Upload some assets here!"}
                 </p>
                 <p style={styles.dropzoneSubText}>
                   Drag & drop a .glb file or click to browse
@@ -575,6 +742,29 @@ const ViewAssets = () => {
       <div style={{...styles.assetListPanel, ...mobileStyles.assetListPanel}}>
         <h3 style={styles.assetListHeader}>Your 3D Models</h3>
         
+        {/* Pagination controls */}
+        {assets.length > 0 && !error && (
+          <div style={styles.paginationControls}>
+            <Button 
+              variant="icon"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              &lt;
+            </Button>
+            <span style={styles.pageIndicator}>
+              {currentPage} / {totalPages}
+            </span>
+            <Button 
+              variant="icon"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              &gt;
+            </Button>
+          </div>
+        )}
+        
         {/* Scrollable asset grid */}
         <div style={styles.assetListContainer}>
           {error ? (
@@ -583,47 +773,17 @@ const ViewAssets = () => {
             </div>
           ) : assets.length > 0 ? (
             <div style={{...styles.assetGrid, ...mobileStyles.assetGrid}}>
-              {assets.map((asset, index) => (
+              {getPaginatedAssets.map((asset, index) => (
                 <div 
-                  key={index} 
+                  key={asset.id || index} 
                   style={{
                     ...styles.assetItem,
-                    ...(hoverIndex === index ? styles.assetItemHover : {}),
-                    ...(selectedModel && selectedModel.name === asset.name ? styles.assetItemSelected : {})
+                    ...(selectedModel && (selectedModel.id === asset.id || selectedModel.name === asset.name) ? styles.assetItemSelected : {})
                   }}
-                  onMouseEnter={() => setHoverIndex(index)}
-                  onMouseLeave={() => setHoverIndex(null)}
                   onClick={() => setSelectedModel(asset)}
                 >
-                  <div 
-                    style={{
-                      ...styles.assetThumbnail,
-                      ...(thumbnails[asset.name] ? {
-                        backgroundImage: `url(${thumbnails[asset.name]})`,
-                        fontSize: 0, // Hide the emoji when we have a thumbnail
-                      } : {})
-                    }}
-                  >
-                    {!thumbnails[asset.name] && !thumbnailsRendering[asset.name] && '🧊'}
-                    
-                    {/* Loading indicator */}
-                    {thumbnailsRendering[asset.name] && (
-                      <div style={styles.thumbnailLoading}>
-                        <div style={styles.thumbnailSpinner}></div>
-                      </div>
-                    )}
-                  </div>
-                  <div style={styles.assetName}>{formatFileName(asset.name)}</div>
-                  
-                  {/* Render thumbnails in the background */}
-                  {thumbnailsRendering[asset.name] && (
-                    <ThumbnailRenderer
-                      modelUrl={getModelUrl(asset)}
-                      onRendered={(thumbnailUrl) => handleThumbnailRendered(asset.name, thumbnailUrl)}
-                      onError={(error) => handleThumbnailError(asset.name, error)}
-                      size={120} // Higher resolution for better quality
-                    />
-                  )}
+                  {renderAssetThumbnail(asset)}
+                  <div style={styles.assetName}>{asset.displayName || formatFileName(asset.name)}</div>
                 </div>
               ))}
             </div>
@@ -632,25 +792,46 @@ const ViewAssets = () => {
           )}
         </div>
         
-        {/* Upload button */}
-        <div 
-          style={{
-            ...styles.uploadButton,
-            ...(isUploadButtonHover ? styles.uploadButtonHover : {})
-          }}
-          onMouseEnter={() => setIsUploadButtonHover(true)}
-          onMouseLeave={() => setIsUploadButtonHover(false)}
-          onClick={handleUploadButtonClick}
-        >
-          <span style={{ marginRight: '8px' }}>Upload New Model</span>
-          <span>+</span>
+        {/* Button Container with Upload and Create buttons */}
+        <div style={styles.buttonContainer}>
+          <Button
+            variant="secondary"
+            onClick={() => fileInputRef.current.click()}
+            style={{ 
+              width: '100%', 
+              padding: '12px 24px',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <span>Upload Model</span>
+            <span>+</span>
+          </Button>
+          
+          <Button
+            variant="primary"
+            onClick={() => setIsCreationPopupOpen(true)}
+            style={{ width: '100%', padding: '12px 24px' }}
+          >
+            Create 3D Asset
+          </Button>
         </div>
+        
         <input 
           type="file" 
           ref={fileInputRef}
           style={{ display: 'none' }}
-          accept=".glb"
-          onChange={handleFileInputChange}
+          accept=".glb,model/gltf-binary"
+          onChange={(e) => handleFileUpload(e.target.files[0])}
+        />
+        
+        {/* Asset Creation Popup */}
+        <AssetCreationPopup 
+          isOpen={isCreationPopupOpen}
+          onClose={() => setIsCreationPopupOpen(false)}
+          onAssetCreated={handleAssetCreated}
         />
       </div>
     </div>

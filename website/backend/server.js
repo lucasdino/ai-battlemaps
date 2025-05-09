@@ -1,155 +1,106 @@
+/**
+ * Main server application that sets up the Express server with all routes and middleware.
+ */
 const express = require('express');
-const cors = require('cors');
-const path = require('path');
 const fs = require('fs');
-const multer = require('multer');
+const path = require('path');
+const CONFIG = require('./config/config');
+const ModelMetadataUtil = require('./utils/modelMetadataUtil');
 
+// Import middleware and router utilities
+const { setupCommonMiddleware, setupStaticServing } = require('./utils/middleware');
+const { setupRouters } = require('./utils/router');
+
+// Require routers
+const modelsApiRouter = require('./routes/modelsApi');
+const imagesRouter = require('./routes/images');
+const trellisRouter = require('./routes/trellis');
+const systemPromptRouter = require('./routes/systemPrompt');
+const debugRouter = require('./routes/debug');
+
+// Initialize Express app
 const app = express();
-const port = 3001; // Backend runs on a different port than frontend
+const port = CONFIG.PORT;
 
-// Ensure assets directory exists
-const assetsDir = path.join(__dirname, 'assets');
-if (!fs.existsSync(assetsDir)){
-    fs.mkdirSync(assetsDir, { recursive: true });
-    console.log(`Created assets directory at ${assetsDir}`);
-}
+// Ensure all necessary directories exist
+const ensureDirectoriesExist = () => {
+  const directories = [
+    CONFIG.DIRECTORIES.ASSETS_ROOT,
+    CONFIG.DIRECTORIES.MODELS,
+    CONFIG.DIRECTORIES.MODEL_ICONS,
+    CONFIG.DIRECTORIES.DATA,
+    CONFIG.DIRECTORIES.IMAGES,
+    CONFIG.DIRECTORIES.ASSET_VIDEOS
+  ];
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)){
-    fs.mkdirSync(uploadsDir, { recursive: true });
-    console.log(`Created uploads directory at ${uploadsDir}`);
-}
-
-// Expanded CORS configuration
-app.use(cors({
-  origin: '*', // Allow all origins
-  methods: ['GET', 'POST'], // Allow GET and POST
-  allowedHeaders: ['Content-Type'], // Allow Content-Type header
-}));
-
-// Add middleware to parse JSON
-app.use(express.json());
-
-// Multer setup for file storage in the uploads directory
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir); // Store files in the 'uploads' directory
-  },
-  filename: function (req, file, cb) {
-    // Keep original filename
-    // Consider adding logic to prevent overwrites or sanitize names if needed
-    cb(null, file.originalname);
-  }
-});
-
-const upload = multer({
-  storage: storage,
-  fileFilter: (req, file, cb) => {
-    // Accept only .glb files
-    if (path.extname(file.originalname).toLowerCase() === '.glb') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only .glb files are allowed!'), false);
+  directories.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      console.log(`Creating directory: ${dir}`);
+      fs.mkdirSync(dir, { recursive: true });
+      
+      // Add a .gitkeep file to ensure the directory is tracked by git
+      const gitkeepPath = path.join(dir, '.gitkeep');
+      if (!fs.existsSync(gitkeepPath)) {
+        fs.writeFileSync(gitkeepPath, '# This file ensures the directory is tracked by git\n');
+        console.log(`Added .gitkeep file to ${dir}`);
+      }
     }
-  }
+  });
+};
+
+// Call the function before setting up routes
+ensureDirectoriesExist();
+
+// Initialize the metadata file
+ModelMetadataUtil.initMetadataFile();
+
+// Initialize the system prompt file if it doesn't exist
+if (!fs.existsSync(CONFIG.SYSTEM_PROMPT_FILE)) {
+  fs.writeFileSync(
+    CONFIG.SYSTEM_PROMPT_FILE, 
+    JSON.stringify({ 
+      systemPrompt: CONFIG.IMAGE_GENERATION.DEFAULT_SYSTEM_PROMPT 
+    }, null, 2)
+  );
+  console.log(`Created system prompt file at ${CONFIG.SYSTEM_PROMPT_FILE}`);
+}
+
+// Setup common middleware (CORS, JSON parsing)
+setupCommonMiddleware(app);
+
+// Setup static file serving for assets
+setupStaticServing(app);
+
+// Setup all API routers using the unified models API
+setupRouters(app, {
+  modelsApi: modelsApiRouter,
+  images: imagesRouter, 
+  trellis: trellisRouter,
+  systemPrompt: systemPromptRouter,
+  debug: debugRouter
 });
 
-// Updated route to list assets from both assets and uploads directories
-app.get('/api/assets', (req, res) => {
-  console.log('Received request to list assets');
-  
-  // Helper function to read and filter GLB files
-  const readGlbFiles = (directory) => {
-    return new Promise((resolve, reject) => {
-      fs.readdir(directory, (err, files) => {
-        if (err) {
-          console.error(`Could not list the directory ${directory}.`, err);
-          reject(err);
-          return;
-        }
-        // Filter for .glb files
-        const glbFiles = files
-          .filter(file => path.extname(file).toLowerCase() === '.glb')
-          .map(file => {
-            // Add source information to each file
-            return {
-              name: file,
-              source: path.basename(directory)
-            };
-          });
-        resolve(glbFiles);
-      });
-    });
+// Add a verification endpoint to check if the server is running
+app.get('/api/status', (req, res) => {
+  const status = {
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      models: '/api/models',
+      trellis: CONFIG.ENDPOINTS.TRELLIS,
+      generateImage: CONFIG.ENDPOINTS.GENERATE_IMAGE
+    },
+    staticPaths: {
+      models: '/assets/3d_models',
+      modelIcons: '/assets/3d_model_icons',
+      images: '/assets/images',
+      assetVideos: '/assets/asset_videos'
+    }
   };
-
-  // Read both directories and combine results
-  Promise.all([
-    readGlbFiles(assetsDir),
-    readGlbFiles(uploadsDir)
-  ])
-    .then(([assetsFiles, uploadsFiles]) => {
-      const allFiles = [...assetsFiles, ...uploadsFiles];
-      console.log(`Found ${allFiles.length} GLB files total`);
-      res.json(allFiles);
-    })
-    .catch(error => {
-      console.error("Error listing assets:", error);
-      res.status(500).send("Server error listing assets.");
-    });
+  res.json(status);
 });
 
-// Re-add file upload endpoint
-app.post('/upload', upload.single('asset'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).send('No file uploaded or file type not allowed.');
-  }
-  console.log('Uploaded file:', req.file.filename);
-  // Send back success message or the filename
-  res.json({ message: 'File uploaded successfully', filename: req.file.filename });
-}, (error, req, res, next) => {
-    // Handle Multer errors (e.g., wrong file type)
-    if (error instanceof multer.MulterError) {
-        // A Multer error occurred when uploading.
-        return res.status(500).json({ error: error.message });
-    } else if (error) {
-        // An unknown error occurred when uploading.
-        return res.status(400).json({ error: error.message }); // Use the error message from fileFilter
-    }
-    // Everything went fine.
-    next();
-});
-
-// Add a more detailed error handler
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).send('Server error');
-});
-
-// Serve static assets from both directories
-app.use('/assets', express.static(assetsDir, {
-  setHeaders: (res, path) => {
-    // Set appropriate headers for GLB files
-    if (path.endsWith('.glb')) {
-      res.setHeader('Content-Type', 'model/gltf-binary');
-    }
-  }
-}));
-
-app.use('/uploads', express.static(uploadsDir, {
-  setHeaders: (res, path) => {
-    // Set appropriate headers for GLB files
-    if (path.endsWith('.glb')) {
-      res.setHeader('Content-Type', 'model/gltf-binary');
-    }
-  }
-}));
-
-// Basic route
-app.get('/', (req, res) => {
-  res.send('Backend server is running!');
-});
-
+// Start the server
 app.listen(port, () => {
   console.log(`Backend server listening at http://localhost:${port}`);
 }); 

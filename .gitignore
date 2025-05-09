@@ -1,5 +1,9 @@
 # User-Specific Folders / etc. (for Infinigen since compatability issues between Mac/Linux/Windows)
 lucas_windows/
+infinigen/
+
+# API Keys
+apiKeys.js
 
 # Logs
 logs

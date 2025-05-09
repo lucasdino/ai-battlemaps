@@ -1,0 +1,122 @@
+{
+  "mecharaptor_1746774756493_38ceab47.glb": {
+    "name": "mecharaptor_1746774756493_38ceab47",
+    "type": "image_to_3d",
+    "source": "uploaded_image",
+    "sourceImage": {
+      "file": "image-1746774756498-668283927.png",
+      "path": "/assets/images/image-1746774756498-668283927.png",
+      "source": "uploaded_image"
+    },
+    "status": "complete",
+    "created": 1746774756914,
+    "updated": 1746774808274,
+    "video": {
+      "file": "mecharaptor_1746774756493-preview.mp4",
+      "path": "/assets/asset_videos/mecharaptor_1746774756493-preview.mp4"
+    },
+    "modelFile": "mecharaptor_1746774756493_38ceab47.glb",
+    "modelPath": "/assets/3d_models/mecharaptor_1746774756493_38ceab47.glb",
+    "completed": 1746774808274,
+    "icon": {
+      "file": "mecharaptor_1746774756493_38ceab47.png",
+      "path": "/assets/3d_model_icons/mecharaptor_1746774756493_38ceab47.png"
+    }
+  },
+  "foxy_1746775252575_17e5d7fe.glb": {
+    "name": "foxy_1746775252575_17e5d7fe",
+    "type": "image_to_3d",
+    "source": "uploaded_image",
+    "sourceImage": {
+      "file": "image-1746775252580-322476322.png",
+      "path": "/assets/images/image-1746775252580-322476322.png",
+      "source": "uploaded_image"
+    },
+    "status": "complete",
+    "created": 1746775253003,
+    "updated": 1746775307137,
+    "video": {
+      "file": "foxy_1746775252575-preview.mp4",
+      "path": "/assets/asset_videos/foxy_1746775252575-preview.mp4"
+    },
+    "modelFile": "foxy_1746775252575_17e5d7fe.glb",
+    "modelPath": "/assets/3d_models/foxy_1746775252575_17e5d7fe.glb",
+    "completed": 1746775307137,
+    "icon": {
+      "file": "foxy_1746775252575_17e5d7fe.png",
+      "path": "/assets/3d_model_icons/foxy_1746775252575_17e5d7fe.png"
+    }
+  },
+  "mecharaptor_1746775505457_76024bd8.glb": {
+    "name": "mecharaptor_1746775505457_76024bd8",
+    "type": "image_to_3d",
+    "source": "uploaded_image",
+    "sourceImage": {
+      "file": "image-1746775505462-301214917.png",
+      "path": "/assets/images/image-1746775505462-301214917.png",
+      "source": "uploaded_image"
+    },
+    "status": "complete",
+    "created": 1746775505879,
+    "updated": 1746775563055,
+    "video": {
+      "file": "mecharaptor_1746775505457-preview.mp4",
+      "path": "/assets/asset_videos/mecharaptor_1746775505457-preview.mp4"
+    },
+    "modelFile": "mecharaptor_1746775505457_76024bd8.glb",
+    "modelPath": "/assets/3d_models/mecharaptor_1746775505457_76024bd8.glb",
+    "completed": 1746775563054,
+    "icon": {
+      "file": "mecharaptor_1746775505457_76024bd8.png",
+      "path": "/assets/3d_model_icons/mecharaptor_1746775505457_76024bd8.png"
+    }
+  },
+  "generated-1746775734755-8423_1746775759407_b13e5406.glb": {
+    "name": "generated-1746775734755-8423_1746775759407_b13e5406",
+    "type": "image_to_3d",
+    "source": "uploaded_image",
+    "sourceImage": {
+      "file": "image-1746775759432-593912223.png",
+      "path": "/assets/images/image-1746775759432-593912223.png",
+      "source": "uploaded_image"
+    },
+    "status": "complete",
+    "created": 1746775759999,
+    "updated": 1746775808304,
+    "video": {
+      "file": "generated-1746775734755-8423_1746775759407-preview.mp4",
+      "path": "/assets/asset_videos/generated-1746775734755-8423_1746775759407-preview.mp4"
+    },
+    "modelFile": "generated-1746775734755-8423_1746775759407_b13e5406.glb",
+    "modelPath": "/assets/3d_models/generated-1746775734755-8423_1746775759407_b13e5406.glb",
+    "completed": 1746775808303,
+    "icon": {
+      "file": "generated-1746775734755-8423_1746775759407_b13e5406.png",
+      "path": "/assets/3d_model_icons/generated-1746775734755-8423_1746775759407_b13e5406.png"
+    }
+  },
+  "generated-1746776383332-262975_1746776403151_d0782152.glb": {
+    "name": "generated-1746776383332-262975_1746776403151_d0782152",
+    "type": "image_to_3d",
+    "source": "uploaded_image",
+    "sourceImage": {
+      "file": "image-1746776403176-281959106.png",
+      "path": "/assets/images/image-1746776403176-281959106.png",
+      "source": "uploaded_image"
+    },
+    "status": "complete",
+    "created": 1746776403753,
+    "updated": 1746776471801,
+    "video": {
+      "file": "generated-1746776383332-262975_1746776403151-preview.mp4",
+      "path": "/assets/asset_videos/generated-1746776383332-262975_1746776403151-preview.mp4"
+    },
+    "modelFile": "generated-1746776383332-262975_1746776403151_d0782152.glb",
+    "modelPath": "/assets/3d_models/generated-1746776383332-262975_1746776403151_d0782152.glb",
+    "completed": 1746776471801,
+    "icon": {
+      "file": "generated-1746776383332-262975_1746776403151_d0782152.png",
+      "path": "/assets/3d_model_icons/generated-1746776383332-262975_1746776403151_d0782152.png"
+    }
+  }
+}

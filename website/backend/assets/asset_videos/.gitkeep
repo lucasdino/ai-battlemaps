@@ -1,0 +1,2 @@
+# This directory contains videos generated when going from image to 3D model (using TRELLIS).
+# The .gitkeep file ensures the directory is tracked by git even when empty 
