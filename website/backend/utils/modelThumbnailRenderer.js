@@ -116,12 +116,35 @@ class ModelThumbnailRenderer {
                 // Create scene
                 const scene = new THREE.Scene();
                 
-                // Add lights
-                const ambientLight = new THREE.AmbientLight(0xffffff, 3);
+                // Add lights (matching ModelViewer.jsx setup)
+                // Extremely even, bright lighting from all angles
+                const ambientLight = new THREE.AmbientLight(0xffffff, 8.0);
                 scene.add(ambientLight);
-                const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
-                directionalLight.position.set(1, 1, 1);
-                scene.add(directionalLight);
+
+                // Key directional light (main)
+                const keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
+                keyLight.position.set(3, 6, 3);
+                scene.add(keyLight);
+
+                // Fill directional light (opposite side, higher intensity)
+                const fillLight = new THREE.DirectionalLight(0xffffff, 5.0);
+                fillLight.position.set(-4, -8, -4);
+                scene.add(fillLight);
+
+                // Extra fill light from the side/below
+                const sideLight = new THREE.DirectionalLight(0xffffff, 3);
+                sideLight.position.set(0, -8, 4);
+                scene.add(sideLight);
+
+                // Fourth light from the back
+                const backLight = new THREE.DirectionalLight(0xffffff, 3);
+                backLight.position.set(0, 2, -8);
+                scene.add(backLight);
+
+                // Add another fill directional light from the right
+                const rightFillLight = new THREE.DirectionalLight(0xffffff, 3);
+                rightFillLight.position.set(8, 0, 2);
+                scene.add(rightFillLight);
                 
                 // Create camera
                 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
@@ -154,16 +177,25 @@ class ModelThumbnailRenderer {
                     const size = box.getSize(new THREE.Vector3());
                     const maxDim = Math.max(size.x, size.y, size.z);
                     const fov = camera.fov * (Math.PI / 180);
-                    let cameraZ = Math.abs(maxDim / (2 * Math.tan(fov / 2)));
                     
-                    // Add some margin 
-                    cameraZ *= 1.2;
+                    // Calculate distances needed for height and width
+                    const aspect = 1; // Square thumbnail
+                    const hfov = 2 * Math.atan(Math.tan(fov / 2) * aspect);
+                    const distanceForHeight = size.y / (2.8 * Math.tan(fov / 2));
+                    const distanceForWidth = size.x / (2.8 * Math.tan(hfov / 2));
+                    const distanceForDepth = size.z / (2.8 * Math.tan(hfov / 2));
                     
-                    // Position the camera
-                    camera.position.set(cameraZ * 0.7, cameraZ * 0.5, cameraZ * 0.6);
+                    // Use the maximum distance to ensure the entire model is visible
+                    let cameraZ = Math.max(distanceForHeight, distanceForWidth, distanceForDepth);
+                    
+                    // Minimal margin for extremely tight framing
+                    cameraZ = Math.max(cameraZ * 1.01, 1.1);
+                    
+                    // Position camera at an angle (increased Y multiplier from 0.5 to 0.7 for higher angle)
+                    camera.position.set(cameraZ * 0.8, cameraZ * 0.7, cameraZ * 1);
                     camera.lookAt(new THREE.Vector3(0, 0, 0));
                     
-                    // Rotate the model slightly for a better view
+                    // Rotate the model slightly for a better view (matching ModelViewer.jsx)
                     model.rotation.y = Math.PI / 6;
                     
                     // Render the scene

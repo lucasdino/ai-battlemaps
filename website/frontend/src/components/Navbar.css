@@ -84,14 +84,16 @@
   opacity: 0;
   transform: scaleY(1);
   transform-origin: bottom;
-  transition: opacity 0.2s;
+  transition: none;
   z-index: 5;
   image-rendering: pixelated;
+  pointer-events: none;
 }
 
 .navbar a:hover::after, .navbar-title:hover::after {
   opacity: 1;
   animation: pixelFlame 0.32s steps(1) infinite;
+  animation-fill-mode: forwards;
 }
 
 @keyframes pixelFlame {

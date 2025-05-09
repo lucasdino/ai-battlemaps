@@ -267,14 +267,17 @@ router.post(CONFIG.ENDPOINTS.TRELLIS.replace('/api', ''), imageUpload.single('im
         }
         let responsePayload;
         if (jsonData.status === 'complete') {
-            responsePayload = { 
-              status: 'complete', 
-              message: jsonData.message || 'All files generated.',
-              glbFile: jsonData.glbFile || (glbFileName ? path.basename(glbFileName) : null)
-            };
-            if (glbFileName) ModelMetadataUtil.updateModelMetadata(glbFileName, { status: 'complete' }); 
+            // Update metadata but don't send to client yet
+            if (glbFileName) {
+              ModelMetadataUtil.updateModelMetadata(glbFileName, { status: 'finalizing' });
+            }
+            // Store information to use in finalizeRequest
+            console.log(`Received 'complete' status from upstream, will send after thumbnail generation`);
+            // Skip sending this message to client
+            return;
         } else if (jsonData.status === 'progress' && jsonData.step) {
             responsePayload = { status: 'progress', step: jsonData.step, message: jsonData.message };
+            console.log('responsePayload', responsePayload);
             let internalStatus = 'processing';
             const stepLower = jsonData.step.toLowerCase();
             if (stepLower.includes("preprocess")) {
@@ -366,6 +369,41 @@ router.post(CONFIG.ENDPOINTS.TRELLIS.replace('/api', ''), imageUpload.single('im
         try {
           thumbnailInfo = await generateThumbnailForModel(glbFilePath, glbFileName);
           if (thumbnailInfo) {
+            // Notify client that the thumbnail has been saved so the UI can update immediately
+            const thumbSavedPayload = {
+              status: 'action',
+              step: 'thumbnail saved',
+              message: thumbnailInfo.filename,
+              modelId: glbFileName
+            };
+            console.log(`[SEND] application/json: ${JSON.stringify(thumbSavedPayload)}`);
+
+            // Only attempt to write if the client is still connected and the stream is open
+            if (!clientDisconnected && !res.writableEnded) {
+              res.write(`--${boundary}\r\n`);
+              res.write(`Content-Type: application/json\r\n\r\n`);
+              res.write(JSON.stringify(thumbSavedPayload));
+              res.write('\r\n');
+            }
+            
+            // Now that the thumbnail is generated and sent, send the complete status message
+            if (!clientDisconnected && !res.writableEnded) {
+              // Wait a short time to ensure the thumbnail is processed by the client
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              const completePayload = { 
+                status: 'complete', 
+                message: 'All files generated, thumbnail ready.',
+                glbFile: glbFileName ? path.basename(glbFileName) : null,
+                modelId: glbFileName
+              };
+              console.log(`[SEND] application/json: ${JSON.stringify(completePayload)}`);
+              
+              res.write(`--${boundary}\r\n`);
+              res.write(`Content-Type: application/json\r\n\r\n`);
+              res.write(JSON.stringify(completePayload));
+              res.write('\r\n');
+            }
           } else {
             console.error('Thumbnail generation returned null.');
           }
@@ -378,7 +416,7 @@ router.post(CONFIG.ENDPOINTS.TRELLIS.replace('/api', ''), imageUpload.single('im
       
       if (glbFileName) {
         const finalMetadataUpdate = {
-          status: 'complete', 
+          status: 'complete', // Set this regardless of whether we intercepted a complete message
           completed: Date.now()
         };
         if (videoFileName) { 

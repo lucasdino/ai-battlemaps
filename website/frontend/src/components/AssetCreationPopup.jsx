@@ -4,7 +4,7 @@ import CONFIG from '../config';
 import styles from '../styles/AssetCreationPopup';
 import { Button } from './common';
 
-const AssetCreationPopup = ({ isOpen, onClose, onAssetCreated }) => {
+const AssetCreationPopup = ({ isOpen, onClose, onAssetCreated, generationStatus }) => {
   const isMountedRef = useRef(true);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [uploadedImage, setUploadedImage] = useState(null);
@@ -216,6 +216,7 @@ const AssetCreationPopup = ({ isOpen, onClose, onAssetCreated }) => {
       return; 
     }
     
+    console.log('[AssetCreationPopup] Starting 3D asset generation');
     setIsGenerating(true);
     setError(null);
     setShowImageActions(false);
@@ -336,6 +337,22 @@ const AssetCreationPopup = ({ isOpen, onClose, onAssetCreated }) => {
     }
   };
 
+  // Reset generation state when popup is reopened
+  useEffect(() => {
+    if (isOpen && generationStatus && !generationStatus.inProgress) {
+      console.log('[AssetCreationPopup] Popup opened or generation completed. Reset generation state.', 
+        { isOpen, generationInProgress: generationStatus?.inProgress, isSuccess: generationStatus?.success });
+      // Reset our internal generation state when the popup is opened and no generation is in progress
+      setIsGenerating(false);
+      setCurrentGenerationId(null);
+      currentGenerationIdRef.current = null;
+      if (abortController) {
+        abortController.abort();
+        setAbortController(null);
+      }
+    }
+  }, [isOpen, generationStatus, abortController]);
+
   if (!isOpen) return null;
   if (isInitialLoading) {
     return (
@@ -354,6 +371,8 @@ const AssetCreationPopup = ({ isOpen, onClose, onAssetCreated }) => {
 
   const handleClose = () => {
     if (isGenerating && currentGenerationIdRef.current) {
+      console.log('[AssetCreationPopup] User closing dialog with active generation', 
+        { isGenerating, generationId: currentGenerationIdRef.current });
       const confirmed = window.confirm('Generation is in progress. Are you sure you want to close this dialog? The current generation process will be cancelled.');
       if (confirmed) {
         if (abortController) {
@@ -366,6 +385,7 @@ const AssetCreationPopup = ({ isOpen, onClose, onAssetCreated }) => {
         onClose();
       }
     } else {
+      console.log('[AssetCreationPopup] Closing popup, no active generation', { isGenerating });
       onClose();
     }
   };

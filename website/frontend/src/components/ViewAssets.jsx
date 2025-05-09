@@ -11,6 +11,11 @@ import { Button } from './common';
 // Constants
 const ASSETS_PER_PAGE = 9; // Number of assets to display per page
 
+// Constants for grid item dimensions (including gap)
+const GRID_ITEM_HEIGHT = 96; // Base height of each grid item (matching styles)
+const GRID_ITEM_WIDTH = 120;  // Base width of each grid item (matching styles)
+const GRID_GAP = 12; // Gap between items (matching styles)
+
 // Define the steps we'll use in this component
 const GENERATION_STEPS = [
   { id: 'preprocessing', label: 'Preprocessing' },
@@ -25,8 +30,8 @@ const PROGRESS_STEPS = [
   { id: 'generating_model', label: 'Generating 3D Asset' }
 ];
 const MAJOR_STEPS = [
-  { id: 'preprocessing', label: 'Preprocessing', count: 2 },
-  { id: 'rendering_video', label: 'Rendering Video', count: 3 },
+  { id: 'preprocessing', label: 'Preprocessing', count: 1 },
+  { id: 'rendering_video', label: 'Rendering Video', count: 2 },
   { id: 'generating_model', label: 'Generating GLB', count: 2 },
 ];
 
@@ -46,9 +51,12 @@ const ViewAssets = () => {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [isCreationPopupOpen, setIsCreationPopupOpen] = useState(false);
   const fileInputRef = useRef(null);
+  const gridContainerRef = useRef(null);
+  const [assetsPerPage, setAssetsPerPage] = useState(9);
   const [generationStatus, setGenerationStatus] = useState({
     inProgress: false,
     error: false,
+    success: false,
     errorMessage: '',
     message: '',
     progress: 0,
@@ -69,12 +77,57 @@ const ViewAssets = () => {
   const [actionVideoUrl, setActionVideoUrl] = useState(null);
   const [actionModel, setActionModel] = useState(null);
 
-  // Handle window resize
+  // Calculate assets per page based on container size
+  const calculateAssetsPerPage = useCallback(() => {
+    if (!gridContainerRef.current) return;
+
+    const container = gridContainerRef.current;
+    const containerWidth = container.clientWidth - (GRID_GAP * 2); // Account for container padding
+    const containerHeight = container.clientHeight - (GRID_GAP * 2); // Account for container padding
+
+    // Calculate how many items can fit in a row, accounting for gaps
+    const columnsPerRow = Math.max(1, Math.floor((containerWidth + GRID_GAP) / (GRID_ITEM_WIDTH + GRID_GAP)));
+    
+    // Calculate how many rows can fit, accounting for gaps
+    const rowsPerPage = Math.max(1, Math.floor((containerHeight + GRID_GAP) / (GRID_ITEM_HEIGHT + GRID_GAP)));
+
+    // Calculate total items that can fit
+    const itemsPerPage = columnsPerRow * rowsPerPage;
+    
+    // Update assets per page if it's different
+    if (itemsPerPage !== assetsPerPage) {
+      setAssetsPerPage(itemsPerPage);
+      // Adjust current page if necessary to keep items in view
+      const newTotalPages = Math.max(1, Math.ceil(assets.length / itemsPerPage));
+      if (currentPage > newTotalPages) {
+        setCurrentPage(newTotalPages);
+      }
+    }
+  }, [assetsPerPage, assets.length, currentPage]);
+
+  // Recalculate on window resize or container size change
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+      calculateAssetsPerPage();
+    };
+
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    
+    // Initial calculation
+    calculateAssetsPerPage();
+    
+    // Set up resize observer for container
+    const resizeObserver = new ResizeObserver(calculateAssetsPerPage);
+    if (gridContainerRef.current) {
+      resizeObserver.observe(gridContainerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
+    };
+  }, [calculateAssetsPerPage]);
 
   // Get responsive styles
   const mobileStyles = getMobileStyles(windowWidth);
@@ -82,7 +135,7 @@ const ViewAssets = () => {
   // Clear notifications after timeout
   useEffect(() => {
     if (notification) {
-      const timer = setTimeout(() => setNotification(null), 3000);
+      const timer = setTimeout(() => setNotification(null), 1000);
       return () => clearTimeout(timer);
     }
   }, [notification]);
@@ -216,7 +269,7 @@ const ViewAssets = () => {
       setAssets(mapped);
       
       // Update pagination
-      setTotalPages(data.totalPages || Math.max(1, Math.ceil(mapped.length / ASSETS_PER_PAGE)));
+      setTotalPages(data.totalPages || Math.max(1, Math.ceil(mapped.length / assetsPerPage)));
       if (data.currentPage) setCurrentPage(data.currentPage);
       
       setError(null);
@@ -249,7 +302,7 @@ const ViewAssets = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchFromApi]);
+  }, [fetchFromApi, assetsPerPage]);
 
   // Initial fetch and reconnection attempts
   useEffect(() => {
@@ -307,6 +360,20 @@ const ViewAssets = () => {
       }
       
       const data = await response.json();
+      
+      // After successful upload, trigger icon generation
+      if (data.id) {
+        try {
+          // Request icon generation
+          const iconResponse = await fetch(`${CONFIG.API.BASE_URL}/api/models/${data.id}/icon`);
+          if (!iconResponse.ok) {
+            console.warn('Icon generation failed:', await iconResponse.text());
+          }
+        } catch (iconErr) {
+          console.warn('Error generating icon:', iconErr);
+        }
+      }
+      
       setNotification({ type: 'success', message: `Successfully uploaded ${file.name}!` });
       setCurrentPage(1);
       fetchAssets();
@@ -337,32 +404,6 @@ const ViewAssets = () => {
   const handleActionModelError = (errorMessage) => {
     setNotification({ type: 'error', message: `Failed to load preview model: ${errorMessage}` });
     setActionModel(null); // Clear the action model on error
-  };
-
-  // Helper: map backend info to sub-step index
-  const getStepIndexFromBackend = (info) => {
-    console.log('[DEBUG-STEP-INDEX] Determining step index from:', info);
-    // You may want to refine this mapping based on backend messages
-    const msg = (info.message || '').toLowerCase();
-    const step = (info.step || '').toLowerCase();
-    if (step.includes('preprocess')) {
-      if (msg.includes('1') || msg.includes('start')) return 0;
-      return 1;
-    }
-    if (step.includes('rendering video')) {
-      if (msg.includes('1') || msg.includes('start')) return 2;
-      if (msg.includes('2')) return 3;
-      return 4;
-    }
-    if (step.includes('generating glb') || step.includes('generating 3d asset')) {
-      if (msg.includes('1') || msg.includes('mesh')) return 5;
-      return 6;
-    }
-    // fallback: use progress
-    if (info.progress !== undefined) {
-      return Math.floor((info.progress / 100) * (PROGRESS_STEPS.length - 1));
-    }
-    return 0;
   };
 
   // Handle asset creation events from AssetCreationPopup
@@ -407,10 +448,16 @@ const ViewAssets = () => {
           .then(res => res.json())
           .then(data => {
             if (isMounted && data) { // Check if data is not null/undefined
+              // Extract and normalize video URL if present
+              let vUrl = data.video?.path || data.video;
+              if (vUrl && !vUrl.startsWith('http') && !vUrl.startsWith('/')) {
+                vUrl = `/${vUrl}`;
+              }
               setActionModel({
                 id: data.id, // Ensure id is present
                 name: data.name,
                 displayName: data.displayName || data.name, // Use displayName if available
+                videoUrl: vUrl,
                 ...data
               });
             } else if (isMounted) {
@@ -424,16 +471,39 @@ const ViewAssets = () => {
               setActionModel(null); // Ensure model is cleared on error
             }
           });
+      } else if (info.step === 'thumbnail saved' && info.modelId) {
+        // Refresh asset list to include new thumbnail
+        fetchAssets();
       }
+      
+      // For action status, update UI state but don't show the message in progress indicator
+      setGenerationStatus(prev => ({
+        ...prev,
+        inProgress: info.inProgress || (!info.success && !info.error),
+        error: !!info.error,
+        success: !!info.success,
+        errorMessage: info.errorMessage || '',
+        // Don't update message for action status
+        progress: info.progress !== undefined ? info.progress : prev.progress,
+        previewUrl: info.videoUrl || prev.previewUrl,
+        assetName: info.assetName || prev.assetName,
+        status: info.status,
+        step: info.step
+      }));
+      return; // Exit early for action status
     }
-    // If this is a progress message, increment the count (max 7)
+    
+    // If this is a progress message, increment the count (5)
+    console.log('info', info);
     if (info.inProgress && info.message && info.error !== true && info.success !== true && info.status === 'progress') {
-      setProgressCount(prev => Math.min(prev + 1, 7));
+      setProgressCount(prev => Math.min(prev + 1, 5));
     }
+    
     setGenerationStatus(prev => ({
       ...prev,
       inProgress: info.inProgress || (!info.success && !info.error),
       error: !!info.error,
+      success: !!info.success,
       errorMessage: info.errorMessage || '',
       message: info.message || '',
       progress: info.progress !== undefined ? info.progress : prev.progress,
@@ -442,10 +512,10 @@ const ViewAssets = () => {
       status: info.status,
       step: info.step
     }));
+    
     if (info.success) {
       setNotification({ type: 'success', message: '3D Asset generated successfully!' });
       setIsCreationPopupOpen(false);
-      setTimeout(fetchAssets, 1000);
     } else if (info.error) {
       setNotification({ type: 'error', message: info.errorMessage || 'Asset generation failed' });
     }
@@ -459,30 +529,47 @@ const ViewAssets = () => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        // Try to extract JSON from buffer (very simple, expects one JSON per chunk)
+
+      // Helper to extract and handle any complete JSON objects in the buffer
+      const processBuffer = () => {
         const matches = buffer.match(/\{[\s\S]*?\}/g);
         if (matches) {
+          let lastIndex = 0;
           matches.forEach(jsonStr => {
+            const startIdx = buffer.indexOf(jsonStr, lastIndex);
+            lastIndex = startIdx + jsonStr.length;
             try {
               const data = JSON.parse(jsonStr);
               handleAssetCreated({
                 inProgress: data.status === 'progress',
                 error: data.status === 'error',
+                success: data.status === 'complete',
                 errorMessage: data.status === 'error' ? data.message : '',
                 message: data.message,
                 progress: undefined, // progress is now handled by progressCount
                 videoUrl: data.videoUrl,
                 assetName: data.glbFile,
-                status: data.status
+                status: data.status,
+                step: data.step,
+                modelId: data.modelId || data.glbFile
               });
             } catch {}
           });
-          buffer = '';
+          // Keep any trailing partial JSON in the buffer
+          buffer = buffer.slice(lastIndex);
         }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          // Decode any remaining bytes and break
+          buffer += decoder.decode(value || new Uint8Array(), { stream: false });
+          processBuffer();
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        processBuffer();
       }
     } catch (error) {
       handleAssetCreated({ error: true, errorMessage: error.message });
@@ -499,12 +586,12 @@ const ViewAssets = () => {
   // Get paginated assets
   const getPaginatedAssets = useMemo(() => {
     if (Array.isArray(assets)) {
-      const startIndex = (currentPage - 1) * ASSETS_PER_PAGE;
-      const endIndex = startIndex + ASSETS_PER_PAGE;
+      const startIndex = (currentPage - 1) * assetsPerPage;
+      const endIndex = startIndex + assetsPerPage;
       return assets.slice(startIndex, endIndex);
     }
     return [];
-  }, [assets, currentPage]);
+  }, [assets, currentPage, assetsPerPage]);
 
   // Update model name
   const handleModelNameChange = useCallback(async (newName) => {
@@ -597,15 +684,84 @@ const ViewAssets = () => {
     );
   };
 
+  // Show generated asset in preview when generation completes
+  useEffect(() => {
+    if (generationStatus.success && generationStatus.assetName) {
+      // We won't immediately show the model to prevent buttons flashing before model loads
+      // First clear any existing temporary models
+      setActionModel(null);
+      
+      // Fetch the generated model and show in viewer & asset list
+      fetch(`${CONFIG.API.BASE_URL}/api/models/${generationStatus.assetName}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data) {
+            const modelObj = {
+              id: data.id,
+              name: data.name,
+              displayName: data.displayName || data.name,
+              videoUrl: (() => {
+                let v = data.video?.path || data.video;
+                if (v && !v.startsWith('http') && !v.startsWith('/')) {
+                  v = `/${v}`;
+                }
+                return v;
+              })(),
+              ...data
+            };
+            // Refresh assets list so thumbnail/video show up asap
+            fetchAssets();
+            
+            // Short delay before showing the model to ensure a smoother transition
+            setTimeout(() => {
+              setSelectedModel(modelObj); // Show in main viewer after a delay
+            }, 300);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching generated model:', err);
+          setNotification({ type: 'error', message: 'Could not load generated asset.' });
+        });
+    }
+  }, [generationStatus.success, generationStatus.assetName, fetchAssets]);
+
+  // Update pagination when assets or assetsPerPage changes
+  useEffect(() => {
+    setTotalPages(Math.max(1, Math.ceil(assets.length / assetsPerPage)));
+  }, [assets.length, assetsPerPage]);
+
+  // Handle model deletion
+  const handleModelDeleted = useCallback((modelId, message) => {
+    // Remove the deleted model from assets list
+    setAssets(prevAssets => prevAssets.filter(asset => asset.id !== modelId));
+    
+    // Clear the selected model
+    setSelectedModel(null);
+    
+    // Show success notification
+    setNotification({ type: 'success', message: message || 'Model deleted successfully' });
+    
+    // Refresh the asset list
+    fetchAssets();
+  }, [fetchAssets]);
+
   return (
     <div style={{...styles.container, ...mobileStyles.container}}>
       {/* Left panel - Visualization */}
       <div style={{...styles.visualizationPanel, ...mobileStyles.visualizationPanel}}>
-        {/* Notification message */}
+        {/* Notification message - now positioned in top right with fixed styling */}
         {notification && (
           <div style={{
             ...styles.message, 
-            ...(notification.type === 'error' ? styles.error : styles.success)
+            ...(notification.type === 'error' ? styles.error : styles.success),
+            position: 'absolute',
+            top: '15px',
+            right: '15px',
+            left: 'auto',
+            transform: 'none',
+            zIndex: 1000,
+            boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+            maxWidth: '300px'
           }}>
             {notification.message}
           </div>
@@ -652,7 +808,7 @@ const ViewAssets = () => {
                   <div 
                     style={{
                       ...styles.progress.progressFill,
-                      width: `${(progressCount / 7) * 100}%`,
+                      width: `${(progressCount / 5) * 100}%`,
                       transition: 'width 0.7s cubic-bezier(.4,1.4,.6,1)',
                       boxShadow: '0 0 16px 2px #00aaff88',
                     }}
@@ -664,15 +820,21 @@ const ViewAssets = () => {
                 {/* Render video if available from action */}
                 {actionVideoUrl && !actionModel && (
                   <div style={styles.generationPreviewContainer}>
-                    <video 
-                      src={actionVideoUrl}
-                      style={styles.generationPreviewVideo}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      controls
-                    />
+                    <div style={{position: 'relative', width: '100%', height: '100%'}}>
+                      <video 
+                        src={actionVideoUrl}
+                        style={styles.generationPreviewVideo}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        controls
+                        onMouseOver={e => e.currentTarget.style.boxShadow = '0 0 32px 4px #00ffaa99'}
+                        onMouseOut={e => e.currentTarget.style.boxShadow = styles.generationPreviewVideo.boxShadow}
+                      />
+                      {/* Optional: Overlay play icon on hover */}
+                      {/* <div style={{position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', pointerEvents: 'none', opacity: 0.7, fontSize: 64, color: '#00ffaa'}}>▶</div> */}
+                    </div>
                   </div>
                 )}
                 {/* Render model viewer if GLB saved and model data is available */}
@@ -681,8 +843,10 @@ const ViewAssets = () => {
                     modelUrl={getModelUrl(actionModel)} // Use getModelUrl for consistency
                     modelName={actionModel.displayName || actionModel.name}
                     modelId={actionModel.id}
+                    videoUrl={actionModel.videoUrl}
                     onError={handleActionModelError} // Use dedicated error handler
-                    // onModelNameChange is not needed for this temporary preview
+                    hideControls={true}
+                    onModelDeleted={handleModelDeleted}
                   />
                 )}
                 {/* Fallback to previewUrl if present and not overridden by action video or model */}
@@ -708,8 +872,10 @@ const ViewAssets = () => {
             modelUrl={getModelUrl(selectedModel)} 
             modelName={selectedModel.displayName || selectedModel.name}
             modelId={selectedModel.id}
+            videoUrl={selectedModel.videoUrl}
             onError={handleModelError}
             onModelNameChange={handleModelNameChange}
+            onModelDeleted={handleModelDeleted}
           />
         ) : (
           /* Dropzone when no model is selected */
@@ -766,7 +932,7 @@ const ViewAssets = () => {
         )}
         
         {/* Scrollable asset grid */}
-        <div style={styles.assetListContainer}>
+        <div style={styles.assetListContainer} ref={gridContainerRef}>
           {error ? (
             <div style={{...styles.message, ...styles.error}}>
               {error}
@@ -778,7 +944,7 @@ const ViewAssets = () => {
                   key={asset.id || index} 
                   style={{
                     ...styles.assetItem,
-                    ...(selectedModel && (selectedModel.id === asset.id || selectedModel.name === asset.name) ? styles.assetItemSelected : {})
+                    ...(selectedModel && selectedModel.id === asset.id ? styles.assetItemSelected : {})
                   }}
                   onClick={() => setSelectedModel(asset)}
                 >
@@ -832,6 +998,7 @@ const ViewAssets = () => {
           isOpen={isCreationPopupOpen}
           onClose={() => setIsCreationPopupOpen(false)}
           onAssetCreated={handleAssetCreated}
+          generationStatus={generationStatus}
         />
       </div>
     </div>

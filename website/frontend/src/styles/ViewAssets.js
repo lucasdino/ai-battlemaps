@@ -71,17 +71,21 @@ const styles = {
   },
   assetListContainer: {
     overflowY: 'auto',
-    overflowX: 'hidden', // Change back to hidden to prevent horizontal scrolling
+    overflowX: 'hidden',
     flex: 1,
     marginBottom: '15px',
     padding: '5px',
-    maxHeight: 'calc(100% - 160px)', // Adjusted to leave space for pagination controls
+    maxHeight: 'calc(100% - 160px)', // Space for header, pagination, and buttons
+    display: 'flex',
+    flexDirection: 'column',
   },
   assetGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)', // Return to 2 columns fixed
+    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', // Dynamic columns based on container width
     gap: '12px',
     width: '100%',
+    alignContent: 'start', // Align grid items to the top
+    minHeight: 0, // Allow container to shrink
   },
   assetGridSingleColumn: {
     gridTemplateColumns: '1fr', // 1 column for small screens
@@ -99,6 +103,7 @@ const styles = {
     cursor: 'pointer',
     outline: 'none',
     minWidth: 0,
+    height: '96px', // Fixed height for consistent grid
   },
   assetItemHover: {
     transform: 'translateY(-2px)',
@@ -374,18 +379,33 @@ const styles = {
   },
   generationPreviewContainer: {
     width: '100%',
-    marginTop: '15px',
-    borderRadius: '8px',
+    maxWidth: '600px',
+    minHeight: '320px',
+    height: '340px',
+    marginTop: '24px',
+    borderRadius: '18px',
     overflow: 'hidden',
-    backgroundColor: THEME.bgActive,
-    height: '150px',
+    background: 'linear-gradient(135deg, #ff5e3a 0%, #ffb347 100%)',
+    boxShadow: '0 8px 32px 0 rgba(0,0,0,0.25), 0 1.5px 8px 0 #ff5e3a33',
+    border: '2.5px solid #ff5e3a88',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+    padding: '18px',
+    transition: 'box-shadow 0.3s, border 0.3s',
   },
   generationPreviewVideo: {
-    maxWidth: '100%',
-    maxHeight: '150px',
+    width: '100%',
+    height: '100%',
+    maxWidth: '560px',
+    maxHeight: '300px',
+    borderRadius: '14px',
+    boxShadow: '0 2px 16px 0 #00aaff44',
+    objectFit: 'cover',
+    background: '#111',
+    border: '1.5px solid #00ffaa55',
+    transition: 'box-shadow 0.3s, border 0.3s',
   },
   generationPreviewPlaceholder: {
     color: THEME.textSecondary,
@@ -610,18 +630,24 @@ export const getMobileStyles = (windowWidth) => {
     mobileStyles.paginationControls = {
       marginBottom: '5px', // Smaller margin on mobile
     };
+    mobileStyles.assetGrid = {
+      gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', // Smaller items on mobile
+      gap: '8px',
+    };
+    mobileStyles.assetItem = {
+      padding: '8px',
+      height: '80px', // Smaller height on mobile
+    };
   }
   
   if (windowWidth <= SINGLE_COLUMN_BREAKPOINT) {
     mobileStyles.assetGrid = {
-      gridTemplateColumns: '1fr', // Single column for very small screens
+      gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', // Even smaller on very small screens
+      gap: '6px',
     };
     mobileStyles.assetItem = {
-      padding: '8px', // Smaller padding for small screens
-    };
-    mobileStyles.assetThumbnail = {
-      width: '50px', // Smaller thumbnails on mobile
-      height: '50px',
+      padding: '6px',
+      height: '70px', // Even smaller height on very small screens
     };
   }
   

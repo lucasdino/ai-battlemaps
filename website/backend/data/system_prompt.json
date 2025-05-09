@@ -1,3 +1,3 @@
 {
-  "systemPrompt": "Create this as an isometric projection of a 3D asset. Ensure the subject is the main focus, has visual depth, and the background is minimal."
+  "systemPrompt": "Generate an isometric projection of a 3D asset. It should have color unless otherwise specified by the user. Ensure the subject is the main focus, has visual depth, is well-lit, and the background is minimal. Do not include any text."
 }

@@ -77,6 +77,127 @@ const styles = {
     margin: '15px',
     textAlign: 'center',
   },
+
+  // Model name header styles
+  modelNameHeader: {
+    position: 'absolute',
+    top: '10px',
+    left: '0',
+    right: '0',
+    textAlign: 'center',
+    zIndex: 10,
+    pointerEvents: 'auto'
+  },
+  modelNameContainer: {
+    display: 'inline-block',
+    background: 'rgba(0,0,0,0.6)',
+    padding: '5px 10px',
+    borderRadius: '4px'
+  },
+  modelNameInput: {
+    background: 'transparent',
+    border: `1px solid ${THEME.primary}`,
+    color: THEME.textPrimary,
+    padding: '5px 8px',
+    borderRadius: '3px',
+    fontSize: '16px',
+    fontWeight: '500',
+    minWidth: '200px',
+  },
+  modelNameDisplay: {
+    display: 'inline-block',
+    background: 'rgba(0,0,0,0.6)',
+    padding: '5px 15px',
+    borderRadius: '4px',
+    color: THEME.textPrimary,
+    fontSize: '16px',
+    fontWeight: '500',
+    cursor: 'pointer'
+  },
+
+  // Delete button container
+  deleteButtonContainer: {
+    position: 'absolute',
+    top: '10px',
+    right: '10px',
+    zIndex: 10,
+  },
+
+  // Action buttons container
+  actionButtonsContainer: {
+    position: 'absolute',
+    bottom: '10px',
+    right: '10px',
+    zIndex: 10,
+    display: 'flex',
+    justifyContent: 'flex-end'
+  },
+
+  // Delete confirmation dialog
+  deleteConfirmDialog: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    padding: '20px',
+    borderRadius: '8px',
+    zIndex: 1000,
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '15px',
+    minWidth: '300px'
+  },
+  deleteConfirmTitle: {
+    color: THEME.textPrimary,
+    margin: '0 0 10px 0',
+    textAlign: 'center'
+  },
+  deleteConfirmText: {
+    color: THEME.textSecondary,
+    margin: '0 0 15px 0',
+    textAlign: 'center',
+    fontSize: '14px'
+  },
+  deleteConfirmButtons: {
+    display: 'flex',
+    gap: '10px',
+    justifyContent: 'center'
+  },
+  cancelButton: {
+    padding: '8px 20px',
+    backgroundColor: 'transparent',
+    color: THEME.textPrimary,
+    border: `1px solid ${THEME.textSecondary}`,
+    borderRadius: '4px',
+    cursor: 'pointer',
+  },
+  deleteButton: {
+    padding: '8px 20px',
+    backgroundColor: '#e74c3c',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  loadingSpinner: {
+    display: 'inline-block',
+    width: '12px',
+    height: '12px',
+    borderRadius: '50%',
+    border: '2px solid rgba(255,255,255,0.3)',
+    borderTopColor: 'white',
+    animation: 'spin 1s linear infinite'
+  },
+  disabledButton: {
+    opacity: 0.7,
+    cursor: 'not-allowed'
+  },
   
   // Download buttons styles
   downloadButtonsContainer: {
@@ -125,6 +246,27 @@ export const getLoadingOverlayStyle = (isLoading) => {
   return {
     ...styles.loadingOverlay,
     ...(isLoading ? {} : styles.loadingOverlayHidden)
+  };
+};
+
+// Helper function to get action button style
+export const getActionButtonStyle = (isHovered, isActive, isPrimary = false, isDanger = false) => {
+  return {
+    background: isDanger 
+      ? (isHovered ? '#ff5252' : '#e74c3c') 
+      : isPrimary 
+        ? (isHovered ? '#4dabf7' : THEME.primary) 
+        : (isHovered ? '#f3a653' : '#e67e22'),
+    border: isPrimary && !isDanger ? '2px solid white' : 'none',
+    color: 'white',
+    padding: '8px 12px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: '500',
+    marginLeft: '6px',
+    transition: 'none',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
   };
 };
 

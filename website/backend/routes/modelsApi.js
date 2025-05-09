@@ -132,6 +132,33 @@ router.post('/models/upload', modelUpload.single('model'), async (req, res) => {
     
     // Update the metadata for the model
     await ModelMetadataUtil.updateModelMetadata(uniqueFilename, metadata);
+
+    // Generate icon immediately after upload
+    try {
+      // Create a unique icon name (PNG format)
+      const baseName = path.basename(uniqueFilename, '.glb');
+      const iconName = `${baseName}-${Date.now()}.${CONFIG.THUMBNAILS.FORMAT}`;
+      const iconPath = path.join(CONFIG.DIRECTORIES.MODEL_ICONS, iconName);
+      
+      // Generate the thumbnail
+      await ModelThumbnailRenderer.generateThumbnail(newPath, iconPath, {
+        size: CONFIG.THUMBNAILS.SIZE,
+        backgroundColor: CONFIG.THUMBNAILS.BACKGROUND
+      });
+      
+      // If icon was generated successfully, update metadata
+      if (fs.existsSync(iconPath)) {
+        await ModelMetadataUtil.updateModelMetadata(uniqueFilename, {
+          icon: {
+            file: iconName,
+            path: `/assets/3d_model_icons/${iconName}`
+          }
+        });
+      }
+    } catch (iconError) {
+      console.warn(`Warning: Failed to generate icon for model ${uniqueFilename}:`, iconError);
+      // Continue with upload response even if icon generation fails
+    }
     
     // Send back success message with the filenames
     res.json({ 
@@ -204,6 +231,7 @@ router.delete('/models/:modelId', async (req, res) => {
     const modelPath = path.join(CONFIG.DIRECTORIES.MODELS, modelId);
     let iconPath = null;
     let videoPath = null;
+    let sourceImagePath = null;
     
     // Check if the model has an icon and get its path
     if (metadata.icon && metadata.icon.file) {
@@ -213,6 +241,11 @@ router.delete('/models/:modelId', async (req, res) => {
     // Check if the model has a video and get its path
     if (metadata.video && metadata.video.file) {
       videoPath = path.join(CONFIG.DIRECTORIES.ASSET_VIDEOS, metadata.video.file);
+    }
+    
+    // Check if the model has a source image and get its path
+    if (metadata.sourceImage && metadata.sourceImage.file) {
+      sourceImagePath = path.join(CONFIG.DIRECTORIES.IMAGES, metadata.sourceImage.file);
     }
     
     // Delete the model file
@@ -228,6 +261,12 @@ router.delete('/models/:modelId', async (req, res) => {
     // Delete the video file if it exists
     if (videoPath && fs.existsSync(videoPath)) {
       fs.unlinkSync(videoPath);
+    }
+    
+    // Delete the source image file if it exists
+    if (sourceImagePath && fs.existsSync(sourceImagePath)) {
+      fs.unlinkSync(sourceImagePath);
+      console.log(`Deleted source image: ${sourceImagePath}`);
     }
     
     // Delete the model metadata

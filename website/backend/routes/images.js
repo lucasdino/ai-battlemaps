@@ -56,10 +56,16 @@ router.post(CONFIG.ENDPOINTS.GENERATE_IMAGE.replace('/api', ''), async (req, res
     });
     
   } catch (error) {
-    console.error('Error generating image:', error);
+    console.error('Error generating image route:', error.message); 
+    if (error.response) {
+      console.error('API Error Response:', JSON.stringify(error.response.data, null, 2));
+    }
+    if (error.config) {
+      // console.error('Axios request config:', JSON.stringify(error.config, null, 2)); // Can be very verbose
+    }
     res.status(500).json({ 
       error: 'Failed to generate image', 
-      details: error.message || 'Unknown error'
+      details: error.response ? error.response.data : (error.message || 'Unknown error')
     });
   }
 });
@@ -201,23 +207,30 @@ async function generateStabilityAIImage(prompt, systemPrompt, config) {
   return Buffer.from(response.data);
 }
 
-// Helper function for Google image generation
+// Helper function for Google Gemini image generation
 async function generateGoogleImage(prompt, systemPrompt, config) {
-  console.log(`Generating image with Google Imagen using prompt: ${prompt}`);
-  const fullPrompt = systemPrompt ? `${systemPrompt}. ${prompt}` : prompt;
-  const response = await axios.post(`${config.API_ENDPOINT}`, {
-    prompt: fullPrompt,
-    model: config.MODEL || "imagen-1.0",
-    width: 1024,
-    height: 1024
-  }, {
-    headers: {
-      'Authorization': `Bearer ${config.API_KEY}`,
-      'Content-Type': 'application/json'
+  const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
+  
+  const response = await axios.post(
+    `${config.API_ENDPOINT}?key=${config.API_KEY}`, 
+    {
+      instances: [
+        {
+          prompt: fullPrompt
+        }
+      ],
+      parameters: {
+        sampleCount: 1
+      }
     },
-    responseType: 'arraybuffer'
-  });
-  return Buffer.from(response.data);
+    {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  const b64Data = response.data.predictions[0].bytesBase64Encoded;
+  return Buffer.from(b64Data, 'base64');
 }
 
 module.exports = router; 

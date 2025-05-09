@@ -108,7 +108,8 @@ const styles = {
     letterSpacing: '1px',
     transition: 'transform 0.2s',
     position: 'relative',
-    paddingBottom: '0.5rem',
+    paddingBottom: '0.3rem',
+    paddingTop: '0.6rem',
   },
   navbarTitleHover: {
     transform: 'scale(1.05)',
@@ -151,17 +152,20 @@ const styles = {
     left: 0,
     width: '100%',
     height: '28px',
-    background: 'linear-gradient(to top, #ff5e3a 0%, #ffb300 60%, transparent 100%)',
+    background: 'none',
     opacity: 0,
     transform: 'scaleY(1)',
     transformOrigin: 'bottom',
-    transition: 'opacity 0.2s',
+    transition: 'none',
     zIndex: 5,
     imageRendering: 'pixelated',
+    pointerEvents: 'none',
   },
   linkFlameEffectHover: {
     opacity: 1,
+    background: 'linear-gradient(to top, #ff5e3a 0%, #ffb300 60%, transparent 100%)',
     animation: `${KEYFRAMES.PIXEL_FLAME} 0.32s steps(1) infinite`,
+    animationFillMode: 'forwards',
   },
 };
 

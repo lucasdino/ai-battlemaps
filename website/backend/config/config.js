@@ -3,8 +3,8 @@ const path = require('path');
 const API_KEYS = require('./apiKeys');
 
 // External services configuration
-const TRELLIS_HOST = '50.217.254.168';
-const TRELLIS_PORT = 40471;
+const TRELLIS_HOST = '35.87.142.75';
+const TRELLIS_PORT = 27830;
 
 // Get the backend root directory (one level up from config folder)
 const BACKEND_ROOT = path.join(__dirname, '..');
@@ -100,7 +100,7 @@ const CONFIG = {
         API_KEY: API_KEYS.OPENAI,
         MODEL: 'dall-e-3',
         SIZE: '1024x1024',
-        DESCRIPTION: 'OpenAI DALL-E 3 image generation'
+        DESCRIPTION: 'OpenAI DALL-E 3 (Image Generation).'
       },
       'stability': {
         NAME: 'Stability AI',
@@ -111,16 +111,16 @@ const CONFIG = {
       'google': {
         NAME: 'Google Imagen',
         API_KEY: API_KEYS.GOOGLE,
-        API_ENDPOINT: API_KEYS.GOOGLE_IMAGEN_ENDPOINT,
-        MODEL: 'imagen-1.0',
-        DESCRIPTION: 'Google Imagen image generation'
+        API_ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict',
+        MODEL: 'imagen-3.0-generate-002',
+        DESCRIPTION: 'Google Gemini Imagen 3 (Image Generation).'
       },
       'openai-editor': {
         NAME: 'OpenAI Image Editor',
         API_KEY: API_KEYS.OPENAI,
         MODEL: 'gpt-image-1',
         SIZE: '1024x1024',
-        DESCRIPTION: 'OpenAI image editing capabilities'
+        DESCRIPTION: 'OpenAI GPT Image Model (Image Generation / Image Editing).'
       }
     }
   }
