@@ -672,7 +672,7 @@ class SceneGenerator:
             'assets': assets,
             'metadata': metadata
         }
-
+    
     def export_to_json(self, scene_data: Dict, format: str = 'unity') -> Dict:
         """Export scene data to JSON format"""
         # Clear debug state from all layers
@@ -947,7 +947,7 @@ class SceneGenerator:
             normal = normal_map[y, x] if y > 0 and y < normal_map.shape[0]-1 and x > 0 and x < normal_map.shape[1]-1 else [0, 1, 0]
             
             # Calculate rotation to align with normal
-            rotation = self._calculate_rotation_from_normal(normal)
+            rotation = self.feature_layer._calculate_rotation_from_normal(normal)
             
             # Handle cluster size
             cluster_size = p['cluster_size']
@@ -973,8 +973,8 @@ class SceneGenerator:
                 },
                 'normal': normal if isinstance(normal, list) else normal.tolist(),
                 'slope': float(slope_map[y, x]),
-                'model': models['props'][p['type']],
-                'texture': textures['features'][p['type']],
+                'model': models.get('props', {}).get(p['type']) or models.get('features', {}).get(p['type']),
+                'texture': textures.get('features', {}).get(p['type']) or textures.get('props', {}).get(p['type']),
                 'material': {
                     'color': self._get_prop_color(p['type']),
                     'roughness': 0.8,

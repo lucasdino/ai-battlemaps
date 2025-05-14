@@ -24,7 +24,7 @@ def create_default_config(output_dir: str = "output") -> SceneGeneratorConfig:
     config.height = 256
     # Smaller grid size for more detailed tile placement
     config.grid_size = (16, 16)
-
+    
     # Configure terrain generation
     config.terrain.enabled = True
     config.terrain.noise_scales = {
@@ -32,22 +32,22 @@ def create_default_config(output_dir: str = "output") -> SceneGeneratorConfig:
         "medium": 100.0,
         "small": 50.0,
     }
-
+    
     # Configure feature generation
     config.feature.enabled = True
     config.feature.similarity_threshold = 0.3
     config.feature.max_features = 20  # Increased for more features
-
+    
     # Configure prop generation
     config.prop.enabled = True
     config.prop.density = 0.4  # Increased density
     config.prop.cluster_size = (3, 8)  # Larger clusters
-
+    
     # Configure visual processing
     config.visual.enabled = True
     config.visual.style = "fantasy"
     config.visual.high_res = True  # Enable high resolution
-
+    
     return config
 
 
@@ -61,27 +61,27 @@ def generate_scene(
     """Generate a complete scene with the given prompt"""
     # Setup logging
     setup_logging("DEBUG" if debug else "INFO")
-
+    
     # Create output directory
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-
+    
     # Load or create configuration
     if config_path:
         config = SceneGeneratorConfig.from_yaml(config_path)
     else:
         config = create_default_config(output_dir)
-
+    
     # Enable debug mode if requested
     if debug:
         config.terrain.debug_mode = True
         config.feature.debug_mode = True
         config.prop.debug_mode = True
         config.visual.debug_mode = True
-
+    
     # Initialize scene generator
     generator = SceneGenerator(config)
-
+    
     # Generate scene with multiple views for better detail
     scene_data = generator.generate(
         prompt=prompt,
@@ -89,11 +89,11 @@ def generate_scene(
         batch_views=["top", "45_degrees", "side"] if debug else ["top", "45_degrees"],
         high_res=True,  # Always use high resolution
     )
-
+    
     if not scene_data:
         logging.error("Failed to generate scene")
         return None
-
+    
     # Save visual output in high quality
     if "visual" in scene_data and "image" in scene_data["visual"]:
         image = scene_data["visual"]["image"]
@@ -103,18 +103,17 @@ def generate_scene(
             format="PNG",
             quality=100,  # Maximum quality
         )
-
+    
     # Export scene data in multiple formats
     export_formats = ["tiled", "web", "unity"]  # Export in multiple formats
     for format_type in export_formats:
         export_data = generator.export_to_json(scene_data, format=format_type)
-
-        # Save export data
+    
+    # Save export data
         with open(output_path / f"scene_{format_type}.json", "w") as f:
             import json
-
             json.dump(export_data, f, indent=2)
-
+    
     return scene_data
 
 
@@ -126,14 +125,14 @@ def main():
         # "A military outpost on a hilltop with watchtowers and barracks",
         # "An abandoned mine entrance with scattered mining equipment"
     ]
-
+    
     # Generate scenes for each prompt
     for i, prompt in enumerate(prompts):
         print(f"\nGenerating scene {i+1}: {prompt}")
         scene_data = generate_scene(
             prompt=prompt, style="fantasy", output_dir=f"output/scene_{i+1}", debug=True
         )
-
+        
         if scene_data:
             print(f"Scene {i+1} generated successfully")
             if "visual" in scene_data and "prompt" in scene_data["visual"]:
@@ -141,4 +140,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main() 

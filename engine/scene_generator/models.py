@@ -274,6 +274,153 @@ class ModelGenerator:
         camp.export(output_path)
         return output_path
     
+    def generate_dungeon_model(self) -> Path:
+        """Generate a dungeon model"""
+        # Create base platform
+        platform = box(extents=[4, 0.5, 4])
+        
+        # Create walls
+        walls = []
+        wall_height = 2.0
+        wall_thickness = 0.3
+        
+        # North wall
+        north_wall = box(extents=[4, wall_height, wall_thickness])
+        north_wall.apply_transform(translation_matrix([0, wall_height/2, 2]))
+        walls.append(north_wall)
+        
+        # South wall
+        south_wall = box(extents=[4, wall_height, wall_thickness])
+        south_wall.apply_transform(translation_matrix([0, wall_height/2, -2]))
+        walls.append(south_wall)
+        
+        # East wall
+        east_wall = box(extents=[wall_thickness, wall_height, 4])
+        east_wall.apply_transform(translation_matrix([2, wall_height/2, 0]))
+        walls.append(east_wall)
+        
+        # West wall
+        west_wall = box(extents=[wall_thickness, wall_height, 4])
+        west_wall.apply_transform(translation_matrix([-2, wall_height/2, 0]))
+        walls.append(west_wall)
+        
+        # Add pillars in corners
+        pillars = []
+        pillar_positions = [
+            (1.5, 1.5), (1.5, -1.5), (-1.5, 1.5), (-1.5, -1.5)
+        ]
+        for x, z in pillar_positions:
+            pillar = cylinder(radius=0.2, height=wall_height)
+            pillar.apply_transform(translation_matrix([x, wall_height/2, z]))
+            pillars.append(pillar)
+        
+        # Add some decorative elements
+        decorations = []
+        
+        # Add wall sconces
+        sconce_positions = [
+            (1.8, 1.8), (1.8, -1.8), (-1.8, 1.8), (-1.8, -1.8)
+        ]
+        for x, z in sconce_positions:
+            sconce = box(extents=[0.2, 0.2, 0.2])
+            sconce.apply_transform(translation_matrix([x, wall_height/2, z]))
+            decorations.append(sconce)
+        
+        # Combine all meshes
+        dungeon = trimesh.util.concatenate([platform] + walls + pillars + decorations)
+        
+        # Save model
+        output_path = self.output_dir / "features" / "dungeon.glb"
+        dungeon.export(output_path)
+        return output_path
+    
+    def generate_bridge_model(self) -> Path:
+        """Generate a bridge model"""
+        # Create base platform
+        platform = box(extents=[4, 0.3, 2])
+        
+        # Create bridge deck
+        deck = box(extents=[3.8, 0.1, 1.8])
+        deck.apply_transform(translation_matrix([0, 0.2, 0]))
+        
+        # Create bridge railings
+        railings = []
+        railing_height = 0.5
+        railing_thickness = 0.1
+        
+        # North railing
+        north_railing = box(extents=[3.8, railing_height, railing_thickness])
+        north_railing.apply_transform(translation_matrix([0, railing_height/2, 0.9]))
+        railings.append(north_railing)
+        
+        # South railing
+        south_railing = box(extents=[3.8, railing_height, railing_thickness])
+        south_railing.apply_transform(translation_matrix([0, railing_height/2, -0.9]))
+        railings.append(south_railing)
+        
+        # Create support pillars
+        pillars = []
+        pillar_positions = [
+            (-1.5, -0.8), (-1.5, 0.8), (1.5, -0.8), (1.5, 0.8)
+        ]
+        for x, z in pillar_positions:
+            pillar = cylinder(radius=0.2, height=1.0)
+            pillar.apply_transform(translation_matrix([x, -0.5, z]))
+            pillars.append(pillar)
+        
+        # Combine meshes
+        bridge = trimesh.util.concatenate([platform, deck] + railings + pillars)
+        
+        # Save model
+        output_path = self.output_dir / "features" / "bridge.glb"
+        bridge.export(output_path)
+        return output_path
+    
+    def generate_tower_model(self) -> Path:
+        """Generate a tower model"""
+        # Create base platform
+        platform = box(extents=[2, 0.5, 2])
+        
+        # Create main tower structure
+        tower = cylinder(radius=0.8, height=4.0)
+        tower.apply_transform(translation_matrix([0, 2.25, 0]))
+        
+        # Create tower roof
+        roof = cone(radius=1.0, height=1.5)
+        roof.apply_transform(translation_matrix([0, 5.0, 0]))
+        
+        # Create windows
+        windows = []
+        window_positions = [
+            (0, 1.5, 0.8), (0, 3.0, 0.8),  # North windows
+            (0, 1.5, -0.8), (0, 3.0, -0.8),  # South windows
+            (0.8, 1.5, 0), (0.8, 3.0, 0),  # East windows
+            (-0.8, 1.5, 0), (-0.8, 3.0, 0)  # West windows
+        ]
+        for x, y, z in window_positions:
+            window = box(extents=[0.2, 0.4, 0.1])
+            window.apply_transform(translation_matrix([x, y, z]))
+            windows.append(window)
+        
+        # Create battlements
+        battlements = []
+        battlement_positions = [
+            (0.6, 4.0, 0.6), (0.6, 4.0, -0.6),
+            (-0.6, 4.0, 0.6), (-0.6, 4.0, -0.6)
+        ]
+        for x, y, z in battlement_positions:
+            battlement = box(extents=[0.2, 0.3, 0.2])
+            battlement.apply_transform(translation_matrix([x, y, z]))
+            battlements.append(battlement)
+        
+        # Combine meshes
+        tower_model = trimesh.util.concatenate([platform, tower, roof] + windows + battlements)
+        
+        # Save model
+        output_path = self.output_dir / "features" / "tower.glb"
+        tower_model.export(output_path)
+        return output_path
+    
     def generate_all_models(self) -> Dict[str, Dict[str, str]]:
         """Generate all models and return their paths"""
         models = {
@@ -284,7 +431,10 @@ class ModelGenerator:
                 "temple": str(self.generate_temple_model()),
                 "ruins": str(self.generate_ruins_model()),
                 "well": str(self.generate_well_model()),
-                "camp": str(self.generate_camp_model())
+                "camp": str(self.generate_camp_model()),
+                "dungeon": str(self.generate_dungeon_model()),
+                "bridge": str(self.generate_bridge_model()),
+                "tower": str(self.generate_tower_model())
             },
             "props": {
                 "bush": str(self.generate_bush_model()),

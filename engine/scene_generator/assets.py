@@ -6,6 +6,7 @@ import colorsys
 import json
 from pathlib import Path
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,9 @@ class AssetGenerator:
                 "mountain": ["#808080", "#a9a9a9", "#d3d3d3"],
                 "tree": ["#2d5a27", "#3d7a37", "#4d9a47"],
                 "rock": ["#696969", "#808080", "#a9a9a9"],
-                "building": ["#8b4513", "#a0522d", "#cd853f"]
+                "building": ["#8b4513", "#a0522d", "#cd853f"],
+                "stone": ["#696969", "#808080", "#a9a9a9"],
+                "wood": ["#8b4513", "#a0522d", "#cd853f"]
             },
             "dungeon": {
                 "stone": ["#696969", "#808080", "#a9a9a9"],
@@ -138,6 +141,27 @@ class AssetGenerator:
         textures["camp"] = {
             "diffuse": str(camp_path),
             "normal": str(self._generate_normal_map(camp_path))
+        }
+        
+        # Generate dungeon textures
+        dungeon_path = self._generate_dungeon_texture(palette["building"])
+        textures["dungeon"] = {
+            "diffuse": str(dungeon_path),
+            "normal": str(self._generate_normal_map(dungeon_path))
+        }
+        
+        # Generate bridge textures
+        bridge_path = self._generate_bridge_texture(palette)
+        textures["bridge"] = {
+            "diffuse": str(bridge_path),
+            "normal": str(self._generate_normal_map(bridge_path))
+        }
+        
+        # Generate tower textures
+        tower_path = self._generate_tower_texture(palette)
+        textures["tower"] = {
+            "diffuse": str(tower_path),
+            "normal": str(self._generate_normal_map(tower_path))
         }
         
         return textures
@@ -800,6 +824,201 @@ class AssetGenerator:
         # Save texture
         output_path = self.output_dir / "textures" / "camp.jpg"
         img.save(output_path, quality=95)
+        return output_path
+    
+    def _generate_dungeon_texture(self, colors: List[str]) -> Path:
+        """Generate a dungeon texture"""
+        img = Image.new('RGB', (self.texture_size, self.texture_size))
+        draw = ImageDraw.Draw(img)
+        
+        # Generate base noise
+        noise_data = np.zeros((self.texture_size, self.texture_size))
+        for y in range(self.texture_size):
+            for x in range(self.texture_size):
+                noise_data[y, x] = noise.pnoise2(
+                    x/100, y/100,
+                    octaves=6,
+                    persistence=0.5,
+                    lacunarity=2.0
+                )
+        
+        # Normalize noise
+        noise_data = (noise_data - noise_data.min()) / (noise_data.max() - noise_data.min())
+        
+        # Apply base color
+        for y in range(self.texture_size):
+            for x in range(self.texture_size):
+                color_idx = int(noise_data[y, x] * (len(colors) - 1))
+                color = colors[color_idx]
+                draw.point((x, y), fill=color)
+        
+        # Add stone block patterns
+        block_size = self.texture_size // 8
+        for i in range(8):
+            for j in range(8):
+                x = i * block_size
+                y = j * block_size
+                
+                # Add block outline
+                draw.rectangle(
+                    (x, y, x + block_size, y + block_size),
+                    outline='#000000',
+                    width=2
+                )
+                
+                # Add some stone texture within blocks
+                for _ in range(20):
+                    block_x = x + np.random.randint(0, block_size)
+                    block_y = y + np.random.randint(0, block_size)
+                    size = np.random.randint(2, 5)
+                    color = colors[np.random.randint(0, len(colors))]
+                    draw.ellipse(
+                        (block_x-size, block_y-size, block_x+size, block_y+size),
+                        fill=color
+                    )
+        
+        # Add cracks and weathering
+        for _ in range(50):
+            x = np.random.randint(0, self.texture_size)
+            y = np.random.randint(0, self.texture_size)
+            length = np.random.randint(20, 100)
+            angle = np.random.uniform(0, 360)
+            
+            # Calculate end point
+            end_x = x + length * np.cos(np.radians(angle))
+            end_y = y + length * np.sin(np.radians(angle))
+            
+            # Draw crack
+            draw.line(
+                (x, y, end_x, end_y),
+                fill='#000000',
+                width=2
+            )
+        
+        # Add moss and moisture effects
+        for _ in range(30):
+            x = np.random.randint(0, self.texture_size)
+            y = np.random.randint(0, self.texture_size)
+            size = np.random.randint(10, 30)
+            color = '#355e3b'  # Moss green
+            draw.ellipse(
+                (x-size, y-size, x+size, y+size),
+                fill=color
+            )
+        
+        # Add some torch marks
+        for _ in range(10):
+            x = np.random.randint(0, self.texture_size)
+            y = np.random.randint(0, self.texture_size)
+            size = np.random.randint(5, 15)
+            color = '#8B0000'  # Dark red
+            draw.ellipse(
+                (x-size, y-size, x+size, y+size),
+                fill=color
+            )
+        
+        # Save texture
+        output_path = self.output_dir / "textures" / "dungeon.jpg"
+        img.save(output_path, quality=95)
+        return output_path
+    
+    def _generate_bridge_texture(self, palette: Dict[str, List[str]]) -> Path:
+        """Generate a bridge texture"""
+        # Create base noise
+        base_noise = np.zeros((self.texture_size, self.texture_size, 3), dtype=np.uint8)
+        
+        # Convert stone color to RGB
+        stone_color = self._hex_to_rgb(palette['stone'][0])
+        
+        for i in range(self.texture_size):
+            for j in range(self.texture_size):
+                noise_val = noise.pnoise2(i/100, j/100, octaves=4, persistence=0.5)
+                # Apply noise to color
+                color = np.array(stone_color) * (0.7 + 0.3 * noise_val)
+                base_noise[i, j] = color
+        
+        # Add stone block patterns
+        block_size = self.texture_size // 8
+        edge_color = np.array(stone_color) * 0.8
+        
+        for i in range(0, self.texture_size, block_size):
+            for j in range(0, self.texture_size, block_size):
+                # Add block edges
+                base_noise[i:i+2, j:j+block_size] = edge_color
+                base_noise[i:i+block_size, j:j+2] = edge_color
+        
+        # Add weathering effects
+        for i in range(self.texture_size):
+            for j in range(self.texture_size):
+                if random.random() < 0.1:
+                    base_noise[i, j] = base_noise[i, j] * 0.8
+        
+        # Save texture
+        output_path = self.output_dir / "textures" / "bridge.jpg"
+        Image.fromarray(base_noise).save(output_path)
+        return output_path
+    
+    def _generate_tower_texture(self, palette: Dict[str, List[str]]) -> Path:
+        """Generate a tower texture"""
+        # Create base noise
+        base_noise = np.zeros((self.texture_size, self.texture_size, 3), dtype=np.uint8)
+        
+        # Convert colors to RGB
+        stone_color = self._hex_to_rgb(palette['stone'][0])
+        wood_color = self._hex_to_rgb(palette['wood'][0])
+        
+        for i in range(self.texture_size):
+            for j in range(self.texture_size):
+                noise_val = noise.pnoise2(i/100, j/100, octaves=4, persistence=0.5)
+                # Apply noise to color
+                color = np.array(stone_color) * (0.7 + 0.3 * noise_val)
+                base_noise[i, j] = color
+        
+        # Add stone block patterns
+        block_size = self.texture_size // 12
+        edge_color = np.array(stone_color) * 0.8
+        
+        for i in range(0, self.texture_size, block_size):
+            for j in range(0, self.texture_size, block_size):
+                # Add block edges
+                base_noise[i:i+2, j:j+block_size] = edge_color
+                base_noise[i:i+block_size, j:j+2] = edge_color
+        
+        # Add window frames
+        window_size = block_size * 2
+        window_positions = [
+            (self.texture_size//4, self.texture_size//4),
+            (self.texture_size//4, 3*self.texture_size//4),
+            (3*self.texture_size//4, self.texture_size//4),
+            (3*self.texture_size//4, 3*self.texture_size//4)
+        ]
+        
+        frame_color = np.array(wood_color) * 0.7
+        glass_color = np.array([200, 200, 255])
+        
+        for x, y in window_positions:
+            # Window frame
+            base_noise[x:x+window_size, y:y+2] = frame_color
+            base_noise[x:x+2, y:y+window_size] = frame_color
+            base_noise[x+window_size-2:x+window_size, y:y+window_size] = frame_color
+            base_noise[x:x+window_size, y+window_size-2:y+window_size] = frame_color
+            
+            # Window glass
+            base_noise[x+2:x+window_size-2, y+2:y+window_size-2] = glass_color
+        
+        # Add weathering and moss effects
+        moss_color = np.array([100, 120, 80])
+        
+        for i in range(self.texture_size):
+            for j in range(self.texture_size):
+                if random.random() < 0.05:
+                    base_noise[i, j] = base_noise[i, j] * 0.8
+                if random.random() < 0.02:
+                    base_noise[i, j] = moss_color
+        
+        # Save texture
+        output_path = self.output_dir / "textures" / "tower.jpg"
+        Image.fromarray(base_noise).save(output_path)
         return output_path
     
     def generate_asset_manifest(self) -> Dict:

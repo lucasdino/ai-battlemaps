@@ -306,7 +306,7 @@ export class SceneRenderer {
         return new Promise((resolve, reject) => {
             const textureLoader = new THREE.TextureLoader();
             textureLoader.load(
-                `textures/${name.toLowerCase()}.jpg`,
+                `/assets/textures/textures/${name.toLowerCase()}.jpg`,
                 texture => {
                     texture.encoding = THREE.sRGBEncoding;
                     resolve(texture);
@@ -325,99 +325,111 @@ export class SceneRenderer {
         parent.name = parentName;
         this.scene.add(parent);
         this.objects.push(parent);
-        
+        const gltfLoader = new GLTFLoader();
         for (const obj of objects) {
             try {
-                // Create 2.5D object
-                let geometry;
-                let material;
-
-                // Create basic geometry based on type
-                switch(obj.type.toLowerCase()) {
-                    case 'tree':
-                        // Create tree from basic shapes
-                        const treeGroup = new THREE.Group();
-                        
-                        // Trunk
-                        const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 2, 8);
-                        const trunkMaterial = new THREE.MeshStandardMaterial({ 
-                            color: 0x8B4513,
-                            roughness: 0.9,
-                            metalness: 0.1
+                let meshOrGroup = null;
+                // Try to load a model if specified
+                if (obj.model) {
+                    let modelPath = null;
+                    if (parentName.toLowerCase() === 'features') {
+                        modelPath = `/assets/models/features/${obj.model}`;
+                    } else if (parentName.toLowerCase() === 'props') {
+                        modelPath = `/assets/models/props/${obj.model}`;
+                    }
+                    if (modelPath) {
+                        await new Promise((resolve, reject) => {
+                            gltfLoader.load(
+                                modelPath,
+                                gltf => {
+                                    meshOrGroup = gltf.scene;
+                                    resolve();
+                                },
+                                undefined,
+                                error => {
+                                    console.warn(`Failed to load model ${modelPath}:`, error);
+                                    resolve(); // Fallback to primitive if model fails
+                                }
+                            );
                         });
-                        const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-                        trunk.position.y = 1;
-                        treeGroup.add(trunk);
-                        
-                        // Leaves
-                        const leavesGeometry = new THREE.ConeGeometry(1, 2, 8);
-                        const leavesMaterial = new THREE.MeshStandardMaterial({ 
-                            color: 0x2d5a27,
-                            roughness: 0.8,
-                            metalness: 0.2
-                        });
-                        const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
-                        leaves.position.y = 2.5;
-                        treeGroup.add(leaves);
-                        
-                        return treeGroup;
-
-                    case 'rock':
-                        geometry = new THREE.DodecahedronGeometry(1, 0);
-                        material = new THREE.MeshStandardMaterial({ 
-                            color: 0x808080,
-                            roughness: 0.9,
-                            metalness: 0.3
-                        });
-                        break;
-
-                    case 'building':
-                        geometry = new THREE.BoxGeometry(2, 2, 2);
-                        material = new THREE.MeshStandardMaterial({ 
-                            color: 0x8b4513,
-                            roughness: 0.8,
-                            metalness: 0.2
-                        });
-                        break;
-
-                    default:
-                        // Default to a box for unknown types
-                        geometry = new THREE.BoxGeometry(1, 1, 1);
-                        material = new THREE.MeshStandardMaterial({ 
-                            color: 0x808080,
-                            roughness: 0.8,
-                            metalness: 0.2
-                        });
+                    }
                 }
-
-                const mesh = new THREE.Mesh(geometry, material);
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                
+                // Fallback to primitive if no model or failed to load
+                if (!meshOrGroup) {
+                    let geometry;
+                    let material;
+                    switch(obj.type.toLowerCase()) {
+                        case 'tree':
+                            const treeGroup = new THREE.Group();
+                            const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 2, 8);
+                            const trunkMaterial = new THREE.MeshStandardMaterial({ 
+                                color: 0x8B4513,
+                                roughness: 0.9,
+                                metalness: 0.1
+                            });
+                            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                            trunk.position.y = 1;
+                            treeGroup.add(trunk);
+                            const leavesGeometry = new THREE.ConeGeometry(1, 2, 8);
+                            const leavesMaterial = new THREE.MeshStandardMaterial({ 
+                                color: 0x2d5a27,
+                                roughness: 0.8,
+                                metalness: 0.2
+                            });
+                            const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+                            leaves.position.y = 2.5;
+                            treeGroup.add(leaves);
+                            meshOrGroup = treeGroup;
+                            break;
+                        case 'rock':
+                            geometry = new THREE.DodecahedronGeometry(1, 0);
+                            material = new THREE.MeshStandardMaterial({ 
+                                color: 0x808080,
+                                roughness: 0.9,
+                                metalness: 0.3
+                            });
+                            meshOrGroup = new THREE.Mesh(geometry, material);
+                            break;
+                        case 'building':
+                            geometry = new THREE.BoxGeometry(2, 2, 2);
+                            material = new THREE.MeshStandardMaterial({ 
+                                color: 0x8b4513,
+                                roughness: 0.8,
+                                metalness: 0.2
+                            });
+                            meshOrGroup = new THREE.Mesh(geometry, material);
+                            break;
+                        default:
+                            geometry = new THREE.BoxGeometry(1, 1, 1);
+                            material = new THREE.MeshStandardMaterial({ 
+                                color: 0x808080,
+                                roughness: 0.8,
+                                metalness: 0.2
+                            });
+                            meshOrGroup = new THREE.Mesh(geometry, material);
+                    }
+                }
                 // Position in 2.5D space
-                mesh.position.set(
+                meshOrGroup.position.set(
                     obj.position.x,
                     obj.position.y,
                     obj.position.z
                 );
-                
                 if (obj.rotation) {
-                    mesh.rotation.set(
+                    meshOrGroup.rotation.set(
                         obj.rotation.x,
                         obj.rotation.y,
                         obj.rotation.z
                     );
                 }
-                
                 if (obj.scale) {
-                    mesh.scale.set(
+                    meshOrGroup.scale.set(
                         obj.scale.x,
                         obj.scale.y,
                         obj.scale.z
                     );
                 }
-                
-                parent.add(mesh);
+                parent.add(meshOrGroup);
             } catch (error) {
                 console.warn(`Failed to place object:`, error);
             }

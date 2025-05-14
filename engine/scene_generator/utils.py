@@ -160,7 +160,7 @@ def log_gpu_memory_usage():
         return
     
     for device, memory in get_gpu_memory_usage().items():
-        logger.info(f"{device} memory usage: {memory:.2f} MB")
+        logger.info(f"{device} memory usage: {memory:.2f} MB") 
 
 def to_json_serializable(data: Any, depth: int = 0, max_depth: int = 10, seen: set = None) -> Any:
     """Convert data to JSON serializable format
