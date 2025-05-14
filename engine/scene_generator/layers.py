@@ -19,6 +19,8 @@ from .utils import (
     save_texture, texture_to_base64, texture_to_data_uri,
     to_json_serializable
 )
+from .assets import AssetGenerator
+from .models import ModelGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -493,6 +495,10 @@ class SceneGenerator:
         self.prop_layer = PropLayer(self.config.prop)
         self.visual_layer = VisualPolishLayer(self.config.visual)
         
+        # Initialize asset generators
+        self.asset_generator = AssetGenerator(output_dir="assets/textures")
+        self.model_generator = ModelGenerator(output_dir="assets/models")
+        
         # Setup logging
         logging.basicConfig(
             level=getattr(logging, self.config.log_level),
@@ -511,7 +517,14 @@ class SceneGenerator:
         self.config.visual.style = style
         self.config.visual.high_res = high_res
         
+        # Generate assets
+        logger.info("Generating assets...")
+        textures = self.asset_generator.generate_terrain_textures(style)
+        feature_textures = self.asset_generator.generate_feature_textures(style)
+        models = self.model_generator.generate_all_models()
+        
         # Generate terrain
+        logger.info("Generating terrain...")
         terrain_data = self.terrain_layer.generate(
             self.config.width,
             self.config.height
@@ -520,6 +533,7 @@ class SceneGenerator:
             return None
         
         # Generate features
+        logger.info("Generating features...")
         feature_data = self.feature_layer.generate(
             terrain_data,
             self.config.grid_size,
@@ -529,6 +543,7 @@ class SceneGenerator:
             return None
         
         # Generate props
+        logger.info("Generating props...")
         prop_data = self.prop_layer.generate(
             terrain_data,
             feature_data
@@ -537,6 +552,7 @@ class SceneGenerator:
             return None
         
         # Generate visual polish
+        logger.info("Generating visual polish...")
         visual_data = self.visual_layer.generate(
             {
                 'features': feature_data['features'],
@@ -552,7 +568,14 @@ class SceneGenerator:
             'terrain': terrain_data,
             'features': feature_data,
             'props': prop_data,
-            'visual': visual_data
+            'visual': visual_data,
+            'assets': {
+                'textures': {
+                    'terrain': textures,
+                    'features': feature_textures
+                },
+                'models': models
+            }
         }
         
         # Generate additional views if requested
@@ -790,6 +813,10 @@ class SceneGenerator:
         normal_map = scene_data['terrain']['normal_map']
         slope_map = scene_data['terrain']['slope_map']
         
+        # Get assets
+        textures = scene_data['assets']['textures']
+        models = scene_data['assets']['models']
+        
         # Create terrain data
         terrain_data = {
             'size': {
@@ -809,6 +836,7 @@ class SceneGenerator:
                     'name': 'water',
                     'threshold': 0.2,
                     'tiling': {'x': 4, 'y': 4},
+                    'texture': textures['terrain']['water'],
                     'material': {
                         'color': '#0077be',
                         'roughness': 0.1,
@@ -820,6 +848,7 @@ class SceneGenerator:
                     'name': 'sand',
                     'threshold': 0.3,
                     'tiling': {'x': 8, 'y': 8},
+                    'texture': textures['terrain']['sand'],
                     'material': {
                         'color': '#c2b280',
                         'roughness': 0.9,
@@ -831,6 +860,7 @@ class SceneGenerator:
                     'name': 'grass',
                     'threshold': 0.7,
                     'tiling': {'x': 16, 'y': 16},
+                    'texture': textures['terrain']['grass'],
                     'material': {
                         'color': '#355e3b',
                         'roughness': 0.8,
@@ -842,6 +872,7 @@ class SceneGenerator:
                     'name': 'mountain',
                     'threshold': 0.9,
                     'tiling': {'x': 32, 'y': 32},
+                    'texture': textures['terrain']['mountain'],
                     'material': {
                         'color': '#808080',
                         'roughness': 0.9,
@@ -868,6 +899,15 @@ class SceneGenerator:
             x, y = f['position']
             elev = float(elevation[y, x])
             
+            # Handle size tuple
+            size = f['size']
+            if isinstance(size, tuple):
+                scale_x = float(size[0])
+                scale_y = float(size[1]) if len(size) > 1 else scale_x
+                scale_z = float(size[2]) if len(size) > 2 else scale_x
+            else:
+                scale_x = scale_y = scale_z = float(size)
+            
             features.append({
                 'type': f['type'],
                 'position': {
@@ -881,12 +921,14 @@ class SceneGenerator:
                     'z': 0
                 }),
                 'scale': {
-                    'x': float(f['size']),
-                    'y': float(f['size']),
-                    'z': float(f['size'])
+                    'x': scale_x,
+                    'y': scale_y,
+                    'z': scale_z
                 },
                 'normal': f.get('normal', [0, 1, 0]),
                 'slope': float(f.get('slope', 0)),
+                'model': models['features'][f['type']],
+                'texture': textures['features'][f['type']],
                 'material': {
                     'color': self._get_feature_color(f['type']),
                     'roughness': 0.8,
@@ -907,6 +949,15 @@ class SceneGenerator:
             # Calculate rotation to align with normal
             rotation = self._calculate_rotation_from_normal(normal)
             
+            # Handle cluster size
+            cluster_size = p['cluster_size']
+            if isinstance(cluster_size, tuple):
+                scale_x = float(cluster_size[0])
+                scale_y = float(cluster_size[1]) if len(cluster_size) > 1 else scale_x
+                scale_z = float(cluster_size[2]) if len(cluster_size) > 2 else scale_x
+            else:
+                scale_x = scale_y = scale_z = float(cluster_size)
+            
             props.append({
                 'type': p['type'],
                 'position': {
@@ -916,12 +967,14 @@ class SceneGenerator:
                 },
                 'rotation': rotation,
                 'scale': {
-                    'x': float(p['cluster_size']),
-                    'y': float(p['cluster_size']),
-                    'z': float(p['cluster_size'])
+                    'x': scale_x,
+                    'y': scale_y,
+                    'z': scale_z
                 },
-                'normal': normal.tolist(),
+                'normal': normal if isinstance(normal, list) else normal.tolist(),
                 'slope': float(slope_map[y, x]),
+                'model': models['props'][p['type']],
+                'texture': textures['features'][p['type']],
                 'material': {
                     'color': self._get_prop_color(p['type']),
                     'roughness': 0.8,

@@ -182,16 +182,37 @@ export class SceneRenderer {
         }
         geometry.computeVertexNormals();
         
-        // Create material with default color
-        const material = new THREE.MeshStandardMaterial({
-            color: 0x808080,
-            roughness: 0.8,
-            metalness: 0.2,
-            flatShading: true // Add flat shading for 2.5D look
-        });
+        // Create multi-material terrain
+        const materials = [];
+        const materialIndices = [];
         
-        // Create mesh
-        this.terrain = new THREE.Mesh(geometry, material);
+        // Create materials for each texture layer
+        for (const layer of terrainData.texture_layers) {
+            const material = new THREE.MeshStandardMaterial({
+                color: this.getDefaultColor(layer.name),
+                roughness: layer.material?.roughness || 0.8,
+                metalness: layer.material?.metalness || 0.2,
+                flatShading: true
+            });
+            materials.push(material);
+        }
+        
+        // Assign materials based on height
+        for (let i = 0; i < vertices.length; i += 3) {
+            const height = vertices[i + 1];
+            let materialIndex = 0;
+            
+            for (let j = 0; j < terrainData.texture_layers.length; j++) {
+                if (height > terrainData.texture_layers[j].threshold) {
+                    materialIndex = j;
+                }
+            }
+            
+            materialIndices.push(materialIndex);
+        }
+        
+        // Create mesh with materials
+        this.terrain = new THREE.Mesh(geometry, materials);
         this.terrain.rotation.x = -Math.PI / 2;
         this.terrain.receiveShadow = true;
         this.scene.add(this.terrain);
@@ -201,64 +222,84 @@ export class SceneRenderer {
             try {
                 await this.applyTerrainTextures(terrainData.texture_layers);
             } catch (error) {
-                console.warn('Failed to apply terrain textures, using default material:', error);
+                console.warn('Failed to apply terrain textures, using default materials:', error);
             }
         }
     }
     
-    async applyTerrainTextures(textureLayers) {
-        // Default colors for different terrain types
-        const defaultColors = {
+    getDefaultColor(textureName) {
+        const colors = {
             water: 0x0077be,
             sand: 0xc2b280,
             grass: 0x355e3b,
             mountain: 0x808080
         };
+        return colors[textureName.toLowerCase()] || 0x808080;
+    }
+    
+    async applyTerrainTextures(textureLayers) {
+        const textureLoader = new THREE.TextureLoader();
         
-        const materials = [];
-        
-        for (const layer of textureLayers) {
+        for (let i = 0; i < textureLayers.length; i++) {
+            const layer = textureLayers[i];
+            const material = this.terrain.material[i];
+            
             try {
+                // Load base texture
                 const texture = await this.loadTexture(layer.name);
-                const material = new THREE.MeshStandardMaterial({
-                    map: texture,
-                    roughness: 0.8,
-                    metalness: 0.2
-                });
-                materials.push(material);
-            } catch (error) {
-                console.warn(`Failed to load texture for ${layer.name}, using default color`);
-                const color = defaultColors[layer.name.toLowerCase()] || 0x808080;
-                const material = new THREE.MeshStandardMaterial({
-                    color: color,
-                    roughness: 0.8,
-                    metalness: 0.2
-                });
-                materials.push(material);
-            }
-        }
-        
-        // Apply materials based on height
-        const vertices = this.terrain.geometry.attributes.position.array;
-        const colors = new Float32Array(vertices.length);
-        
-        for (let i = 0; i < vertices.length; i += 3) {
-            const height = vertices[i + 1];
-            let materialIndex = 0;
-            
-            for (let j = 0; j < textureLayers.length; j++) {
-                if (height > textureLayers[j].threshold) {
-                    materialIndex = j;
+                material.map = texture;
+                
+                // Load normal map
+                try {
+                    const normalMap = await this.loadTexture(`${layer.name}_normal`);
+                    material.normalMap = normalMap;
+                    material.normalScale.set(1, 1);
+                } catch (error) {
+                    console.warn(`Failed to load normal map for ${layer.name}`);
                 }
+                
+                // Load roughness map
+                try {
+                    const roughnessMap = await this.loadTexture(`${layer.name}_roughness`);
+                    material.roughnessMap = roughnessMap;
+                } catch (error) {
+                    console.warn(`Failed to load roughness map for ${layer.name}`);
+                }
+                
+                // Load metalness map
+                try {
+                    const metalnessMap = await this.loadTexture(`${layer.name}_metalness`);
+                    material.metalnessMap = metalnessMap;
+                } catch (error) {
+                    console.warn(`Failed to load metalness map for ${layer.name}`);
+                }
+                
+                // Apply tiling
+                if (layer.tiling) {
+                    material.map.wrapS = material.map.wrapT = THREE.RepeatWrapping;
+                    material.map.repeat.set(layer.tiling.x, layer.tiling.y);
+                    
+                    if (material.normalMap) {
+                        material.normalMap.wrapS = material.normalMap.wrapT = THREE.RepeatWrapping;
+                        material.normalMap.repeat.set(layer.tiling.x, layer.tiling.y);
+                    }
+                    
+                    if (material.roughnessMap) {
+                        material.roughnessMap.wrapS = material.roughnessMap.wrapT = THREE.RepeatWrapping;
+                        material.roughnessMap.repeat.set(layer.tiling.x, layer.tiling.y);
+                    }
+                    
+                    if (material.metalnessMap) {
+                        material.metalnessMap.wrapS = material.metalnessMap.wrapT = THREE.RepeatWrapping;
+                        material.metalnessMap.repeat.set(layer.tiling.x, layer.tiling.y);
+                    }
+                }
+                
+                material.needsUpdate = true;
+            } catch (error) {
+                console.warn(`Failed to load textures for ${layer.name}, using default material`);
             }
-            
-            const color = materials[materialIndex].color;
-            colors[i] = color.r;
-            colors[i + 1] = color.g;
-            colors[i + 2] = color.b;
         }
-        
-        this.terrain.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     }
     
     async loadTexture(name) {
@@ -266,7 +307,10 @@ export class SceneRenderer {
             const textureLoader = new THREE.TextureLoader();
             textureLoader.load(
                 `textures/${name.toLowerCase()}.jpg`,
-                texture => resolve(texture),
+                texture => {
+                    texture.encoding = THREE.sRGBEncoding;
+                    resolve(texture);
+                },
                 undefined,
                 error => {
                     console.warn(`Failed to load texture ${name}:`, error);
@@ -286,23 +330,66 @@ export class SceneRenderer {
             try {
                 // Create 2.5D object
                 let geometry;
-                if (obj.type === 'tree') {
-                    geometry = new THREE.ConeGeometry(0.5, 2, 4);
-                } else if (obj.type === 'rock') {
-                    geometry = new THREE.DodecahedronGeometry(0.5);
-                } else if (obj.type === 'building') {
-                    geometry = new THREE.BoxGeometry(1, 2, 1);
-                } else {
-                    geometry = new THREE.BoxGeometry(1, 1, 1);
+                let material;
+
+                // Create basic geometry based on type
+                switch(obj.type.toLowerCase()) {
+                    case 'tree':
+                        // Create tree from basic shapes
+                        const treeGroup = new THREE.Group();
+                        
+                        // Trunk
+                        const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 2, 8);
+                        const trunkMaterial = new THREE.MeshStandardMaterial({ 
+                            color: 0x8B4513,
+                            roughness: 0.9,
+                            metalness: 0.1
+                        });
+                        const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                        trunk.position.y = 1;
+                        treeGroup.add(trunk);
+                        
+                        // Leaves
+                        const leavesGeometry = new THREE.ConeGeometry(1, 2, 8);
+                        const leavesMaterial = new THREE.MeshStandardMaterial({ 
+                            color: 0x2d5a27,
+                            roughness: 0.8,
+                            metalness: 0.2
+                        });
+                        const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+                        leaves.position.y = 2.5;
+                        treeGroup.add(leaves);
+                        
+                        return treeGroup;
+
+                    case 'rock':
+                        geometry = new THREE.DodecahedronGeometry(1, 0);
+                        material = new THREE.MeshStandardMaterial({ 
+                            color: 0x808080,
+                            roughness: 0.9,
+                            metalness: 0.3
+                        });
+                        break;
+
+                    case 'building':
+                        geometry = new THREE.BoxGeometry(2, 2, 2);
+                        material = new THREE.MeshStandardMaterial({ 
+                            color: 0x8b4513,
+                            roughness: 0.8,
+                            metalness: 0.2
+                        });
+                        break;
+
+                    default:
+                        // Default to a box for unknown types
+                        geometry = new THREE.BoxGeometry(1, 1, 1);
+                        material = new THREE.MeshStandardMaterial({ 
+                            color: 0x808080,
+                            roughness: 0.8,
+                            metalness: 0.2
+                        });
                 }
-                
-                const material = new THREE.MeshStandardMaterial({
-                    color: obj.color || 0x808080,
-                    roughness: 0.8,
-                    metalness: 0.2,
-                    flatShading: true
-                });
-                
+
                 const mesh = new THREE.Mesh(geometry, material);
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;

@@ -1,12 +1,41 @@
-# Terrain Textures
+# Required Textures
 
-Place your texture files in this directory with the following names:
-- water.jpg - Blue water texture
-- sand.jpg - Light beige sand texture
-- grass.jpg - Green grass texture
-- mountain.jpg - Grey mountain texture
+## Terrain Textures
+- `water.jpg` - Water texture with normal map
+- `sand.jpg` - Sand texture with normal map
+- `grass.jpg` - Grass texture with normal map
+- `mountain.jpg` - Mountain texture with normal map
 
-You can use any JPG images, but recommended sizes are 1024x1024 pixels.
+## Feature Textures
+- `tree.jpg` - Tree bark texture
+- `rock.jpg` - Rock texture
+- `building.jpg` - Building wall texture
+
+## Prop Textures
+- `bush.jpg` - Bush texture
+- `flower.jpg` - Flower texture
+- `stone.jpg` - Stone texture
+
+Each texture should be:
+- 1024x1024 pixels
+- Include a normal map (_normal.jpg)
+- Include a roughness map (_roughness.jpg)
+- Include a metalness map (_metalness.jpg)
+
+Example:
+```
+textures/
+  ├── terrain/
+  │   ├── water.jpg
+  │   ├── water_normal.jpg
+  │   ├── water_roughness.jpg
+  │   ├── water_metalness.jpg
+  │   └── ...
+  ├── features/
+  │   └── ...
+  └── props/
+      └── ...
+```
 
 ## Default Textures
 If you don't have your own textures, you can use these placeholder colors:
