@@ -47,30 +47,6 @@
       "path": "/assets/3d_model_icons/chickenjockey_1746827381190_a21d8a9a.png"
     }
   },
-  "dwarfboi_1746827766610_694b6972.glb": {
-    "name": "dwarfboi_1746827766610_694b6972",
-    "type": "image_to_3d",
-    "source": "uploaded_image",
-    "sourceImage": {
-      "file": "image-1746827766615-133018742.png",
-      "path": "/assets/images/image-1746827766615-133018742.png",
-      "source": "uploaded_image"
-    },
-    "status": "complete",
-    "created": 1746827766774,
-    "updated": 1746827791571,
-    "video": {
-      "file": "dwarfboi_1746827766610-preview.mp4",
-      "path": "/assets/asset_videos/dwarfboi_1746827766610-preview.mp4"
-    },
-    "modelFile": "dwarfboi_1746827766610_694b6972.glb",
-    "modelPath": "/assets/3d_models/dwarfboi_1746827766610_694b6972.glb",
-    "completed": 1746827791571,
-    "icon": {
-      "file": "dwarfboi_1746827766610_694b6972.png",
-      "path": "/assets/3d_model_icons/dwarfboi_1746827766610_694b6972.png"
-    }
-  },
   "casettepunk_1746828534001_0d0de801.glb": {
     "name": "casettepunk_1746828534001_0d0de801",
     "type": "image_to_3d",
@@ -237,6 +213,78 @@
     "icon": {
       "file": "generated-1746832928396-155145_1746832937290_28d17120.png",
       "path": "/assets/3d_model_icons/generated-1746832928396-155145_1746832937290_28d17120.png"
+    }
+  },
+  "foxy_1747090714262_06aaa36a.glb": {
+    "name": "foxy_1747090714262_06aaa36a",
+    "type": "image_to_3d",
+    "source": "uploaded_image",
+    "sourceImage": {
+      "file": "image-1747090714277-183868186.png",
+      "path": "/assets/images/image-1747090714277-183868186.png",
+      "source": "uploaded_image"
+    },
+    "status": "complete",
+    "created": 1747090714719,
+    "updated": 1747090776903,
+    "video": {
+      "file": "foxy_1747090714262-preview.mp4",
+      "path": "/assets/asset_videos/foxy_1747090714262-preview.mp4"
+    },
+    "modelFile": "foxy_1747090714262_06aaa36a.glb",
+    "modelPath": "/assets/3d_models/foxy_1747090714262_06aaa36a.glb",
+    "completed": 1747090776902,
+    "icon": {
+      "file": "foxy_1747090714262_06aaa36a.png",
+      "path": "/assets/3d_model_icons/foxy_1747090714262_06aaa36a.png"
+    }
+  },
+  "dwarfboi_1747090931945_c496af18.glb": {
+    "name": "dwarfboi_1747090931945_c496af18",
+    "type": "image_to_3d",
+    "source": "uploaded_image",
+    "sourceImage": {
+      "file": "image-1747090931949-13785898.png",
+      "path": "/assets/images/image-1747090931949-13785898.png",
+      "source": "uploaded_image"
+    },
+    "status": "complete",
+    "created": 1747090932304,
+    "updated": 1747090960497,
+    "video": {
+      "file": "dwarfboi_1747090931945-preview.mp4",
+      "path": "/assets/asset_videos/dwarfboi_1747090931945-preview.mp4"
+    },
+    "modelFile": "dwarfboi_1747090931945_c496af18.glb",
+    "modelPath": "/assets/3d_models/dwarfboi_1747090931945_c496af18.glb",
+    "completed": 1747090960497,
+    "icon": {
+      "file": "dwarfboi_1747090931945_c496af18.png",
+      "path": "/assets/3d_model_icons/dwarfboi_1747090931945_c496af18.png"
+    }
+  },
+  "generated-1747091012985-509203_1747091034763_29d44791.glb": {
+    "name": "Gundrin",
+    "type": "image_to_3d",
+    "source": "uploaded_image",
+    "sourceImage": {
+      "file": "image-1747091034790-193211962.png",
+      "path": "/assets/images/image-1747091034790-193211962.png",
+      "source": "uploaded_image"
+    },
+    "status": "complete",
+    "created": 1747091035354,
+    "updated": 1747091083306,
+    "video": {
+      "file": "generated-1747091012985-509203_1747091034763-preview.mp4",
+      "path": "/assets/asset_videos/generated-1747091012985-509203_1747091034763-preview.mp4"
+    },
+    "modelFile": "generated-1747091012985-509203_1747091034763_29d44791.glb",
+    "modelPath": "/assets/3d_models/generated-1747091012985-509203_1747091034763_29d44791.glb",
+    "completed": 1747091064914,
+    "icon": {
+      "file": "generated-1747091012985-509203_1747091034763_29d44791.png",
+      "path": "/assets/3d_model_icons/generated-1747091012985-509203_1747091034763_29d44791.png"
     }
   }
 }

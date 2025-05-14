@@ -3,8 +3,8 @@ const path = require('path');
 const API_KEYS = require('./apiKeys');
 
 // External services configuration
-const TRELLIS_HOST = '35.87.142.75';
-const TRELLIS_PORT = 27830;
+const TRELLIS_HOST = '52.4.82.21';
+const TRELLIS_PORT = 6571;
 
 // Get the backend root directory (one level up from config folder)
 const BACKEND_ROOT = path.join(__dirname, '..');
