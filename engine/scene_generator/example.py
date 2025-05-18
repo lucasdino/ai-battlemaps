@@ -111,8 +111,8 @@ def generate_scene(
     
     # Save export data
         with open(output_path / f"scene_{format_type}.json", "w") as f:
-            import json
-            json.dump(export_data, f, indent=2)
+        import json
+        json.dump(export_data, f, indent=2)
     
     return scene_data
 

@@ -1,0 +1,1 @@
+# Initialize the image_scene_synthesis directory for new scene generation functionality 

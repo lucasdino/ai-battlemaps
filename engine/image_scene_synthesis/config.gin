@@ -1,0 +1,16 @@
+# Configuration for generate_image
+generate_image.model_id = "runwayml/stable-diffusion-v1-5"
+generate_image.num_inference_steps = 50
+generate_image.device = "auto"
+
+# Configuration for label_image
+label_image.labels = ["forest", "river", "cliff", "valley"]
+
+# Configuration for structure_extraction
+structure_extraction.contour_level = 0.5
+
+# Configuration for mesh_synthesis
+mesh_synthesis.output_format = "obj"
+
+# Configuration for wfc_tiling
+wfc_tiling.pattern_size = 3 
