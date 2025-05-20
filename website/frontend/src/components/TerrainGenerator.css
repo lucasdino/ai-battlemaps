@@ -1,11 +1,8 @@
 .terrain-generator {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-    padding: 2rem;
+    position: relative;
+    width: 100%;
     height: 100vh;
-    background: #1a1a1a;
-    color: #ffffff;
+    overflow: hidden;
 }
 
 .terrain-controls {
@@ -125,21 +122,21 @@
 }
 
 .error-message {
-    padding: 1rem;
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     background: rgba(255, 0, 0, 0.1);
-    border: 1px solid #ff4444;
+    color: #ff0000;
+    padding: 10px 20px;
     border-radius: 8px;
-    color: #ff4444;
-    font-size: 0.9rem;
+    z-index: 1000;
+    backdrop-filter: blur(10px);
 }
 
 .terrain-viewer {
-    flex: 1;
-    min-height: 400px;
-    background: #000000;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    height: 100%;
 }
 
 /* Responsive adjustments */
@@ -155,4 +152,14 @@
     .terrain-viewer {
         min-height: 300px;
     }
+}
+
+/* Remove old form styles since we're using ChatBox now */
+.terrain-description-form {
+    display: none;
+}
+
+/* Ensure the GUI panel is visible above the chatbox */
+.lil-gui {
+    z-index: 1001 !important;
 } 
