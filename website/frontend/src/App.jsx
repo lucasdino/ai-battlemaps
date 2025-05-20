@@ -2,7 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 import Home from './components/Home.jsx';
 import ViewAssets from './components/ViewAssets.jsx';
-import TerrainGenerator from './components/TerrainGenerator.jsx';
+import { TerrainGenerator } from './components/terrain-generator/TerrainGenerator.jsx';
 import './App.css';
 
 function App() {
