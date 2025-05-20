@@ -43,14 +43,12 @@ router.post(CONFIG.ENDPOINTS.GENERATE_IMAGE.replace('/api', ''), async (req, res
       case 'openai':
         imageData = await generateOpenAIImage(prompt, systemPrompt, providerConfig);
         break;
-      case 'stability':
-        imageData = await generateStabilityAIImage(prompt, systemPrompt, providerConfig);
-        break;
       case 'google':
         imageData = await generateGoogleImage(prompt, systemPrompt, providerConfig);
         break;
       case 'openai-editor':
-        return res.status(400).json({ error: 'Image editor cannot be used for initial generation' });
+        imageData = await generateOpenAIImage(prompt, systemPrompt, providerConfig);
+        break;
       default:
         return res.status(400).json({ error: 'Unsupported provider' });
     }
@@ -141,19 +139,32 @@ router.get(CONFIG.ENDPOINTS.IMAGE_PROVIDERS.replace('/api', ''), (req, res) => {
 // Helper function for OpenAI image generation
 async function generateOpenAIImage(prompt, systemPrompt, config) {
   console.log(`Generating image with OpenAI using prompt: ${prompt}`);
+
   const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
-  const response = await axios.post('https://api.openai.com/v1/images/generations', {
-    model: config.MODEL || "dall-e-3",
+
+  // Build the request body dynamically; GPT-Image (gpt-image-1) rejects the
+  // "response_format" parameter, whereas DALL-E 3 still expects it for base64.
+  const requestBody = {
+    model: config.MODEL || 'dall-e-3',
     prompt: fullPrompt,
     n: 1,
-    size: config.SIZE || "1024x1024",
-    response_format: "b64_json"
-  }, {
+    size: config.SIZE || '1024x1024',
+  };
+
+  if ((config.MODEL || 'dall-e-3') !== 'gpt-image-1') {
+    // DALL-E models accept response_format; GPT-Image does not
+    requestBody.response_format = 'b64_json';
+  }
+
+  const response = await axios.post('https://api.openai.com/v1/images/generations', requestBody, {
     headers: {
       'Authorization': `Bearer ${config.API_KEY}`,
-      'Content-Type': 'application/json'
-    }
+      'Content-Type': 'application/json',
+    },
   });
+
+  // OpenAI will always return base64 data for GPT-Image and for DALL-E when
+  // response_format is set to b64_json. The JSON structure is consistent.
   const b64Data = response.data.data[0].b64_json;
   return Buffer.from(b64Data, 'base64');
 }
@@ -195,34 +206,9 @@ async function editImagesWithOpenAI(imageBuffers, prompt, systemPrompt, config) 
   }
 }
 
-// Helper function for Stability AI image generation
-async function generateStabilityAIImage(prompt, systemPrompt, config) {
-  console.log(`Generating image with Stability AI using prompt: ${prompt}`);
-  const fullPrompt = systemPrompt ? `${systemPrompt}. ${prompt}` : prompt;
-  const response = await axios.post(`https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image`, {
-    text_prompts: [
-      {
-        text: fullPrompt,
-        weight: 1
-      }
-    ],
-    cfg_scale: 7,
-    height: 1024,
-    width: 1024,
-    samples: 1,
-  }, {
-    headers: {
-      'Authorization': `Bearer ${config.API_KEY}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    },
-    responseType: 'arraybuffer'
-  });
-  return Buffer.from(response.data);
-}
-
 // Helper function for Google Gemini image generation
 async function generateGoogleImage(prompt, systemPrompt, config) {
+  console.log(`Generating image with Google using prompt: ${prompt}`);
   const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
   
   const response = await axios.post(

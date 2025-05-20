@@ -96,19 +96,6 @@ const CONFIG = {
     DEFAULT_SYSTEM_PROMPT: "Generate an isometric projection of a 3D asset. It should have color unless otherwise specified by the user. Ensure the subject is the main focus, has visual depth, is well lit, and there should be no background. Do not include any text.",
     DEFAULT_EDIT_SYSTEM_PROMPT: "Incorporate the user's instructions while generating an isometric projection of a 3D asset. There should be no background, the subject should be well lit, and there should be visual depth in the image of the 3D asset.",
     PROVIDERS: {
-      'openai': {
-        NAME: 'OpenAI DALL-E',
-        API_KEY: API_KEYS.OPENAI,
-        MODEL: 'dall-e-3',
-        SIZE: '1024x1024',
-        DESCRIPTION: 'OpenAI DALL-E 3 (Image Generation).'
-      },
-      'stability': {
-        NAME: 'Stability AI',
-        API_KEY: API_KEYS.STABILITY,
-        MODEL: 'stable-diffusion-xl',
-        DESCRIPTION: 'Stability AI image generation with SDXL'
-      },
       'google': {
         NAME: 'Google Imagen',
         API_KEY: API_KEYS.GOOGLE,
@@ -116,12 +103,19 @@ const CONFIG = {
         MODEL: 'imagen-3.0-generate-002',
         DESCRIPTION: 'Google Gemini Imagen 3 (Image Generation).'
       },
+      'openai': {
+        NAME: 'OpenAI DALL-E',
+        API_KEY: API_KEYS.OPENAI,
+        MODEL: 'dall-e-3',
+        SIZE: '1024x1024',
+        DESCRIPTION: 'OpenAI DALL-E 3 (Image Generation).'
+      },
       'openai-editor': {
-        NAME: 'OpenAI Image Editor',
+        NAME: 'OpenAI GPT-Image',
         API_KEY: API_KEYS.OPENAI,
         MODEL: 'gpt-image-1',
         SIZE: '1024x1024',
-        DESCRIPTION: 'OpenAI GPT Image Model (Image Generation / Image Editing).'
+        DESCRIPTION: 'OpenAI GPT-Image Model (Image Generation / Image Editing).'
       }
     }
   }
