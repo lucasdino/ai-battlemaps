@@ -1,3 +1,4 @@
 {
-  "systemPrompt": "Generate an isometric projection of a 3D asset. It should have color unless otherwise specified by the user. Ensure the subject is the main focus, has visual depth, is well-lit, and the background is minimal. Do not include any text."
+  "generation_systemPrompt": "Generate an isometric projection of a 3D asset. It should have color unless otherwise specified by the user. Ensure the subject is the main focus, has visual depth, is well lit, and there should be no background. Do not include any text.",
+  "imageEdit_systemPrompt": "Incorporate the user's instructions while generating an isometric projection of a 3D asset. There should be no background, the subject should be well lit, and there should be visual depth in the image of the 3D asset. If multiple images are passed in, incorporate the user's instructions and make sure that you keep the style of the original assets unless otherwise specified by the user."
 }

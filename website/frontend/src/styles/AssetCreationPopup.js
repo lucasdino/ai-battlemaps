@@ -98,6 +98,24 @@ const styles = {
     marginBottom: '0.5rem',
     fontWeight: '500',
   },
+  // Dotted upload box for Upload view
+  uploadBox: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '2px dashed rgba(0,0,0,0.2)',
+    borderRadius: '4px',
+    padding: '1.5rem',
+    cursor: 'pointer',
+    backgroundColor: THEME.bgPrimary,
+    color: THEME.textSecondary,
+    minHeight: '220px',
+    transition: 'background-color 0.2s',
+    '&:hover': {
+      backgroundColor: THEME.bgSecondary,
+    },
+  },
   generatedImageInfo: {
     position: 'absolute',
     bottom: '10px',
@@ -200,8 +218,8 @@ const styles = {
   // Prompt container (for image generation)
   promptContainer: {
     ...sharedStyles.utils.flexColumn,
-    ...sharedStyles.utils.gap16,
-    marginBottom: '1.5rem',
+    ...sharedStyles.utils.gap8,
+    marginBottom: 0,
   },
   label: {
     ...sharedStyles.typography.label,
@@ -251,6 +269,200 @@ const styles = {
     height: '20px',
     marginTop: '4px',
   },
+  
+  // Spinner for inline button loading
+  spinnerInline: {
+    display: 'inline-block',
+    width: 22,
+    height: 22,
+    border: '3px solid #eee',
+    borderTop: `3px solid ${THEME.accentPrimary}`,
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+    verticalAlign: 'middle',
+    margin: '0 auto',
+  },
+  // Large spinner for below button
+  spinnerLarge: {
+    display: 'block',
+    width: 36,
+    height: 36,
+    border: '4px solid #eee',
+    borderTop: `4px solid ${THEME.accentPrimary}`,
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+    margin: '0 auto',
+  },
+  generationSpinnerContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    marginBottom: 0,
+    width: '100%',
+  },
+  generationSpinnerText: {
+    marginTop: 8,
+    color: THEME.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  
+  // Edit Image View
+  editImageContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    width: '100%',
+    gap: '1.5rem',
+  },
+  editImagePreviewContainer: {
+    width: '100%',
+    height: '300px',
+    backgroundColor: THEME.bgPrimary,
+    borderRadius: '4px',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    border: THEME.border,
+    position: 'relative',
+  },
+  editPromptContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  editPromptLabel: {
+    ...sharedStyles.typography.label,
+  },
+  editPromptTextarea: {
+    ...sharedStyles.inputs.base,
+    minHeight: '100px',
+    resize: 'vertical',
+  },
+  editImageActions: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '16px',
+    marginTop: '1rem',
+  },
+  backButton: {
+    ...sharedStyles.buttons.secondary,
+    flex: 1,
+  },
+  makeEditButton: {
+    ...sharedStyles.buttons.primary,
+    flex: 2,
+  },
+  
+  // === Edit Images Carousel ===
+  editImagesCarousel: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    maxWidth: '720px',
+    margin: '0 auto',
+    minHeight: '360px',
+    gap: '0',
+    position: 'relative',
+  },
+  carouselArrow: {
+    background: 'none',
+    border: 'none',
+    color: THEME.accentPrimary,
+    fontSize: '36px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    padding: 4,
+    width: 40,
+    height: 360,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  carouselArrowDisabled: {
+    color: '#888',
+    cursor: 'not-allowed',
+  },
+  carouselImagesContainer: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: 0,
+    width: '100%',
+    height: '100%',
+    transition: 'transform 0.3s ease',
+  },
+  editImageCard: {
+    position: 'relative',
+    width: '100%',
+    height: '240px',
+    background: THEME.bgPrimary,
+    borderRadius: '16px',
+    overflow: 'hidden',
+    border: `2px solid ${THEME.accentPrimary}`,
+    boxShadow: '0 2px 16px rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+    background: '#181818',
+    display: 'block',
+  },
+  removeImageButtonLarge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    background: '#444',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    width: 32,
+    height: 32,
+    fontSize: 20,
+    fontWeight: 700,
+    cursor: 'pointer',
+    transition: 'background 0.2s, color 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeImageButtonHover: {
+    background: THEME.accentPrimary,
+    color: '#fff',
+  },
+  editWarning: {
+    color: THEME.accentPrimary,
+    textAlign: 'center',
+    marginTop: 10,
+    fontWeight: 600,
+    fontSize: 15,
+    letterSpacing: 0.2,
+  },
+  imageCountIndicator: {
+    position: 'absolute',
+    top: 8,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    background: 'rgba(0,0,0,0.7)',
+    color: '#fff',
+    padding: '2px 8px',
+    borderRadius: 4,
+    fontSize: 12,
+    pointerEvents: 'none',
+  },
 };
+
+// Add keyframes for spin animation
+const styleSheet = typeof document !== 'undefined' ? document.styleSheets[0] : null;
+if (styleSheet && !Array.from(styleSheet.cssRules).some(rule => rule.name === 'spin')) {
+  styleSheet.insertRule(`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`, styleSheet.cssRules.length);
+}
 
 export default styles; 

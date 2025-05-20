@@ -3,8 +3,8 @@ const path = require('path');
 const API_KEYS = require('./apiKeys');
 
 // External services configuration
-const TRELLIS_HOST = '52.4.82.21';
-const TRELLIS_PORT = 6571;
+const TRELLIS_HOST = '194.26.196.175';
+const TRELLIS_PORT = 13708;
 
 // Get the backend root directory (one level up from config folder)
 const BACKEND_ROOT = path.join(__dirname, '..');
@@ -93,7 +93,8 @@ const CONFIG = {
   // Image generation configuration
   IMAGE_GENERATION: {
     DEFAULT_PROVIDER: 'openai',
-    DEFAULT_SYSTEM_PROMPT: 'Generate an isometric projection of a 3D asset. Ensure the subject is the main focus, their full body is visible, visual depth, and there is no background.',
+    DEFAULT_SYSTEM_PROMPT: "Generate an isometric projection of a 3D asset. It should have color unless otherwise specified by the user. Ensure the subject is the main focus, has visual depth, is well lit, and there should be no background. Do not include any text.",
+    DEFAULT_EDIT_SYSTEM_PROMPT: "Incorporate the user's instructions while generating an isometric projection of a 3D asset. There should be no background, the subject should be well lit, and there should be visual depth in the image of the 3D asset.",
     PROVIDERS: {
       'openai': {
         NAME: 'OpenAI DALL-E',

@@ -5,9 +5,18 @@ const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const multer = require('multer');
+const FormData = require('form-data');
 const CONFIG = require('../config/config');
 
 const router = express.Router();
+
+// Multer setup for memory storage (to get buffers)
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 } // Example: 50MB limit per file
+});
 
 /**
  * Generate an image using AI
@@ -74,12 +83,13 @@ router.post(CONFIG.ENDPOINTS.GENERATE_IMAGE.replace('/api', ''), async (req, res
  * Edit an existing image using AI
  * POST /api/edit-image
  */
-router.post(CONFIG.ENDPOINTS.EDIT_IMAGE.replace('/api', ''), async (req, res) => {
+router.post(CONFIG.ENDPOINTS.EDIT_IMAGE.replace('/api', ''), upload.array('images', 5), async (req, res) => {
   try {
-    const { imageUrl, prompt, systemPrompt } = req.body;
-    
-    if (!imageUrl) {
-      return res.status(400).json({ error: 'Image URL is required' });
+    const { prompt, systemPrompt } = req.body;
+    const files = req.files;
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'At least one image file is required' });
     }
     
     if (!prompt) {
@@ -89,21 +99,10 @@ router.post(CONFIG.ENDPOINTS.EDIT_IMAGE.replace('/api', ''), async (req, res) =>
     const providerConfig = CONFIG.IMAGE_GENERATION.PROVIDERS['openai-editor'];
     const filename = `edited-${Date.now()}-${Math.round(Math.random() * 1E6)}.png`;
     const outputPath = path.join(CONFIG.DIRECTORIES.IMAGES, filename);
-    let imagePath;
-
-    if (imageUrl.startsWith('/assets/')) {
-      const relativePath = imageUrl.replace('/assets/', '');
-      imagePath = path.join(CONFIG.DIRECTORIES.ASSETS_ROOT, relativePath);
-    } else {
-      return res.status(400).json({ error: 'Unsupported image URL format. Must be a server asset path.' });
-    }
     
-    if (!fs.existsSync(imagePath)) {
-      return res.status(404).json({ error: 'Source image not found' });
-    }
+    const imageBuffers = files.map(file => file.buffer);
     
-    const imageBuffer = fs.readFileSync(imagePath);
-    const editedImageData = await editImageWithOpenAI(imageBuffer, prompt, systemPrompt, providerConfig);
+    const editedImageData = await editImagesWithOpenAI(imageBuffers, prompt, systemPrompt, providerConfig);
     fs.writeFileSync(outputPath, editedImageData, 'binary');
     
     res.json({
@@ -159,26 +158,41 @@ async function generateOpenAIImage(prompt, systemPrompt, config) {
   return Buffer.from(b64Data, 'base64');
 }
 
-// Helper function for OpenAI image editing
-async function editImageWithOpenAI(imageBuffer, prompt, systemPrompt, config) {
-  console.log(`Editing image with OpenAI using prompt: ${prompt}`);
+// Helper function for OpenAI image editing (handles multiple buffers)
+async function editImagesWithOpenAI(imageBuffers, prompt, systemPrompt, config) {
+  if (!imageBuffers || imageBuffers.length === 0) {
+    throw new Error('At least one image buffer must be provided.');
+  }
+
   const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
-  const b64Image = imageBuffer.toString('base64');
-  const response = await axios.post('https://api.openai.com/v1/images/generations', {
-    model: config.MODEL || "gpt-image-1", // This might need to be an actual edit model endpoint
-    prompt: fullPrompt,
-    n: 1,
-    size: config.SIZE || "1024x1024",
-    response_format: "b64_json",
-    reference_image: b64Image // Parameter name might vary for actual edit APIs
-  }, {
-    headers: {
-      'Authorization': `Bearer ${config.API_KEY}`,
-      'Content-Type': 'application/json'
-    }
+  const form = new FormData();
+
+  // Attach all image buffers as image[] fields, with debug logging
+  imageBuffers.forEach((buf, i) => {
+    console.log(`Adding image buffer #${i} - size: ${buf.length} bytes`);
+    form.append('image[]', buf, { filename: `image${i}.png`, contentType: 'image/png' });
   });
-  const b64Data = response.data.data[0].b64_json;
-  return Buffer.from(b64Data, 'base64');
+
+  form.append('model', config.MODEL || 'gpt-image-1');
+  form.append('prompt', fullPrompt);
+  if (config.SIZE) form.append('size', config.SIZE);
+
+  try {
+    const response = await axios.post('https://api.openai.com/v1/images/edits', form, {
+      headers: {
+        ...form.getHeaders(),
+        'Authorization': `Bearer ${config.API_KEY}`,
+      },
+      maxBodyLength: Infinity, // To support large image uploads
+    });
+
+    // The response is always base64, no need for response_format param
+    const b64Data = response.data.data[0].b64_json;
+    return Buffer.from(b64Data, 'base64');
+  } catch (err) {
+    console.error("OpenAI API Error:", err.response?.data || err.message || err);
+    throw err;
+  }
 }
 
 // Helper function for Stability AI image generation
