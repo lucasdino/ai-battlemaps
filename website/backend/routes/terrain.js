@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const terrainGenerator = require('../utils/terrain/TerrainGenerator');
-const { getTerrainParams } = require('../utils/terrain/terrainAgent');
 
 // Generate terrain based on natural language description
 router.post('/generate', async (req, res) => {
@@ -105,51 +104,6 @@ router.post('/strategies', async (req, res) => {
         res.status(500).json({ 
             error: 'Failed to register strategy',
             message: error.message || 'An unexpected error occurred while registering the strategy'
-        });
-    }
-});
-
-// Get terrain parameters based on description
-router.post('/params', async (req, res) => {
-    try {
-        const { description } = req.body;
-        
-        if (!description) {
-            console.error('Missing description in request body');
-            return res.status(400).json({ 
-                error: 'Description is required',
-                message: 'Please provide a description of the terrain you want to generate'
-            });
-        }
-
-        console.log('Getting terrain parameters for description:', description);
-        const params = getTerrainParams(description);
-        
-        console.log('Generated terrain parameters:', JSON.stringify(params, null, 2));
-        console.log('Parameter details:', {
-            noiseIterations: params.noiseIterations,
-            positionFrequency: params.positionFrequency,
-            warpFrequency: params.warpFrequency,
-            warpStrength: params.warpStrength,
-            strength: params.strength,
-            colors: {
-                sand: params.colorSand,
-                grass: params.colorGrass,
-                snow: params.colorSnow,
-                rock: params.colorRock
-            }
-        });
-
-        res.json(params);
-    } catch (error) {
-        console.error('Error getting terrain parameters:', {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-        });
-        res.status(500).json({ 
-            error: 'Failed to get terrain parameters',
-            message: error.message || 'An unexpected error occurred while getting terrain parameters'
         });
     }
 });
