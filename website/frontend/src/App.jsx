@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 import Home from './components/Home.jsx';
 import ViewAssets from './components/ViewAssets.jsx';
+import TerrainGenerator from './components/TerrainGenerator.jsx';
 import './App.css';
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/view-assets" element={<ViewAssets />} />
+          <Route path="/terrain-generator" element={<TerrainGenerator />} />
         </Routes>
       </div>
     </div>

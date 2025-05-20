@@ -1,7 +1,7 @@
 // Frontend API Configuration
 const CONFIG = {
   API: {
-    BASE_URL: 'http://localhost:3001',
+    BASE_URL: 'http://localhost:3000',
     ENDPOINTS: {
       MODELS: {
         BASE: '/api/models',
