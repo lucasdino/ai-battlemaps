@@ -58,20 +58,6 @@ const Navbar = () => {
             }}
           />
         </Link>
-        <Link 
-          to="/terrain-generator" 
-          style={styles.navbarLink}
-          onMouseEnter={() => setHoveredLink('terrain')}
-          onMouseLeave={() => setHoveredLink(null)}
-        >
-          Terrain Generator
-          <span 
-            style={{
-              ...styles.linkFlameEffect,
-              ...(hoveredLink === 'terrain' ? styles.linkFlameEffectHover : {})
-            }}
-          />
-        </Link>
       </div>
     </nav>
   );
