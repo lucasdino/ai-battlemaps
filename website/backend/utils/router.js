@@ -12,6 +12,7 @@ const setupRouters = (app, routers) => {
   // Extract routers from the provided object
   const {
     modelsApi,
+    terrainsApi,
     trellis,
     images,
     systemPrompt,
@@ -20,6 +21,7 @@ const setupRouters = (app, routers) => {
 
   // Mount all API routers
   app.use('/api', modelsApi);
+  app.use('/api', terrainsApi);
   app.use('/api', trellis);
   app.use('/api', images);
   app.use('/api', systemPrompt);

@@ -58,6 +58,20 @@ const Navbar = () => {
             }}
           />
         </Link>
+        <Link 
+          to="/view-terrains" 
+          style={styles.navbarLink}
+          onMouseEnter={() => setHoveredLink('terrains')}
+          onMouseLeave={() => setHoveredLink(null)}
+        >
+          Terrains
+          <span 
+            style={{
+              ...styles.linkFlameEffect,
+              ...(hoveredLink === 'terrains' ? styles.linkFlameEffectHover : {})
+            }}
+          />
+        </Link>
       </div>
     </nav>
   );

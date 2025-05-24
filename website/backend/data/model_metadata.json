@@ -370,5 +370,77 @@
       "file": "generated-1747272252733-557818_1747272271003_d8a84c04.png",
       "path": "/assets/3d_model_icons/generated-1747272252733-557818_1747272271003_d8a84c04.png"
     }
+  },
+  "wizard_dragon_1747769405175_a8ea3534.glb": {
+    "name": "wizard_dragon_1747769405175_a8ea3534",
+    "type": "image_to_3d",
+    "source": "uploaded_image",
+    "sourceImage": {
+      "file": "image-1747769405184-10691061.png",
+      "path": "/assets/images/image-1747769405184-10691061.png",
+      "source": "uploaded_image"
+    },
+    "status": "complete",
+    "created": 1747769405432,
+    "updated": 1747769526992,
+    "video": {
+      "file": "wizard_dragon_1747769405175-preview.mp4",
+      "path": "/assets/asset_videos/wizard_dragon_1747769405175-preview.mp4"
+    },
+    "modelFile": "wizard_dragon_1747769405175_a8ea3534.glb",
+    "modelPath": "/assets/3d_models/wizard_dragon_1747769405175_a8ea3534.glb",
+    "completed": 1747769526991,
+    "icon": {
+      "file": "wizard_dragon_1747769405175_a8ea3534.png",
+      "path": "/assets/3d_model_icons/wizard_dragon_1747769405175_a8ea3534.png"
+    }
+  },
+  "funkopop_swanson_1747771324935_d59c54e0.glb": {
+    "name": "funkopop_swanson_1747771324935_d59c54e0",
+    "type": "image_to_3d",
+    "source": "uploaded_image",
+    "sourceImage": {
+      "file": "image-1747771324938-14650362.png",
+      "path": "/assets/images/image-1747771324938-14650362.png",
+      "source": "uploaded_image"
+    },
+    "status": "complete",
+    "created": 1747771325203,
+    "updated": 1747771374581,
+    "video": {
+      "file": "funkopop_swanson_1747771324935-preview.mp4",
+      "path": "/assets/asset_videos/funkopop_swanson_1747771324935-preview.mp4"
+    },
+    "modelFile": "funkopop_swanson_1747771324935_d59c54e0.glb",
+    "modelPath": "/assets/3d_models/funkopop_swanson_1747771324935_d59c54e0.glb",
+    "completed": 1747771374580,
+    "icon": {
+      "file": "funkopop_swanson_1747771324935_d59c54e0.png",
+      "path": "/assets/3d_model_icons/funkopop_swanson_1747771324935_d59c54e0.png"
+    }
+  },
+  "edited-1747771432094-386786_1747771466019_fe396e4e.glb": {
+    "name": "edited-1747771432094-386786_1747771466019_fe396e4e",
+    "type": "image_to_3d",
+    "source": "uploaded_image",
+    "sourceImage": {
+      "file": "image-1747771466039-562363202.png",
+      "path": "/assets/images/image-1747771466039-562363202.png",
+      "source": "uploaded_image"
+    },
+    "status": "complete",
+    "created": 1747771466434,
+    "updated": 1747771519124,
+    "video": {
+      "file": "edited-1747771432094-386786_1747771466019-preview.mp4",
+      "path": "/assets/asset_videos/edited-1747771432094-386786_1747771466019-preview.mp4"
+    },
+    "modelFile": "edited-1747771432094-386786_1747771466019_fe396e4e.glb",
+    "modelPath": "/assets/3d_models/edited-1747771432094-386786_1747771466019_fe396e4e.glb",
+    "completed": 1747771519123,
+    "icon": {
+      "file": "edited-1747771432094-386786_1747771466019_fe396e4e.png",
+      "path": "/assets/3d_model_icons/edited-1747771432094-386786_1747771466019_fe396e4e.png"
+    }
   }
 }

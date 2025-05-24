@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const CONFIG = require('./config/config');
 const ModelMetadataUtil = require('./utils/modelMetadataUtil');
+const TerrainMetadataUtil = require('./utils/terrainMetadataUtil');
 
 // Import middleware and router utilities
 const { setupCommonMiddleware, setupStaticServing } = require('./utils/middleware');
@@ -13,6 +14,7 @@ const { setupRouters } = require('./utils/router');
 
 // Require routers
 const modelsApiRouter = require('./routes/modelsApi');
+const terrainsApiRouter = require('./routes/terrainsApi');
 const imagesRouter = require('./routes/images');
 const trellisRouter = require('./routes/trellis');
 const systemPromptRouter = require('./routes/systemPrompt');
@@ -30,7 +32,10 @@ const ensureDirectoriesExist = () => {
     CONFIG.DIRECTORIES.MODEL_ICONS,
     CONFIG.DIRECTORIES.DATA,
     CONFIG.DIRECTORIES.IMAGES,
-    CONFIG.DIRECTORIES.ASSET_VIDEOS
+    CONFIG.DIRECTORIES.ASSET_VIDEOS,
+    CONFIG.DIRECTORIES.TERRAINS,
+    CONFIG.DIRECTORIES.TERRAIN_IMAGES,
+    CONFIG.DIRECTORIES.TERRAIN_ICONS
   ];
 
   directories.forEach(dir => {
@@ -54,6 +59,9 @@ ensureDirectoriesExist();
 // Initialize the metadata file
 ModelMetadataUtil.initMetadataFile();
 
+// Initialize terrain metadata file
+TerrainMetadataUtil.initMetadataFile();
+
 // Initialize the system prompt file if it doesn't exist
 if (!fs.existsSync(CONFIG.SYSTEM_PROMPT_FILE)) {
   fs.writeFileSync(
@@ -74,6 +82,7 @@ setupStaticServing(app);
 // Setup all API routers using the unified models API
 setupRouters(app, {
   modelsApi: modelsApiRouter,
+  terrainsApi: terrainsApiRouter,
   images: imagesRouter, 
   trellis: trellisRouter,
   systemPrompt: systemPromptRouter,

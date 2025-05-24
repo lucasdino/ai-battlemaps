@@ -2,9 +2,10 @@
 const path = require('path');
 const API_KEYS = require('./apiKeys');
 
+
 // External services configuration
-const TRELLIS_HOST = '194.26.196.175';
-const TRELLIS_PORT = 13708;
+const TRELLIS_HOST = '64.62.194.198';
+const TRELLIS_PORT = 20760;
 
 // Get the backend root directory (one level up from config folder)
 const BACKEND_ROOT = path.join(__dirname, '..');
@@ -24,7 +25,10 @@ const CONFIG = {
     IMAGES: path.join(BACKEND_ROOT, 'assets', 'images'),
     ASSET_VIDEOS: path.join(BACKEND_ROOT, 'assets', 'asset_videos'),
     MODEL_ICONS: path.join(BACKEND_ROOT, 'assets', '3d_model_icons'),
-    DATA: path.join(BACKEND_ROOT, 'data')
+    DATA: path.join(BACKEND_ROOT, 'data'),
+    TERRAINS: path.join(BACKEND_ROOT, 'assets', 'terrains'),
+    TERRAIN_IMAGES: path.join(BACKEND_ROOT, 'assets', 'terrain_images'),
+    TERRAIN_ICONS: path.join(BACKEND_ROOT, 'assets', 'terrain_icons')
   },
   
   ENDPOINTS: {
@@ -32,6 +36,10 @@ const CONFIG = {
     MODELS: '/api/models',
     MODELS_UPLOAD: '/api/models/upload',
     MODELS_VIDEOS: '/api/models/videos',
+    
+    // Terrain API endpoints
+    TERRAINS: '/api/terrains',
+    TERRAINS_UPLOAD: '/api/terrains/upload',
     
     // AI generation endpoints
     TRELLIS: '/api/trellis',

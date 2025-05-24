@@ -35,12 +35,21 @@ const setupStaticServing = (app) => {
   app.use('/assets/images', express.static(CONFIG.DIRECTORIES.IMAGES));
   app.use('/assets/asset_videos', express.static(CONFIG.DIRECTORIES.ASSET_VIDEOS));
   
+  // Terrain asset directories
+  console.log(`[DEBUG] Serving terrains from physical path: ${CONFIG.DIRECTORIES.TERRAINS}`);
+  app.use('/assets/terrains', express.static(CONFIG.DIRECTORIES.TERRAINS));
+  app.use('/assets/terrain_images', express.static(CONFIG.DIRECTORIES.TERRAIN_IMAGES));
+  app.use('/assets/terrain_icons', express.static(CONFIG.DIRECTORIES.TERRAIN_ICONS));
+  
   // Log the static serving paths for debugging
   console.log('Serving static files from:');
   console.log(`- ${CONFIG.DIRECTORIES.MODELS} at /assets/3d_models`);
   console.log(`- ${CONFIG.DIRECTORIES.MODEL_ICONS} at /assets/3d_model_icons`);
   console.log(`- ${CONFIG.DIRECTORIES.IMAGES} at /assets/images`);
   console.log(`- ${CONFIG.DIRECTORIES.ASSET_VIDEOS} at /assets/asset_videos`);
+  console.log(`- ${CONFIG.DIRECTORIES.TERRAINS} at /assets/terrains`);
+  console.log(`- ${CONFIG.DIRECTORIES.TERRAIN_IMAGES} at /assets/terrain_images`);
+  console.log(`- ${CONFIG.DIRECTORIES.TERRAIN_ICONS} at /assets/terrain_icons`);
 };
 
 /**

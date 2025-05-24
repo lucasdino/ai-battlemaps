@@ -10,6 +10,11 @@ const CONFIG = {
         ICON: '/api/models/:id/icon',
         VIDEO: '/api/models/:id/video'
       },
+      TERRAINS: {
+        BASE: '/api/terrains',
+        UPLOAD: '/api/terrains/upload',
+        ICON: '/api/terrains/:id/icon'
+      },
       TRELLIS: '/api/trellis', // 3D asset generation endpoint that connects to external service
       GENERATE_IMAGE: '/api/generate-image', // Endpoint to generate images with AI
       IMAGE_PROVIDERS: '/api/image-providers', // Endpoint to get available image generation providers
@@ -25,7 +30,10 @@ const CONFIG = {
       IMAGE_GEN: 'assets/image_gen',
       IMAGE_UPLOADS: 'assets/image_uploads',
       MODEL_ICONS: 'assets/3d_model_icons',
-      ASSET_VIDEOS: 'assets/asset_videos'
+      ASSET_VIDEOS: 'assets/asset_videos',
+      TERRAINS: 'assets/terrains',
+      TERRAIN_IMAGES: 'assets/terrain_images',
+      TERRAIN_ICONS: 'assets/terrain_icons'
     }
   }
 };

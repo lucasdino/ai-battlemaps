@@ -949,7 +949,14 @@ const ViewAssets = () => {
                   onClick={() => setSelectedModel(asset)}
                 >
                   {renderAssetThumbnail(asset)}
-                  <div style={styles.assetName}>{asset.displayName || formatFileName(asset.name)}</div>
+                  <div style={{
+                    ...styles.assetName,
+                    color: '#fff', // Force white font
+                    fontSize: '11px', // Small font
+                    marginTop: '4px',
+                    lineHeight: '1.2',
+                    textShadow: '0 1px 2px #000a',
+                  }}>{asset.displayName || formatFileName(asset.name) || '(no name)'}</div>
                 </div>
               ))}
             </div>

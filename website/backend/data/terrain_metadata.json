@@ -1,0 +1,24 @@
+{
+  "throneroom_1748044430911_o9rvd8.glb": {
+    "created": 1748044431262,
+    "name": "throneroom",
+    "type": "terrain",
+    "originalFilename": "throneroom.jpg",
+    "dimensions": {
+      "width": 6.4,
+      "height": 10,
+      "depth": 0.1
+    },
+    "scale": 1.4,
+    "gridDivisions": 7,
+    "sourceImage": {
+      "file": "throneroom_1748044430911_o9rvd8.jpg",
+      "path": "/assets/terrain_images/throneroom_1748044430911_o9rvd8.jpg"
+    },
+    "icon": {
+      "file": "throneroom_1748044430911_o9rvd8_icon.png",
+      "path": "/assets/terrain_icons/throneroom_1748044430911_o9rvd8_icon.png"
+    },
+    "updated": 1748044740898
+  }
+}

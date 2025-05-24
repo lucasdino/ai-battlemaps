@@ -64,7 +64,7 @@ const sharedStyles = {
     },
     secondaryHover: {
       backgroundColor: THEME.bgActive,
-      borderColor: THEME.textPrimary,
+      border: `1px solid ${THEME.textPrimary}`,
     },
     secondaryPressed: {
       transform: 'translateY(1px)',
