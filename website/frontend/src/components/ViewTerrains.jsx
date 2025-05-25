@@ -133,6 +133,7 @@ const ViewTerrains = () => {
   const [agentPlacementConfig, setAgentPlacementConfig] = useState([]); // NEW state for per-asset agent placement counts
   const [terrainViewerMetrics, setTerrainViewerMetrics] = useState(null); // <-- ADDED STATE
   const [globallySelectedPlacedAssetId, setGloballySelectedPlacedAssetId] = useState(null); // <-- ADDED STATE
+  const [playerAssetId, setPlayerAssetId] = useState(null);  // Player Asset OS
   
   // Refs
   const fileInputRef = useRef(null);
@@ -779,6 +780,17 @@ const ViewTerrains = () => {
     };
   }, [currentSelectedAssetForPlacement, showMessage]);
 
+  // Handler to set/unset a placed asset as the player asset
+  const handleSetAsPlayer = useCallback((assetId) => {
+    setPlayerAssetId(prevId => prevId === assetId ? null : assetId);
+    showMessage(
+      playerAssetId === assetId 
+        ? 'Player asset unset' 
+        : 'Player asset set',
+      'success'
+    );
+  }, [playerAssetId, showMessage]);
+
   return (
     <div style={combinedStyles.container}>
       {/* Message Display */}
@@ -802,9 +814,9 @@ const ViewTerrains = () => {
               onError={handleTerrainViewerError}
               onTerrainNameChange={handleTerrainNameChange}
               onTerrainDeleted={handleTerrainDeleted}
-              onTerrainMetricsUpdate={setTerrainViewerMetrics} 
-              onPlacedAssetSelected={handlePlacedAssetSelectionChange} // <-- PASS CALLBACK
-              onPlacedAssetMoved={handlePlacedAssetMoved} // <-- PASS NEW CALLBACK
+              onTerrainMetricsUpdate={setTerrainViewerMetrics}
+              onPlacedAssetSelected={handlePlacedAssetSelectionChange}
+              onPlacedAssetMoved={handlePlacedAssetMoved}
               showGrid={true}
               scale={selectedTerrain.scale}
               selectedAsset={
@@ -821,6 +833,8 @@ const ViewTerrains = () => {
               }
               onAssetPlaced={handleManualAssetPlaced}
               placedAssets={placedAssetsOnTerrain}
+              playerAssetId={playerAssetId}  // Player Asset ID
+              onSetAsPlayer={handleSetAsPlayer}  // Set/unset player asset
             />
           </div>
         ) : (

@@ -4,6 +4,7 @@ infinigen/
 
 # API Keys
 apiKeys.js
+**/apiKeys.js
 
 # Logs
 logs

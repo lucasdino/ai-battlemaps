@@ -22,7 +22,9 @@ const TerrainViewer = ({
   onAssetPlaced, 
   placedAssets: assetsToDisplayProp,
   onPlacedAssetSelected,
-  onPlacedAssetMoved // <-- NEW PROP for when an asset is moved by dragging
+  onPlacedAssetMoved,
+  playerAssetId,  // Player Asset ID
+  onSetAsPlayer   // Set/unset player asset
 }) => {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
@@ -37,6 +39,7 @@ const TerrainViewer = ({
   const mouseRef = useRef(new THREE.Vector2());
   const selectionBoxRef = useRef(null); // For visually indicating selection
   const dragControlsRef = useRef(null); // <-- REF FOR DRAGCONTROLS
+  const playerMarkerRef = useRef(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -47,6 +50,259 @@ const TerrainViewer = ({
   const [saveStatus, setSaveStatus] = useState(null); // For save feedback
   const assetInstancesRef = useRef({}); // Use a ref to keep track of loaded instances { [assetId]: instance }
   const [selectedPlacedAssetId, setSelectedPlacedAssetId] = useState(null); // ID of the currently selected PLACED asset
+
+  // Player View State
+  const [isPlayerView, setIsPlayerView] = useState(false);
+  const [previousCameraPosition, setPreviousCameraPosition] = useState(null);
+  const [previousControlsTarget, setPreviousControlsTarget] = useState(null);
+  const [isToggling, setIsToggling] = useState(false);
+
+  // Player View Camera Settings
+  const PLAYER_CAMERA_HEIGHT = 0.5 // Player Camera Height (meters)
+
+  // Effect for loading and managing placed asset models in the scene
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    const currentInstanceIds = Object.keys(assetInstancesRef.current);
+    const propAssetIds = assetsToDisplayProp.map(a => a.id);
+
+    // 1. Remove assets that are in currentInstances but no longer in props
+    currentInstanceIds.forEach(instanceId => {
+      if (!propAssetIds.includes(instanceId)) {
+        const instanceToRemove = assetInstancesRef.current[instanceId];
+        if (instanceToRemove) {
+          scene.remove(instanceToRemove);
+          // TODO: Proper disposal of geometry and material
+        }
+        delete assetInstancesRef.current[instanceId];
+      }
+    });
+
+    // 2. Load and add new assets that are in props but not yet in currentInstances
+    assetsToDisplayProp.forEach(assetData => {
+      // --- DIAGNOSTIC LOG --- 
+      console.log(`[TV AssetSync] Processing asset: ${assetData.name} (ID: ${assetData.id}), Already loaded: ${!!assetInstancesRef.current[assetData.id]}`);
+      
+      if (!assetInstancesRef.current[assetData.id] && assetData.modelUrl) {
+        const fullAssetUrl = assetData.modelUrl.startsWith('http') 
+          ? assetData.modelUrl 
+          : `${CONFIG.API.BASE_URL}${assetData.modelUrl.startsWith('/') ? '' : '/'}${assetData.modelUrl}`;
+
+        assetLoaderRef.current.load(
+          fullAssetUrl,
+          (gltf) => {
+            const modelInstance = gltf.scene.clone();
+            
+            // Set scale and rotation first, as these can affect the bounding box
+            modelInstance.scale.set(assetData.scale.x, assetData.scale.y, assetData.scale.z);
+            modelInstance.rotation.set(assetData.rotation.x, assetData.rotation.y, assetData.rotation.z);
+            
+            // Calculate bounding box AFTER scaling and rotation (rotation might not be critical for axis-aligned bbox height)
+            const bbox = new THREE.Box3().setFromObject(modelInstance);
+            
+            // The goal is to have the world-coordinate bottom of the model (bbox.min.y after world transform)
+            // sit at assetData.position.y (the click point on the terrain).
+            // modelInstance.position is the model's origin.
+            // The offset from the model's origin to its bottom is bbox.min.y (in its local, scaled space).
+            // So, modelInstance.position.y + bbox.min.y (world) = assetData.position.y (world)
+            // modelInstance.position.y = assetData.position.y - bbox.min.y (where bbox.min.y is relative to origin after scale)
+            // Let's try to set the origin to the click point, then shift it based on bbox.
+            modelInstance.position.set(assetData.position.x, assetData.position.y, assetData.position.z);
+            modelInstance.position.y -= bbox.min.y; // Subtracting bbox.min.y will shift the model up if min.y is negative, down if positive.
+
+            modelInstance.userData = { assetId: assetData.id }; // Essential for identification
+
+            modelInstance.traverse((child) => {
+              if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                
+                // --- BEGIN MATERIAL LOGGING ---
+                if (child.material) {
+                  console.log(`[Asset Material] Asset: ${assetData.name}, Mesh: ${child.name}, Material Type: ${child.material.type}`);
+                  if (child.material.isMeshStandardMaterial) {
+                    console.log(`  Original Color:`, child.material.color.getHexString());
+                    console.log(`  Original Metalness: ${child.material.metalness}, Roughness: ${child.material.roughness}`);
+                    
+                    // --- BEGIN RUNTIME MATERIAL ADJUSTMENT ---
+                    child.material.metalness = 0.5; // Reduce metalness
+                    child.material.roughness = 0.5; // Reduce roughness
+                    // child.material.color.setHex(0xffffff); // Ensure base color is white if it's not
+                    console.log(`  Adjusted Metalness: ${child.material.metalness}, Roughness: ${child.material.roughness}`);
+                    // --- END RUNTIME MATERIAL ADJUSTMENT ---
+
+                    console.log(`  Emissive:`, child.material.emissive.getHexString(), `Intensity: ${child.material.emissiveIntensity}`);
+                  } else if (child.material.isMeshBasicMaterial) {
+                    console.log(`  Color:`, child.material.color.getHexString());
+                    console.warn(`  WARN: MeshBasicMaterial used, will not respond to scene lighting.`);
+                  }
+                  // Log if material is an array (MultiMaterial)
+                  if (Array.isArray(child.material)) {
+                    console.log(`  Material is an array (MultiMaterial). Count: ${child.material.length}`);
+                    child.material.forEach((mat, index) => {
+                      console.log(`    Sub-material ${index}: Type: ${mat.type}`);
+                      if (mat.isMeshStandardMaterial) {
+                        console.log(`      Color:`, mat.color.getHexString());
+                        console.log(`      Metalness: ${mat.metalness}, Roughness: ${mat.roughness}`);
+                      } else if (mat.isMeshBasicMaterial) {
+                        console.log(`      Color:`, mat.color.getHexString());
+                        console.warn(`      WARN: Sub-material MeshBasicMaterial used.`);
+                      }
+                    });
+                  }
+                } else {
+                  console.log(`[Asset Material] Asset: ${assetData.name}, Mesh: ${child.name}, No material found.`);
+                }
+                // --- END MATERIAL LOGGING ---
+              }
+            });
+            
+            scene.add(modelInstance);
+            assetInstancesRef.current[assetData.id] = modelInstance; // Store instance
+          },
+          undefined, // onProgress
+          (error) => {
+            console.error(`Error loading asset ${fullAssetUrl}:`, error);
+            if (onError) onError(`Failed to load asset: ${assetData.name || assetData.modelUrl}`);
+            // If an asset fails to load, it simply won't be added to assetInstancesRef.current
+            // The parent component (ViewTerrains) is responsible for the list of assets that *should* exist.
+          }
+        );
+      }
+    });
+
+  }, [assetsToDisplayProp, onError]); // Depend on the prop `assetsToDisplayProp`
+
+  // Player View Toggle Function
+  const togglePlayerView = useCallback(() => {
+    if (!playerAssetId || !assetInstancesRef.current[playerAssetId]) {
+      return;
+    }
+
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+
+    // Check if camera and controls exist
+    if (!camera || !controls) {
+      console.warn('Camera or controls not initialized');
+      return;
+    }
+
+    setIsToggling(true);
+    const playerInstance = assetInstancesRef.current[playerAssetId];
+
+    if (!isPlayerView) {
+      // Save current camera position
+      setPreviousCameraPosition(camera.position.clone());
+      setPreviousControlsTarget(controls.target.clone());
+
+      // Get player position
+      const playerPosition = playerInstance.position.clone();
+      
+      console.log('Player Position:', {
+        x: playerPosition.x,
+        y: playerPosition.y,
+        z: playerPosition.z
+      });
+
+      // Set camera position
+      camera.position.set(
+        playerPosition.x,
+        playerPosition.y + PLAYER_CAMERA_HEIGHT,
+        playerPosition.z + 0.2
+      );
+
+      // Reset camera orientation
+      camera.quaternion.identity();
+      camera.rotation.set(0, 0, 1);
+      camera.up.set(0, 1, 0);
+
+      // Create forward vector (Z+ direction)
+      const forward = new THREE.Vector3(0, 0, 1);
+      
+      // Calculate camera target position (10 units forward)
+      const targetPosition = new THREE.Vector3(
+        camera.position.x,
+        camera.position.y,
+        camera.position.z + 10
+      );
+
+      // Look camera forward
+      camera.lookAt(targetPosition);
+
+      // OrbitControlsの設定
+      controls.target.copy(targetPosition);
+      controls.enabled = false;
+
+      console.log('Camera Position:', {
+        x: camera.position.x,
+        y: camera.position.y,
+        z: camera.position.z
+      });
+
+      console.log('Camera is looking at:', {
+        x: targetPosition.x,
+        y: targetPosition.y,
+        z: targetPosition.z
+      });
+
+      console.log('Camera Rotation (radians):', {
+        x: camera.rotation.x,
+        y: camera.rotation.y,
+        z: camera.rotation.z
+      });
+
+      console.log('Camera Rotation (degrees):', {
+        x: THREE.MathUtils.radToDeg(camera.rotation.x),
+        y: THREE.MathUtils.radToDeg(camera.rotation.y),
+        z: THREE.MathUtils.radToDeg(camera.rotation.z)
+      });
+
+      setIsPlayerView(true);
+    } else {
+      // Reset to original view
+      if (previousCameraPosition && previousControlsTarget) {
+        camera.position.copy(previousCameraPosition);
+        camera.quaternion.identity();
+        camera.up.set(0, 1, 0);
+        controls.target.copy(previousControlsTarget);
+        controls.enabled = true;
+        
+        console.log('Reset to original view:', {
+          position: {
+            x: camera.position.x,
+            y: camera.position.y,
+            z: camera.position.z
+          },
+          target: {
+            x: controls.target.x,
+            y: controls.target.y,
+            z: controls.target.z
+          }
+        });
+      }
+      setIsPlayerView(false);
+    }
+
+    controls.update();
+    setIsToggling(false);
+  }, [playerAssetId, isPlayerView, previousCameraPosition, previousControlsTarget]);
+
+  // Enable keyboard event processing
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key.toLowerCase() === 'v') {
+        togglePlayerView();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [togglePlayerView]);
 
   // Load scale from backend if not provided as prop
   useEffect(() => {
@@ -166,8 +422,8 @@ const TerrainViewer = ({
     // Animation loop
     const animate = () => {
       animationFrameIdRef.current = requestAnimationFrame(animate);
-      controls.update(); // Only required if controls.enableDamping or controls.autoRotate are set to true
-      renderer.render(scene, camera);
+      controlsRef.current?.update();
+      rendererRef.current?.render(sceneRef.current, cameraRef.current);
     };
     animate();
 
@@ -352,13 +608,6 @@ const TerrainViewer = ({
     if (!scene || !camera) return;
 
     const handleClick = (event) => {
-      // --- DEBUG LOG ---
-      // console.log(
-      //   '[TV handleClick] Start. selectedAsset:', selectedAsset, 
-      //   'selectedAsset.modelUrl:', selectedAsset ? selectedAsset.modelUrl : 'N/A', 
-      //   'terrainModelRef.current:', !!terrainModelRef.current
-      // );
-
       const rect = rendererRef.current.domElement.getBoundingClientRect();
       mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouseRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -367,20 +616,13 @@ const TerrainViewer = ({
       // Case 1: Placing a NEW asset (selectedAsset prop is provided)
       if (selectedAsset && selectedAsset.modelUrl && terrainModelRef.current) {
         const mainTerrainObject = terrainModelRef.current;
-
-        // --- DEBUG LOG (ensure this is reached) ---
-        // console.log('[TV handleClick] Raycasting Check. mainTerrainObject:', mainTerrainObject, 'Children:', mainTerrainObject.children);
-
         const intersectsTerrain = raycasterRef.current.intersectObjects(mainTerrainObject.children, true);
-
-        // --- DEBUG LOG ---
-        // console.log('[TV handleClick] Placing new asset. Intersects terrain:', intersectsTerrain.length > 0, intersectsTerrain);
 
         if (intersectsTerrain.length > 0) {
           const intersectionPoint = intersectsTerrain[0].point;
           const newAssetData = {
             id: `asset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            modelUrl: selectedAsset.modelUrl, // Ensure this is correct
+            modelUrl: selectedAsset.modelUrl,
             name: selectedAsset.name || 'Asset',
             position: { 
               x: intersectionPoint.x, 
@@ -392,8 +634,6 @@ const TerrainViewer = ({
             instance: null 
           };
           if (onAssetPlaced) {
-            // --- DEBUG LOG ---
-            // console.log('[TV handleClick] Calling onAssetPlaced with:', newAssetData);
             onAssetPlaced(newAssetData); 
           }
         }
@@ -404,36 +644,27 @@ const TerrainViewer = ({
         const intersectsAssets = raycasterRef.current.intersectObjects(placedAssetInstances, true);
 
         if (intersectsAssets.length > 0) {
-          // Find the highest-level parent that is a direct child of the scene (or the asset group)
-          // and has our userData.assetId
           let clickedAssetInstance = intersectsAssets[0].object;
           while (clickedAssetInstance.parent !== scene && clickedAssetInstance.parent !== null) {
-            if (clickedAssetInstance.userData?.assetId) break; // Found the main group for the asset
+            if (clickedAssetInstance.userData?.assetId) break;
             clickedAssetInstance = clickedAssetInstance.parent;
           }
           
           if (clickedAssetInstance?.userData?.assetId) {
             setSelectedPlacedAssetId(clickedAssetInstance.userData.assetId);
           } else {
-            // Clicked on a part of an asset that doesn't have the ID, or logic error. Deselect.
             setSelectedPlacedAssetId(null);
           }
         } else {
-          // Clicked on empty space (or terrain, if we don't re-check terrain here), deselect.
-          // Check if terrain was clicked to avoid deselecting if user just clicks terrain
           const mainTerrainObject = terrainModelRef.current;
           if (mainTerrainObject) {
             const intersectsTerrain = raycasterRef.current.intersectObject(mainTerrainObject, true);
             if (intersectsTerrain.length > 0) {
-              // Clicked on terrain, deselect any selected asset
-               setSelectedPlacedAssetId(null);
-            }
-            // If not terrain and not asset, it's empty space - also deselect
-            else {
-                 setSelectedPlacedAssetId(null);
+              setSelectedPlacedAssetId(null);
+            } else {
+              setSelectedPlacedAssetId(null);
             }
           } else {
-            // No terrain model, just empty space
             setSelectedPlacedAssetId(null);
           }
         }
@@ -448,122 +679,7 @@ const TerrainViewer = ({
         rendererDomElement.removeEventListener('click', handleClick);
       }
     };
-  }, [selectedAsset, onAssetPlaced, assetsToDisplayProp, onPlacedAssetSelected]); // Added assetsToDisplayProp and onPlacedAssetSelected
-
-  // Effect for loading and managing placed asset models in the scene
-  useEffect(() => {
-    const scene = sceneRef.current;
-    if (!scene) return;
-
-    const currentInstanceIds = Object.keys(assetInstancesRef.current);
-    const propAssetIds = assetsToDisplayProp.map(a => a.id);
-
-    // 1. Remove assets that are in currentInstances but no longer in props
-    currentInstanceIds.forEach(instanceId => {
-      if (!propAssetIds.includes(instanceId)) {
-        const instanceToRemove = assetInstancesRef.current[instanceId];
-        if (instanceToRemove) {
-          scene.remove(instanceToRemove);
-          // TODO: Proper disposal of geometry and material
-        }
-        delete assetInstancesRef.current[instanceId];
-      }
-    });
-
-    // 2. Load and add new assets that are in props but not yet in currentInstances
-    assetsToDisplayProp.forEach(assetData => {
-      // --- DIAGNOSTIC LOG --- 
-      console.log(`[TV AssetSync] Processing asset: ${assetData.name} (ID: ${assetData.id}), Already loaded: ${!!assetInstancesRef.current[assetData.id]}`);
-      
-      if (!assetInstancesRef.current[assetData.id] && assetData.modelUrl) {
-        const fullAssetUrl = assetData.modelUrl.startsWith('http') 
-          ? assetData.modelUrl 
-          : `${CONFIG.API.BASE_URL}${assetData.modelUrl.startsWith('/') ? '' : '/'}${assetData.modelUrl}`;
-
-        assetLoaderRef.current.load(
-          fullAssetUrl,
-          (gltf) => {
-            const modelInstance = gltf.scene.clone();
-            
-            // Set scale and rotation first, as these can affect the bounding box
-            modelInstance.scale.set(assetData.scale.x, assetData.scale.y, assetData.scale.z);
-            modelInstance.rotation.set(assetData.rotation.x, assetData.rotation.y, assetData.rotation.z);
-            
-            // Calculate bounding box AFTER scaling and rotation (rotation might not be critical for axis-aligned bbox height)
-            const bbox = new THREE.Box3().setFromObject(modelInstance);
-            
-            // The goal is to have the world-coordinate bottom of the model (bbox.min.y after world transform)
-            // sit at assetData.position.y (the click point on the terrain).
-            // modelInstance.position is the model's origin.
-            // The offset from the model's origin to its bottom is bbox.min.y (in its local, scaled space).
-            // So, modelInstance.position.y + bbox.min.y (world) = assetData.position.y (world)
-            // modelInstance.position.y = assetData.position.y - bbox.min.y (where bbox.min.y is relative to origin after scale)
-            // Let's try to set the origin to the click point, then shift it based on bbox.
-            modelInstance.position.set(assetData.position.x, assetData.position.y, assetData.position.z);
-            modelInstance.position.y -= bbox.min.y; // Subtracting bbox.min.y will shift the model up if min.y is negative, down if positive.
-
-            modelInstance.userData = { assetId: assetData.id }; // Essential for identification
-
-            modelInstance.traverse((child) => {
-              if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-                
-                // --- BEGIN MATERIAL LOGGING ---
-                if (child.material) {
-                  console.log(`[Asset Material] Asset: ${assetData.name}, Mesh: ${child.name}, Material Type: ${child.material.type}`);
-                  if (child.material.isMeshStandardMaterial) {
-                    console.log(`  Original Color:`, child.material.color.getHexString());
-                    console.log(`  Original Metalness: ${child.material.metalness}, Roughness: ${child.material.roughness}`);
-                    
-                    // --- BEGIN RUNTIME MATERIAL ADJUSTMENT ---
-                    child.material.metalness = 0.5; // Reduce metalness
-                    child.material.roughness = 0.5; // Reduce roughness
-                    // child.material.color.setHex(0xffffff); // Ensure base color is white if it's not
-                    console.log(`  Adjusted Metalness: ${child.material.metalness}, Roughness: ${child.material.roughness}`);
-                    // --- END RUNTIME MATERIAL ADJUSTMENT ---
-
-                    console.log(`  Emissive:`, child.material.emissive.getHexString(), `Intensity: ${child.material.emissiveIntensity}`);
-                  } else if (child.material.isMeshBasicMaterial) {
-                    console.log(`  Color:`, child.material.color.getHexString());
-                    console.warn(`  WARN: MeshBasicMaterial used, will not respond to scene lighting.`);
-                  }
-                  // Log if material is an array (MultiMaterial)
-                  if (Array.isArray(child.material)) {
-                    console.log(`  Material is an array (MultiMaterial). Count: ${child.material.length}`);
-                    child.material.forEach((mat, index) => {
-                      console.log(`    Sub-material ${index}: Type: ${mat.type}`);
-                      if (mat.isMeshStandardMaterial) {
-                        console.log(`      Color:`, mat.color.getHexString());
-                        console.log(`      Metalness: ${mat.metalness}, Roughness: ${mat.roughness}`);
-                      } else if (mat.isMeshBasicMaterial) {
-                        console.log(`      Color:`, mat.color.getHexString());
-                        console.warn(`      WARN: Sub-material MeshBasicMaterial used.`);
-                      }
-                    });
-                  }
-                } else {
-                  console.log(`[Asset Material] Asset: ${assetData.name}, Mesh: ${child.name}, No material found.`);
-                }
-                // --- END MATERIAL LOGGING ---
-              }
-            });
-            
-            scene.add(modelInstance);
-            assetInstancesRef.current[assetData.id] = modelInstance; // Store instance
-          },
-          undefined, // onProgress
-          (error) => {
-            console.error(`Error loading asset ${fullAssetUrl}:`, error);
-            if (onError) onError(`Failed to load asset: ${assetData.name || assetData.modelUrl}`);
-            // If an asset fails to load, it simply won't be added to assetInstancesRef.current
-            // The parent component (ViewTerrains) is responsible for the list of assets that *should* exist.
-          }
-        );
-      }
-    });
-
-  }, [assetsToDisplayProp, onError]); // Depend on the prop `assetsToDisplayProp`
+  }, [selectedAsset, onAssetPlaced, assetsToDisplayProp, onPlacedAssetSelected]);
 
   // Load terrain model
   useEffect(() => {
@@ -791,6 +907,155 @@ const TerrainViewer = ({
   // This helps if direct state updates to Three.js objects become unreliable.
   const viewerKey = terrainUrl || 'no-terrain';
 
+  // make player marker
+  const createPlayerMarker = useCallback(() => {
+    // delete existing marker
+    if (playerMarkerRef.current) {
+      sceneRef.current.remove(playerMarkerRef.current);
+      playerMarkerRef.current = null;
+    }
+
+    // create marker if player asset is specified
+    if (playerAssetId && assetInstancesRef.current[playerAssetId]) {
+      const playerInstance = assetInstancesRef.current[playerAssetId];
+      
+      // create marker geometry and material
+      const markerGeometry = new THREE.ConeGeometry(0.2, 0.4, 4);
+      const markerMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xff0000,
+        transparent: true,
+        opacity: 0.8
+      });
+      
+      // create marker mesh
+      const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+      marker.rotation.x = Math.PI;
+      
+      // set marker position (above player)
+      const boundingBox = new THREE.Box3().setFromObject(playerInstance);
+      const height = boundingBox.max.y - boundingBox.min.y;
+      marker.position.copy(playerInstance.position);
+      marker.position.y += height + 0.5; // model height + offset
+      
+      // add marker to scene
+      sceneRef.current.add(marker);
+      playerMarkerRef.current = marker;
+
+      // marker animation
+      const animate = () => {
+        if (playerMarkerRef.current) {
+          playerMarkerRef.current.rotation.y += 0.02;
+          requestAnimationFrame(animate);
+        }
+      };
+      animate();
+    }
+  }, [playerAssetId]);
+
+  // update player marker
+  useEffect(() => {
+    if (sceneRef.current) {
+      createPlayerMarker();
+    }
+  }, [playerAssetId, createPlayerMarker]);
+
+  // add player setting option to right click menu
+  const handleContextMenu = useCallback((event) => {
+    event.preventDefault();
+  
+    // Remove existing menu processing
+    const removeExistingMenu = () => {
+      const existingMenu = document.getElementById('context-menu');
+      if (existingMenu && existingMenu.parentNode) {
+        existingMenu.parentNode.removeChild(existingMenu);
+      }
+    };
+  
+    // Remove existing menu when component mounts
+    removeExistingMenu();
+  
+    // Process raycast
+    const rect = rendererRef.current.domElement.getBoundingClientRect();
+    mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouseRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    
+    raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
+    const placedAssetInstances = Object.values(assetInstancesRef.current).filter(Boolean);
+    const intersects = raycasterRef.current.intersectObjects(placedAssetInstances, true);
+  
+    if (intersects.length > 0) {
+      let clickedObject = intersects[0].object;
+      while (clickedObject.parent && !clickedObject.userData?.assetId) {
+        clickedObject = clickedObject.parent;
+      }
+      const assetId = clickedObject.userData?.assetId;
+  
+      if (assetId) {
+        const menuElement = document.createElement('div');
+        menuElement.id = 'context-menu';
+        menuElement.style.position = 'fixed';
+        menuElement.style.left = `${event.clientX}px`;
+        menuElement.style.top = `${event.clientY}px`;
+        menuElement.style.backgroundColor = 'white';
+        menuElement.style.border = '1px solid #ccc';
+        menuElement.style.borderRadius = '4px';
+        menuElement.style.padding = '4px 0';
+        menuElement.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+        menuElement.style.zIndex = '1000';
+  
+        const menuItem = document.createElement('div');
+        menuItem.style.padding = '8px 16px';
+        menuItem.style.cursor = 'pointer';
+        menuItem.style.color = '#000000';
+        menuItem.textContent = playerAssetId === assetId ? 'Unset Player' : 'Set as Player';
+        
+        menuItem.addEventListener('click', () => {
+          onSetAsPlayer(assetId);
+          removeExistingMenu();
+        });
+  
+        menuElement.appendChild(menuItem);
+        document.body.appendChild(menuElement);
+  
+        // Click outside menu to close
+        const closeMenu = (e) => {
+          const menu = document.getElementById('context-menu');
+          if (menu && !menu.contains(e.target)) {
+            removeExistingMenu();
+            document.removeEventListener('click', closeMenu);
+          }
+        };
+        
+        // Add event listener with slight delay
+        requestAnimationFrame(() => {
+          document.addEventListener('click', closeMenu);
+        });
+      }
+    }
+  }, [playerAssetId, onSetAsPlayer]);
+  
+  // Use useEffect at the top level of the component
+  useEffect(() => {
+    // Remove menu when component unmounts
+    return () => {
+      const existingMenu = document.getElementById('context-menu');
+      if (existingMenu && existingMenu.parentNode) {
+        existingMenu.parentNode.removeChild(existingMenu);
+      }
+    };
+  }, []);
+  
+  // add right click event listener to rendererRef.current.domElement
+  useEffect(() => {
+    const rendererElement = rendererRef.current?.domElement;
+    if (rendererElement) {
+      rendererElement.addEventListener('contextmenu', handleContextMenu);
+      return () => {
+        rendererElement.removeEventListener('contextmenu', handleContextMenu);
+      };
+    }
+  }, [handleContextMenu]);
+
   return (
     <div key={viewerKey} style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: THEME.bgLight || '#f0f0f0' }}>
       <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
@@ -801,6 +1066,35 @@ const TerrainViewer = ({
           Loading terrain...
         </div>
       )}
+
+      {playerAssetId && (
+        <div style={{
+          position: 'absolute',
+          bottom: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: 'rgba(40,44,52,0.8)',
+          padding: '8px 16px',
+          borderRadius: '6px',
+          color: THEME.textPrimary || 'white',
+          fontSize: '14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          zIndex: 10
+        }}>
+          Press
+          <span style={{ 
+            backgroundColor: THEME.accentPrimary || '#61dafb',
+            color: 'black',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            fontWeight: 'bold'
+          }}>V</span>
+          {isPlayerView ? 'to return to normal view' : 'to switch to first-person view'}
+        </div>
+      )}
+
       {error && (
         <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(220,53,69,0.9)', color: 'white', zIndex: 10, padding: '20px', textAlign: 'center' }}>
           <div style={{ fontSize: '24px', marginBottom: '15px' }}>⚠️</div>
@@ -863,7 +1157,6 @@ const TerrainViewer = ({
         </div>
       )}
       
-      {/* Add keyframes for spinner to avoid style conflicts */}
       <style>{`
         @keyframes spinViewer {
           from { transform: rotate(0deg); }
