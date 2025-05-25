@@ -218,10 +218,28 @@ const TerrainViewer = ({
       const newDragControls = new DragControls(dragItems, camera, rendererDomElement);
       dragControlsRef.current = newDragControls;
 
+      let originalMaterials = new Map(); // To store original material properties
+
       newDragControls.addEventListener('dragstart', function (event) {
         orbitControls.enabled = false; // Disable OrbitControls during drag
-        // Optional: Change appearance of dragged object
-        // event.object.material.opacity = 0.5; 
+        
+        originalMaterials.clear();
+        event.object.traverse((child) => {
+          if (child.isMesh && child.material) {
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach(material => {
+              if (!originalMaterials.has(material.uuid)) {
+                originalMaterials.set(material.uuid, {
+                  opacity: material.opacity,
+                  transparent: material.transparent,
+                });
+              }
+              material.opacity = 0.6;
+              material.transparent = true;
+              material.needsUpdate = true;
+            });
+          }
+        });
       });
 
       newDragControls.addEventListener('drag', function (event) {
@@ -234,7 +252,21 @@ const TerrainViewer = ({
       
       newDragControls.addEventListener('dragend', function (event) {
         orbitControls.enabled = true; // Re-enable OrbitControls
-        // event.object.material.opacity = 1.0; // Reset appearance
+        
+        event.object.traverse((child) => {
+          if (child.isMesh && child.material) {
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach(material => {
+              if (originalMaterials.has(material.uuid)) {
+                const originalProps = originalMaterials.get(material.uuid);
+                material.opacity = originalProps.opacity;
+                material.transparent = originalProps.transparent;
+                material.needsUpdate = true;
+              }
+            });
+          }
+        });
+        originalMaterials.clear();
 
         const draggedAsset = event.object;
         const assetId = draggedAsset.userData?.assetId;

@@ -486,7 +486,7 @@ const ViewTerrains = () => {
     // console.log('[VT handleManualAssetPlaced] Called with:', newAssetData);
 
     setPlacedAssetsOnTerrain(prev => [...prev, { ...newAssetData, id: newAssetData.id || `manual-${Date.now()}` }]);
-    setCurrentSelectedAssetForPlacement(null);
+    // setCurrentSelectedAssetForPlacement(null); // Do not automatically exit placement mode
     setGloballySelectedPlacedAssetId(null); // Deselect any placed asset when placing a new one
   }, []);
 
@@ -726,10 +726,14 @@ const ViewTerrains = () => {
 
   // Callback from TerrainViewer when a placed asset is selected or deselected
   const handlePlacedAssetSelectionChange = useCallback((assetId) => {
+    // console.log('[VT handlePlacedAssetSelectionChange] Called with assetId:', assetId);
     setGloballySelectedPlacedAssetId(assetId);
-    if (assetId) {
-        setCurrentSelectedAssetForPlacement(null); // If a placed asset is selected, deselect any asset pending placement
-    }
+    // if (assetId) {
+    //     // If a placed asset is selected (e.g. by clicking on it for dragging/manipulation),
+    //     // then we should probably exit the mode of "placing a new asset from the palette".
+    //     setCurrentSelectedAssetForPlacement(null); 
+    //     // console.log('[VT handlePlacedAssetSelectionChange] Cleared currentSelectedAssetForPlacement because a placed asset was selected.');
+    // }
   }, []);
 
   // Callback from TerrainViewer when a placed asset has been moved
@@ -755,6 +759,25 @@ const ViewTerrains = () => {
     setGloballySelectedPlacedAssetId(null); // Deselect after deletion
     showMessage('Selected asset deleted.', 'success');
   }, [globallySelectedPlacedAssetId, showMessage]);
+
+  // Add Escape key listener to cancel asset placement
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // console.log('[ViewTerrains handleKeyDown] Key pressed:', event.key);
+      if (event.key === 'Escape') {
+        // console.log('[ViewTerrains handleKeyDown] Escape pressed. currentSelectedAssetForPlacement:', currentSelectedAssetForPlacement);
+        if (currentSelectedAssetForPlacement) {
+          setCurrentSelectedAssetForPlacement(null);
+          showMessage('Asset placement cancelled', 'info'); // Changed message slightly for clarity
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [currentSelectedAssetForPlacement, showMessage]);
 
   return (
     <div style={combinedStyles.container}>
@@ -951,7 +974,20 @@ const ViewTerrains = () => {
       {/* Asset Placement Controls - Moved here for better layout with viewer */}
       {selectedTerrain && (
         <div style={combinedStyles.assetControlsContainer}>
-          <h3 style={combinedStyles.assetControlsTitle}>Place Assets</h3>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+            <h3 style={combinedStyles.assetControlsTitle}>Place Assets</h3>
+            {currentSelectedAssetForPlacement && (
+              <Button 
+                onClick={() => {
+                  setCurrentSelectedAssetForPlacement(null);
+                  showMessage('Asset placement cancelled', 'info');
+                }}
+                style={{...combinedStyles.actionButton, ...combinedStyles.cancelButton, padding: '5px 10px', fontSize: '12px'}}
+              >
+                Cancel Placement (Esc)
+              </Button>
+            )}
+          </div>
           <div style={combinedStyles.assetSelection}>
             {availableAssets.map(asset => (
               <Button
