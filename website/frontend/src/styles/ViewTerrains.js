@@ -47,7 +47,7 @@ const styles = {
     flexDirection: 'column',
     height: '100%', // Fill the height of the parent container
     minWidth: '250px', // Ensure panel doesn't get too narrow
-    maxWidth: '400px', // Limit maximum width
+    maxWidth: '320px', // Limit maximum width
   },
   terrainListHeader: {
     marginBottom: '15px',
@@ -377,6 +377,75 @@ const styles = {
     color: THEME.textPrimary,
     fontSize: '14px',
     textAlign: 'center',
+  },
+  // Styles for Asset Placement UI
+  assetControlsContainer: {
+    flex: '0.7',
+    padding: '15px',
+    backgroundColor: THEME.bgPrimary,
+    borderLeft: THEME.border,
+    borderRadius: '8px',
+    boxShadow: THEME.boxShadow,
+    height: '100%',
+    overflowY: 'auto',
+    maxWidth: '280px',
+    minWidth: '220px',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  assetControlsTitle: {
+    fontSize: '16px',
+    color: THEME.accentPrimary,
+    marginBottom: '10px',
+    fontWeight: 'bold',
+  },
+  assetSelection: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    marginBottom: '15px',
+  },
+  assetButton: {
+    // Using common button styles from './common' is preferred if they fit
+    // These are overrides or specific styles if common Button can't be fully styled via props
+    padding: '8px 12px',
+    fontSize: '13px',
+    backgroundColor: THEME.bgSecondary,
+    color: THEME.textPrimary,
+    border: `1px solid ${THEME.border}`,
+    borderRadius: '4px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  assetButtonSelected: {
+    backgroundColor: THEME.accentPrimary,
+    color: THEME.bgPrimary, // Or THEME.textLight if accentPrimary is dark
+    borderColor: THEME.accentPrimary,
+    boxShadow: `0 0 5px ${THEME.accentPrimary}`,
+  },
+  assetActionButtons: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    marginBottom: '10px',
+    alignItems: 'stretch',
+  },
+  actionButton: {
+    // Again, prefer common Button component and style via its props if possible
+    padding: '8px 15px',
+    fontSize: '13px',
+    // Uses default Button styling primarily
+  },
+  clearButton: {
+    backgroundColor: THEME.dangerBg, // Example for a danger action
+    color: THEME.textLight,
+    // Add hover effects if Button component doesn't provide them sufficiently
+  },
+  infoText: {
+    fontSize: '12px',
+    color: THEME.textSecondary,
+    marginTop: '5px',
+    minHeight: '18px', // Reserve space to prevent layout shifts
   },
 };
 

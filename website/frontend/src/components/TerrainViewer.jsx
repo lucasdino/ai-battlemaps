@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'; // Standard controls
+import { DragControls } from 'three/examples/jsm/controls/DragControls'; // <-- IMPORT DRAGCONTROLS
 import THEME from '../theme';
 import { Button } from './common';
 import CONFIG from '../config';
@@ -13,9 +14,15 @@ const TerrainViewer = ({
   onError, 
   onTerrainNameChange,
   onTerrainDeleted,
+  onTerrainMetricsUpdate,
   hideControls = false,
   showGrid: initialShowGrid = true, // Renamed prop for clarity
-  scale: initialScaleProp // Accept scale as prop if available
+  scale: initialScaleProp, // Accept scale as prop if available
+  selectedAsset, // For placing NEW assets
+  onAssetPlaced, 
+  placedAssets: assetsToDisplayProp,
+  onPlacedAssetSelected,
+  onPlacedAssetMoved // <-- NEW PROP for when an asset is moved by dragging
 }) => {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
@@ -25,7 +32,11 @@ const TerrainViewer = ({
   const terrainModelRef = useRef(null); // Reference to the loaded GLTF scene
   const gridHelperRef = useRef(null); // Will now hold LineSegments for custom grid
   const animationFrameIdRef = useRef(null); // For cancelling animation frame
-  // const originalModelSizeRef = useRef(null); // To store unscaled model dimensions
+  const assetLoaderRef = useRef(new GLTFLoader());
+  const raycasterRef = useRef(new THREE.Raycaster());
+  const mouseRef = useRef(new THREE.Vector2());
+  const selectionBoxRef = useRef(null); // For visually indicating selection
+  const dragControlsRef = useRef(null); // <-- REF FOR DRAGCONTROLS
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -34,6 +45,8 @@ const TerrainViewer = ({
   const [isGridVisible, setIsGridVisible] = useState(initialShowGrid);
   const [currentScale, setCurrentScale] = useState(initialScaleProp || 1);
   const [saveStatus, setSaveStatus] = useState(null); // For save feedback
+  const assetInstancesRef = useRef({}); // Use a ref to keep track of loaded instances { [assetId]: instance }
+  const [selectedPlacedAssetId, setSelectedPlacedAssetId] = useState(null); // ID of the currently selected PLACED asset
 
   // Load scale from backend if not provided as prop
   useEffect(() => {
@@ -105,31 +118,31 @@ const TerrainViewer = ({
     currentMount.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // --- Carmack-Inspired Lighting: Simple, Bright, Top-Down --- 
-    // Ambient light for overall scene visibility, prevents pitch black areas.
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); // Moderate ambient
+    // --- Lighting Setup ---
+    // Ambient light for overall scene visibility
+    const ambientLight = new THREE.AmbientLight(0xffffff, 3); // Further increased ambient light
     scene.add(ambientLight);
 
-    // Single, strong DirectionalLight from directly above.
-    const sunLight = new THREE.DirectionalLight(0xffffff, 2.0); // Strong intensity
-    sunLight.position.set(0, 50, 0); // Positioned very high, directly above origin
-    sunLight.castShadow = true;
+    // Directional light for highlights and shadows
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0); // Further increased directional light
+    directionalLight.position.set(20, 40, 25); // Adjusted position for broader coverage
+    directionalLight.castShadow = true;
+    // Configure shadow properties
+    directionalLight.shadow.mapSize.width = 2048; // Increased shadow map resolution
+    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 100; // Increased far plane for shadows
+    const shadowCamSize = 30; // Increased area covered by shadow camera
+    directionalLight.shadow.camera.left = -shadowCamSize;
+    directionalLight.shadow.camera.right = shadowCamSize;
+    directionalLight.shadow.camera.top = shadowCamSize;
+    directionalLight.shadow.camera.bottom = -shadowCamSize;
+    directionalLight.shadow.bias = -0.001; // Helps prevent shadow acne
 
-    // Configure shadows for the sunLight
-    sunLight.shadow.mapSize.width = 1024; // Shadow map resolution
-    sunLight.shadow.mapSize.height = 1024;
-    sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 100; // Increased far plane for high light
-    // Adjust ortho shadow camera bounds to encompass typical terrain sizes
-    const shadowCamSize = 20;
-    sunLight.shadow.camera.left = -shadowCamSize;
-    sunLight.shadow.camera.right = shadowCamSize;
-    sunLight.shadow.camera.top = shadowCamSize;
-    sunLight.shadow.camera.bottom = -shadowCamSize;
-    sunLight.shadow.bias = -0.0001; // Helps prevent shadow acne on flat surfaces
-
-    scene.add(sunLight);
-    // scene.add(new THREE.CameraHelper(sunLight.shadow.camera)); // For debugging shadow camera
+    scene.add(directionalLight);
+    // For debugging shadow camera:
+    // const shadowHelper = new THREE.CameraHelper(directionalLight.shadow.camera);
+    // scene.add(shadowHelper);
     // --- End Lighting Setup ---
 
     // OrbitControls
@@ -183,6 +196,343 @@ const TerrainViewer = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
 
+  // Effect to setup DragControls when an asset is selected
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    const rendererDomElement = rendererRef.current?.domElement;
+    const orbitControls = controlsRef.current; // OrbitControls instance
+
+    // Clean up existing DragControls
+    if (dragControlsRef.current) {
+      dragControlsRef.current.dispose();
+      dragControlsRef.current = null;
+    }
+
+    // Only setup DragControls if an asset is selected, and we are NOT placing a new one,
+    // and all necessary refs are available.
+    if (selectedPlacedAssetId && !selectedAsset && assetInstancesRef.current[selectedPlacedAssetId] && scene && camera && rendererDomElement && orbitControls && terrainModelRef.current) {
+      const selectedInstance = assetInstancesRef.current[selectedPlacedAssetId];
+      const dragItems = [selectedInstance];
+      
+      const newDragControls = new DragControls(dragItems, camera, rendererDomElement);
+      dragControlsRef.current = newDragControls;
+
+      newDragControls.addEventListener('dragstart', function (event) {
+        orbitControls.enabled = false; // Disable OrbitControls during drag
+        // Optional: Change appearance of dragged object
+        // event.object.material.opacity = 0.5; 
+      });
+
+      newDragControls.addEventListener('drag', function (event) {
+        // Constrain dragging to XZ plane by resetting Y.
+        // Note: The object's Y might be its center. We'll snap to terrain on dragend.
+        // For now, let's allow free dragging in 3D space and rely on dragend for final positioning
+        // For simple XZ plane dragging:
+        // event.object.position.y = assetInstancesRef.current[selectedPlacedAssetId]?.userData?.originalY || 0; 
+      });
+      
+      newDragControls.addEventListener('dragend', function (event) {
+        orbitControls.enabled = true; // Re-enable OrbitControls
+        // event.object.material.opacity = 1.0; // Reset appearance
+
+        const draggedAsset = event.object;
+        const assetId = draggedAsset.userData?.assetId;
+
+        if (assetId && onPlacedAssetMoved && terrainModelRef.current) {
+          // New X and Z are from the drag
+          const newX = draggedAsset.position.x;
+          const newZ = draggedAsset.position.z;
+
+          // Raycast downwards from above the new X,Z to find the terrain Y
+          const raycaster = new THREE.Raycaster();
+          const down = new THREE.Vector3(0, -1, 0);
+          // Start raycast from a point above the asset's new X,Z position
+          const origin = new THREE.Vector3(newX, draggedAsset.position.y + 10, newZ); // Start 10 units above current dragged Y
+          raycaster.set(origin, down);
+
+          const mainTerrainObject = terrainModelRef.current;
+          const intersectsTerrain = raycaster.intersectObject(mainTerrainObject, true); // Recursive check
+
+          let newY = draggedAsset.position.y; // Default to dragged Y if no intersection
+          if (intersectsTerrain.length > 0) {
+            newY = intersectsTerrain[0].point.y; // Y from terrain
+            // Now, adjust Y so the bottom of the asset model sits on the terrain
+            const bbox = new THREE.Box3().setFromObject(draggedAsset);
+            newY -= bbox.min.y; // Shift model up by its "depth" below its origin
+          } else {
+            console.warn(`[DragControls] DragEnd: Could not snap asset ${assetId} to terrain. Using its current Y.`);
+          }
+          
+          const finalPosition = new THREE.Vector3(newX, newY, newZ);
+          onPlacedAssetMoved(assetId, finalPosition);
+          
+          // Update the instance's position directly for immediate visual feedback
+          // The parent will update state, which will re-render, but this can avoid flicker.
+          // However, this might conflict if parent state update is slow or different.
+          // For now, let parent handle state.
+        }
+      });
+    }
+
+    return () => { // Cleanup when effect re-runs or component unmounts
+      if (dragControlsRef.current) {
+        dragControlsRef.current.dispose();
+        dragControlsRef.current = null;
+      }
+    };
+  // Depend on selectedPlacedAssetId, selectedAsset (to disable drag when placing), and refs
+  }, [selectedPlacedAssetId, selectedAsset, onPlacedAssetMoved, terrainModelRef]); 
+
+  // Effect to update visual selection indicator (BoxHelper)
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    // Remove existing selection box if any
+    if (selectionBoxRef.current) {
+      scene.remove(selectionBoxRef.current);
+      selectionBoxRef.current.dispose?.(); // Dispose geometry/material if applicable (BoxHelper does this internally)
+      selectionBoxRef.current = null;
+    }
+
+    if (selectedPlacedAssetId && assetInstancesRef.current[selectedPlacedAssetId]) {
+      const selectedInstance = assetInstancesRef.current[selectedPlacedAssetId];
+      const boxHelper = new THREE.BoxHelper(selectedInstance, 0xffff00); // Yellow color for selection
+      scene.add(boxHelper);
+      selectionBoxRef.current = boxHelper;
+    }
+  }, [selectedPlacedAssetId, assetsToDisplayProp]); // Re-run if selection or displayed assets change (instances might re-render)
+
+  // Call onPlacedAssetSelected when selectedPlacedAssetId changes
+  useEffect(() => {
+    if (onPlacedAssetSelected) {
+      onPlacedAssetSelected(selectedPlacedAssetId);
+    }
+  }, [selectedPlacedAssetId, onPlacedAssetSelected]);
+
+  // Effect for handling click-to-place OR click-to-select
+  useEffect(() => {
+    if (!rendererRef.current || !rendererRef.current.domElement) return;
+    
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    if (!scene || !camera) return;
+
+    const handleClick = (event) => {
+      // --- DEBUG LOG ---
+      // console.log(
+      //   '[TV handleClick] Start. selectedAsset:', selectedAsset, 
+      //   'selectedAsset.modelUrl:', selectedAsset ? selectedAsset.modelUrl : 'N/A', 
+      //   'terrainModelRef.current:', !!terrainModelRef.current
+      // );
+
+      const rect = rendererRef.current.domElement.getBoundingClientRect();
+      mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouseRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      raycasterRef.current.setFromCamera(mouseRef.current, camera);
+
+      // Case 1: Placing a NEW asset (selectedAsset prop is provided)
+      if (selectedAsset && selectedAsset.modelUrl && terrainModelRef.current) {
+        const mainTerrainObject = terrainModelRef.current;
+
+        // --- DEBUG LOG (ensure this is reached) ---
+        // console.log('[TV handleClick] Raycasting Check. mainTerrainObject:', mainTerrainObject, 'Children:', mainTerrainObject.children);
+
+        const intersectsTerrain = raycasterRef.current.intersectObjects(mainTerrainObject.children, true);
+
+        // --- DEBUG LOG ---
+        // console.log('[TV handleClick] Placing new asset. Intersects terrain:', intersectsTerrain.length > 0, intersectsTerrain);
+
+        if (intersectsTerrain.length > 0) {
+          const intersectionPoint = intersectsTerrain[0].point;
+          const newAssetData = {
+            id: `asset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            modelUrl: selectedAsset.modelUrl, // Ensure this is correct
+            name: selectedAsset.name || 'Asset',
+            position: { 
+              x: intersectionPoint.x, 
+              y: intersectionPoint.y,
+              z: intersectionPoint.z 
+            },
+            rotation: selectedAsset.rotation || { x: 0, y: Math.random() * Math.PI * 2, z: 0 },
+            scale: selectedAsset.scale || { x: 1, y: 1, z: 1 },
+            instance: null 
+          };
+          if (onAssetPlaced) {
+            // --- DEBUG LOG ---
+            // console.log('[TV handleClick] Calling onAssetPlaced with:', newAssetData);
+            onAssetPlaced(newAssetData); 
+          }
+        }
+      } 
+      // Case 2: Selecting an EXISTING placed asset (no new asset being placed)
+      else if (!selectedAsset) {
+        const placedAssetInstances = Object.values(assetInstancesRef.current).filter(Boolean);
+        const intersectsAssets = raycasterRef.current.intersectObjects(placedAssetInstances, true);
+
+        if (intersectsAssets.length > 0) {
+          // Find the highest-level parent that is a direct child of the scene (or the asset group)
+          // and has our userData.assetId
+          let clickedAssetInstance = intersectsAssets[0].object;
+          while (clickedAssetInstance.parent !== scene && clickedAssetInstance.parent !== null) {
+            if (clickedAssetInstance.userData?.assetId) break; // Found the main group for the asset
+            clickedAssetInstance = clickedAssetInstance.parent;
+          }
+          
+          if (clickedAssetInstance?.userData?.assetId) {
+            setSelectedPlacedAssetId(clickedAssetInstance.userData.assetId);
+          } else {
+            // Clicked on a part of an asset that doesn't have the ID, or logic error. Deselect.
+            setSelectedPlacedAssetId(null);
+          }
+        } else {
+          // Clicked on empty space (or terrain, if we don't re-check terrain here), deselect.
+          // Check if terrain was clicked to avoid deselecting if user just clicks terrain
+          const mainTerrainObject = terrainModelRef.current;
+          if (mainTerrainObject) {
+            const intersectsTerrain = raycasterRef.current.intersectObject(mainTerrainObject, true);
+            if (intersectsTerrain.length > 0) {
+              // Clicked on terrain, deselect any selected asset
+               setSelectedPlacedAssetId(null);
+            }
+            // If not terrain and not asset, it's empty space - also deselect
+            else {
+                 setSelectedPlacedAssetId(null);
+            }
+          } else {
+            // No terrain model, just empty space
+            setSelectedPlacedAssetId(null);
+          }
+        }
+      }
+    };
+
+    const rendererDomElement = rendererRef.current.domElement;
+    rendererDomElement.addEventListener('click', handleClick);
+
+    return () => {
+      if (rendererDomElement) { 
+        rendererDomElement.removeEventListener('click', handleClick);
+      }
+    };
+  }, [selectedAsset, onAssetPlaced, assetsToDisplayProp, onPlacedAssetSelected]); // Added assetsToDisplayProp and onPlacedAssetSelected
+
+  // Effect for loading and managing placed asset models in the scene
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    const currentInstanceIds = Object.keys(assetInstancesRef.current);
+    const propAssetIds = assetsToDisplayProp.map(a => a.id);
+
+    // 1. Remove assets that are in currentInstances but no longer in props
+    currentInstanceIds.forEach(instanceId => {
+      if (!propAssetIds.includes(instanceId)) {
+        const instanceToRemove = assetInstancesRef.current[instanceId];
+        if (instanceToRemove) {
+          scene.remove(instanceToRemove);
+          // TODO: Proper disposal of geometry and material
+        }
+        delete assetInstancesRef.current[instanceId];
+      }
+    });
+
+    // 2. Load and add new assets that are in props but not yet in currentInstances
+    assetsToDisplayProp.forEach(assetData => {
+      // --- DIAGNOSTIC LOG --- 
+      console.log(`[TV AssetSync] Processing asset: ${assetData.name} (ID: ${assetData.id}), Already loaded: ${!!assetInstancesRef.current[assetData.id]}`);
+      
+      if (!assetInstancesRef.current[assetData.id] && assetData.modelUrl) {
+        const fullAssetUrl = assetData.modelUrl.startsWith('http') 
+          ? assetData.modelUrl 
+          : `${CONFIG.API.BASE_URL}${assetData.modelUrl.startsWith('/') ? '' : '/'}${assetData.modelUrl}`;
+
+        assetLoaderRef.current.load(
+          fullAssetUrl,
+          (gltf) => {
+            const modelInstance = gltf.scene.clone();
+            
+            // Set scale and rotation first, as these can affect the bounding box
+            modelInstance.scale.set(assetData.scale.x, assetData.scale.y, assetData.scale.z);
+            modelInstance.rotation.set(assetData.rotation.x, assetData.rotation.y, assetData.rotation.z);
+            
+            // Calculate bounding box AFTER scaling and rotation (rotation might not be critical for axis-aligned bbox height)
+            const bbox = new THREE.Box3().setFromObject(modelInstance);
+            
+            // The goal is to have the world-coordinate bottom of the model (bbox.min.y after world transform)
+            // sit at assetData.position.y (the click point on the terrain).
+            // modelInstance.position is the model's origin.
+            // The offset from the model's origin to its bottom is bbox.min.y (in its local, scaled space).
+            // So, modelInstance.position.y + bbox.min.y (world) = assetData.position.y (world)
+            // modelInstance.position.y = assetData.position.y - bbox.min.y (where bbox.min.y is relative to origin after scale)
+            // Let's try to set the origin to the click point, then shift it based on bbox.
+            modelInstance.position.set(assetData.position.x, assetData.position.y, assetData.position.z);
+            modelInstance.position.y -= bbox.min.y; // Subtracting bbox.min.y will shift the model up if min.y is negative, down if positive.
+
+            modelInstance.userData = { assetId: assetData.id }; // Essential for identification
+
+            modelInstance.traverse((child) => {
+              if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                
+                // --- BEGIN MATERIAL LOGGING ---
+                if (child.material) {
+                  console.log(`[Asset Material] Asset: ${assetData.name}, Mesh: ${child.name}, Material Type: ${child.material.type}`);
+                  if (child.material.isMeshStandardMaterial) {
+                    console.log(`  Original Color:`, child.material.color.getHexString());
+                    console.log(`  Original Metalness: ${child.material.metalness}, Roughness: ${child.material.roughness}`);
+                    
+                    // --- BEGIN RUNTIME MATERIAL ADJUSTMENT ---
+                    child.material.metalness = 0.5; // Reduce metalness
+                    child.material.roughness = 0.5; // Reduce roughness
+                    // child.material.color.setHex(0xffffff); // Ensure base color is white if it's not
+                    console.log(`  Adjusted Metalness: ${child.material.metalness}, Roughness: ${child.material.roughness}`);
+                    // --- END RUNTIME MATERIAL ADJUSTMENT ---
+
+                    console.log(`  Emissive:`, child.material.emissive.getHexString(), `Intensity: ${child.material.emissiveIntensity}`);
+                  } else if (child.material.isMeshBasicMaterial) {
+                    console.log(`  Color:`, child.material.color.getHexString());
+                    console.warn(`  WARN: MeshBasicMaterial used, will not respond to scene lighting.`);
+                  }
+                  // Log if material is an array (MultiMaterial)
+                  if (Array.isArray(child.material)) {
+                    console.log(`  Material is an array (MultiMaterial). Count: ${child.material.length}`);
+                    child.material.forEach((mat, index) => {
+                      console.log(`    Sub-material ${index}: Type: ${mat.type}`);
+                      if (mat.isMeshStandardMaterial) {
+                        console.log(`      Color:`, mat.color.getHexString());
+                        console.log(`      Metalness: ${mat.metalness}, Roughness: ${mat.roughness}`);
+                      } else if (mat.isMeshBasicMaterial) {
+                        console.log(`      Color:`, mat.color.getHexString());
+                        console.warn(`      WARN: Sub-material MeshBasicMaterial used.`);
+                      }
+                    });
+                  }
+                } else {
+                  console.log(`[Asset Material] Asset: ${assetData.name}, Mesh: ${child.name}, No material found.`);
+                }
+                // --- END MATERIAL LOGGING ---
+              }
+            });
+            
+            scene.add(modelInstance);
+            assetInstancesRef.current[assetData.id] = modelInstance; // Store instance
+          },
+          undefined, // onProgress
+          (error) => {
+            console.error(`Error loading asset ${fullAssetUrl}:`, error);
+            if (onError) onError(`Failed to load asset: ${assetData.name || assetData.modelUrl}`);
+            // If an asset fails to load, it simply won't be added to assetInstancesRef.current
+            // The parent component (ViewTerrains) is responsible for the list of assets that *should* exist.
+          }
+        );
+      }
+    });
+
+  }, [assetsToDisplayProp, onError]); // Depend on the prop `assetsToDisplayProp`
+
   // Load terrain model
   useEffect(() => {
     if (!terrainUrl || !sceneRef.current) {
@@ -235,6 +585,18 @@ const TerrainViewer = ({
         // Create and add the custom grid
         updateCustomGrid(size.x, size.z, center);
 
+        // <-- ADDED CALL to onTerrainMetricsUpdate -->
+        if (onTerrainMetricsUpdate) {
+          onTerrainMetricsUpdate({
+            width: size.x,
+            depth: size.z,
+            height: size.y, // Include height in case it's useful later
+            centerX: center.x,
+            centerY: center.y,
+            centerZ: center.z,
+          });
+        }
+
         // Center camera on the new model
         if (controlsRef.current && cameraRef.current) {
             // --- Camera fit logic for 90% viewport ---
@@ -276,7 +638,7 @@ const TerrainViewer = ({
         if (onError) onError(errorMessage);
       }
     );
-  }, [terrainUrl, onError]); // Re-run if terrainUrl changes
+  }, [terrainUrl, onError, currentScale, onTerrainMetricsUpdate]); // Re-run if terrainUrl or currentScale changes, also add onTerrainMetricsUpdate
 
   // Function to create/update the custom rectangular grid
   const updateCustomGrid = (width, depth, gridCenter) => {
@@ -341,6 +703,18 @@ const TerrainViewer = ({
       const scaledCenterVec = scaledBox.getCenter(new THREE.Vector3());
 
       updateCustomGrid(scaledSizeVec.x, scaledSizeVec.z, scaledCenterVec);
+      
+      // <-- ADDED CALL to onTerrainMetricsUpdate -->
+      if (onTerrainMetricsUpdate) {
+        onTerrainMetricsUpdate({
+          width: scaledSizeVec.x,
+          depth: scaledSizeVec.z,
+          height: scaledSizeVec.y,
+          centerX: scaledCenterVec.x,
+          centerY: scaledCenterVec.y,
+          centerZ: scaledCenterVec.z,
+        });
+      }
     }
     // TODO: Add API call here to persist the scale if desired
     // e.g., onScaleChange(terrainId, newScale);
