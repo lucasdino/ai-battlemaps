@@ -47,7 +47,7 @@ const styles = {
     flexDirection: 'column',
     height: '100%', // Fill the height of the parent container
     minWidth: '250px', // Ensure panel doesn't get too narrow
-    maxWidth: '400px', // Limit maximum width
+    maxWidth: '320px', // Limit maximum width
   },
   terrainListHeader: {
     marginBottom: '15px',
@@ -378,6 +378,80 @@ const styles = {
     fontSize: '14px',
     textAlign: 'center',
   },
+  // Styles for Asset Placement UI
+  assetControlsContainer: {
+    flex: '0.7',
+    padding: '15px',
+    backgroundColor: THEME.bgPrimary,
+    borderLeft: THEME.border,
+    borderRadius: '8px',
+    boxShadow: THEME.boxShadow,
+    height: '100%',
+    overflowY: 'auto',
+    maxWidth: '280px',
+    minWidth: '220px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '15px',
+  },
+  transformControlsContainer: {
+    padding: '12px',
+    backgroundColor: 'rgba(50, 55, 65, 0.9)',
+    borderRadius: '6px',
+    border: `1px solid ${THEME.bgLight}`,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+  },
+  assetControlsTitle: {
+    fontSize: '16px',
+    color: THEME.accentPrimary,
+    marginBottom: '10px',
+    fontWeight: 'bold',
+  },
+  assetSelection: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    marginBottom: '15px',
+  },
+  assetButton: {
+    padding: '8px 12px',
+    fontSize: '13px',
+    backgroundColor: THEME.bgSecondary,
+    color: THEME.textPrimary,
+    border: `1px solid ${THEME.border}`,
+    borderRadius: '4px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  assetButtonSelected: {
+    backgroundColor: THEME.accentPrimary,
+    color: THEME.bgPrimary,
+    borderColor: THEME.accentPrimary,
+    boxShadow: `0 0 5px ${THEME.accentPrimary}`,
+  },
+  assetActionButtons: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    marginBottom: '10px',
+    alignItems: 'stretch',
+  },
+  actionButton: {
+    padding: '8px 15px',
+    fontSize: '13px',
+  },
+  clearButton: {
+    backgroundColor: THEME.dangerBg,
+    color: THEME.textLight,
+  },
+  infoText: {
+    fontSize: '12px',
+    color: THEME.textSecondary,
+    marginTop: '5px',
+    minHeight: '18px',
+  },
 };
 
 // Responsive styles for mobile/small screens
@@ -412,30 +486,30 @@ export const getMobileStyles = (windowWidth) => {
       overflowX: 'hidden',
     };
     mobileStyles.paginationControls = {
-      marginBottom: '5px', // Smaller margin on mobile
+      marginBottom: '5px',
     };
     mobileStyles.terrainGrid = {
-      gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', // Smaller items on mobile
+      gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
       gap: '8px',
     };
     mobileStyles.terrainItem = {
       padding: '8px',
-      height: '80px', // Smaller height on mobile
+      height: '80px',
     };
     mobileStyles.dimensionsContainer = {
-      gridTemplateColumns: '1fr', // Stack vertically on mobile
+      gridTemplateColumns: '1fr',
       gap: '8px',
     };
   }
   
   if (windowWidth <= SINGLE_COLUMN_BREAKPOINT) {
     mobileStyles.terrainGrid = {
-      gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', // Even smaller on very small screens
+      gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
       gap: '6px',
     };
     mobileStyles.terrainItem = {
       padding: '6px',
-      height: '70px', // Even smaller height on very small screens
+      height: '70px',
     };
   }
   

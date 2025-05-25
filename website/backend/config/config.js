@@ -1,6 +1,6 @@
 // Backend API Configuration
 const path = require('path');
-const API_KEYS = require('./apiKeys');
+const API_KEYS = require('./apiKeys'); // Re-added: API keys will come from this file
 
 
 // External services configuration
@@ -106,21 +106,21 @@ const CONFIG = {
     PROVIDERS: {
       'google': {
         NAME: 'Google Imagen',
-        API_KEY: API_KEYS.GOOGLE,
+        API_KEY: API_KEYS.GOOGLE, // Use API_KEYS object
         API_ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict',
         MODEL: 'imagen-3.0-generate-002',
         DESCRIPTION: 'Google Gemini Imagen 3 (Image Generation).'
       },
       'openai': {
         NAME: 'OpenAI DALL-E',
-        API_KEY: API_KEYS.OPENAI,
+        API_KEY: API_KEYS.OPENAI, // Use API_KEYS object
         MODEL: 'dall-e-3',
         SIZE: '1024x1024',
         DESCRIPTION: 'OpenAI DALL-E 3 (Image Generation).'
       },
       'openai-editor': {
         NAME: 'OpenAI GPT-Image',
-        API_KEY: API_KEYS.OPENAI,
+        API_KEY: API_KEYS.OPENAI, // Use API_KEYS object
         MODEL: 'gpt-image-1',
         SIZE: '1024x1024',
         DESCRIPTION: 'OpenAI GPT-Image Model (Image Generation / Image Editing).'

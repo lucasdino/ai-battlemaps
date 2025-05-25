@@ -1,3 +1,5 @@
+// require('dotenv').config(); // Load environment variables from .env file -- REMOVED
+
 /**
  * Main server application that sets up the Express server with all routes and middleware.
  */
