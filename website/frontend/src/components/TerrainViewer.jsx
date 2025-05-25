@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'; // Standard controls
-import { DragControls } from 'three/examples/jsm/controls/DragControls'; // <-- IMPORT DRAGCONTROLS
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import THEME from '../theme';
 import { Button } from './common';
 import CONFIG from '../config';
@@ -16,27 +16,32 @@ const TerrainViewer = ({
   onTerrainDeleted,
   onTerrainMetricsUpdate,
   hideControls = false,
-  showGrid: initialShowGrid = true, // Renamed prop for clarity
-  scale: initialScaleProp, // Accept scale as prop if available
-  selectedAsset, // For placing NEW assets
+  showGrid: initialShowGrid = true,
+  scale: initialScaleProp,
+  selectedAsset, 
   onAssetPlaced, 
-  placedAssets: assetsToDisplayProp,
+  rawPlacedAssets,
   onPlacedAssetSelected,
-  onPlacedAssetMoved // <-- NEW PROP for when an asset is moved by dragging
+  onPlacedAssetMoved,
+  transformMode,
+  onTransformModeChange,
+  onPlacedAssetDeleted
 }) => {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const cameraRef = useRef(null);
   const rendererRef = useRef(null);
   const controlsRef = useRef(null); // For OrbitControls
-  const terrainModelRef = useRef(null); // Reference to the loaded GLTF scene
-  const gridHelperRef = useRef(null); // Will now hold LineSegments for custom grid
-  const animationFrameIdRef = useRef(null); // For cancelling animation frame
+  const transformControlsRef = useRef(null); // For TransformControls
+  const terrainModelRef = useRef(null);
+  const gridHelperRef = useRef(null);
+  const animationFrameIdRef = useRef(null);
   const assetLoaderRef = useRef(new GLTFLoader());
   const raycasterRef = useRef(new THREE.Raycaster());
   const mouseRef = useRef(new THREE.Vector2());
-  const selectionBoxRef = useRef(null); // For visually indicating selection
-  const dragControlsRef = useRef(null); // <-- REF FOR DRAGCONTROLS
+  const selectionBoxRef = useRef(null);
+  const lightRef = useRef(null);
+  const ambientLightRef = useRef(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -44,27 +49,79 @@ const TerrainViewer = ({
   const [editedName, setEditedName] = useState(terrainName || '');
   const [isGridVisible, setIsGridVisible] = useState(initialShowGrid);
   const [currentScale, setCurrentScale] = useState(initialScaleProp || 1);
-  const [saveStatus, setSaveStatus] = useState(null); // For save feedback
-  const assetInstancesRef = useRef({}); // Use a ref to keep track of loaded instances { [assetId]: instance }
-  const [selectedPlacedAssetId, setSelectedPlacedAssetId] = useState(null); // ID of the currently selected PLACED asset
+  const [saveStatus, setSaveStatus] = useState(null);
+  const assetInstancesRef = useRef({});
+  const [selectedPlacedAssetId, setSelectedPlacedAssetId] = useState(null);
+  const originalMaterialsRef = useRef(new Map());
+  const uniformScaleDragDataRef = useRef(null); // For uniform scaling
 
-  // Load scale from backend if not provided as prop
+  // Helper function to restore original material
+  const restoreOriginalMaterial = useCallback((object) => {
+    if (!object) return;
+    
+    const originalMaterials = originalMaterialsRef.current.get(object.uuid);
+    if (originalMaterials) {
+      object.traverse((child) => {
+        if (child.isMesh && child.material) {
+          const originalMaterial = originalMaterials.get(child.uuid);
+          if (originalMaterial) {
+            // Only dispose if it's a different material (the temporary transparent one)
+            if (child.material !== originalMaterial) {
+              child.material.dispose();
+            }
+            // Restore the original material
+            child.material = originalMaterial;
+            child.material.needsUpdate = true;
+          }
+        }
+      });
+      originalMaterialsRef.current.delete(object.uuid);
+    } else {
+      // Fallback: if no original material stored, just reset transparency
+      object.traverse((child) => {
+        if (child.isMesh && child.material) {
+          child.material.opacity = 1.0;
+          child.material.transparent = false;
+          child.material.needsUpdate = true;
+        }
+      });
+    }
+  }, []);
+
+  // Derive assetsToDisplay with full URLs internally
+  const assetsToDisplay = React.useMemo(() => {
+    if (!rawPlacedAssets) {
+        return [];
+    }
+    const processed = rawPlacedAssets.map((asset, index) => {
+      let newModelUrl = asset.modelUrl;
+      if (asset.modelUrl && !asset.modelUrl.startsWith('http') && !asset.modelUrl.startsWith('/')) {
+        newModelUrl = `${CONFIG.API.BASE_URL}/${asset.modelUrl}`;
+      } else if (asset.modelUrl && !asset.modelUrl.startsWith('http') && asset.modelUrl.startsWith('/')) {
+        newModelUrl = `${CONFIG.API.BASE_URL}${asset.modelUrl}`;
+      }
+      return { ...asset, modelUrl: newModelUrl };
+    });
+    return processed;
+  }, [rawPlacedAssets]);
+
+  // Fetch initial scale if not provided
   useEffect(() => {
     if (!terrainId) return;
-    // If initialScaleProp is provided, use it
     if (typeof initialScaleProp === 'number') {
       setCurrentScale(initialScaleProp);
       return;
     }
-    // Otherwise, fetch from backend
     fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.BASE}/${terrainId}`)
       .then(res => res.json())
       .then(data => {
-        if (typeof data.scale === 'number') {
+        if (data && typeof data.scale === 'number') { // Added check for data
           setCurrentScale(data.scale);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        // console.warn(\`[TerrainViewer] Could not fetch initial scale for ${terrainId}\`);
+      });
   }, [terrainId, initialScaleProp]);
 
   // Save scale to backend
@@ -86,9 +143,14 @@ const TerrainViewer = ({
     }
   };
 
-  // Basic scene initialization
+  // Main scene setup effect
   useEffect(() => {
-    if (!mountRef.current) return;
+    if (!mountRef.current || !terrainUrl) { // Ensure terrainUrl is present
+        setIsLoading(false); // Not loading if no URL
+        return;
+    }
+    setIsLoading(true);
+    setError(null);
 
     const currentMount = mountRef.current;
     const width = currentMount.clientWidth;
@@ -100,82 +162,385 @@ const TerrainViewer = ({
     sceneRef.current = scene;
 
     // Camera
-    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    // Adjusted for an angled top-down view
-    const viewDistance = 10; // Distance from origin for the initial view
-    camera.position.set(viewDistance / Math.sqrt(2), viewDistance, viewDistance / Math.sqrt(2)); // Angled view
-    // For a more direct 45-degree top-down:
-    // camera.position.set(0, viewDistance, viewDistance); // Or an X/Z offset if preferred
+    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 2000); // Increased far plane
+    camera.position.set(10, 10, 10);
     cameraRef.current = camera;
 
     // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.outputEncoding = THREE.sRGBEncoding; // Important for GLTF colors
-    renderer.shadowMap.enabled = true; // Enable shadows in the renderer
+    renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     currentMount.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // --- Lighting Setup ---
-    // Ambient light for overall scene visibility
-    const ambientLight = new THREE.AmbientLight(0xffffff, 3); // Further increased ambient light
-    scene.add(ambientLight);
+    // OrbitControls
+    const orbitControls = new OrbitControls(camera, renderer.domElement);
+    orbitControls.enableDamping = true;
+    orbitControls.dampingFactor = 0.1;
+    orbitControls.screenSpacePanning = true; // Better panning
+    orbitControls.minDistance = 1;
+    orbitControls.maxDistance = 500; // Increased max distance
+    orbitControls.maxPolarAngle = Math.PI / 2 - 0.05; // Prevent camera going below ground
+    controlsRef.current = orbitControls;
 
-    // Directional light for highlights and shadows
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0); // Further increased directional light
-    directionalLight.position.set(20, 40, 25); // Adjusted position for broader coverage
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 2.0); // Significantly increased ambient light
+    scene.add(ambientLight);
+    ambientLightRef.current = ambientLight;
+
+    const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 1.5); // Increased hemisphere light
+    scene.add(hemisphereLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5); // Increased directional light intensity
+    directionalLight.position.set(20, 30, 20);
     directionalLight.castShadow = true;
-    // Configure shadow properties
-    directionalLight.shadow.mapSize.width = 2048; // Increased shadow map resolution
+    directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
     directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 100; // Increased far plane for shadows
-    const shadowCamSize = 30; // Increased area covered by shadow camera
-    directionalLight.shadow.camera.left = -shadowCamSize;
-    directionalLight.shadow.camera.right = shadowCamSize;
-    directionalLight.shadow.camera.top = shadowCamSize;
-    directionalLight.shadow.camera.bottom = -shadowCamSize;
-    directionalLight.shadow.bias = -0.001; // Helps prevent shadow acne
-
+    directionalLight.shadow.camera.far = 100;
+    directionalLight.shadow.camera.left = -30;
+    directionalLight.shadow.camera.right = 30;
+    directionalLight.shadow.camera.top = 30;
+    directionalLight.shadow.camera.bottom = -30;
     scene.add(directionalLight);
-    // For debugging shadow camera:
-    // const shadowHelper = new THREE.CameraHelper(directionalLight.shadow.camera);
-    // scene.add(shadowHelper);
-    // --- End Lighting Setup ---
+    lightRef.current = directionalLight;
 
-    // OrbitControls
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.screenSpacePanning = false;
-    controls.minDistance = 1;
-    controls.maxDistance = 50;
-    controls.target.set(0, 0, 0); // Look at origin
-    controlsRef.current = controls;
+    // Add additional fill lights to reduce shadows
+    const fillLight1 = new THREE.DirectionalLight(0xffffff, 1.0);
+    fillLight1.position.set(-20, 20, -20);
+    scene.add(fillLight1);
 
-    // Initial placeholder for grid, will be replaced on model load
-    // const initialGridColor = new THREE.Color(0xffffff); // White
-    // const gridHelper = new THREE.GridHelper(10, 10, initialGridColor, initialGridColor);
-    // gridHelper.position.y = 0;
-    // gridHelper.visible = isGridVisible;
-    // scene.add(gridHelper);
-    // gridHelperRef.current = gridHelper; // Store initial reference
+    const fillLight2 = new THREE.DirectionalLight(0xffffff, 0.8);
+    fillLight2.position.set(0, 20, -30);
+    scene.add(fillLight2);
+    
+    // TransformControls
+    let transformControlsInstance;
+    try {
+        transformControlsInstance = new TransformControls(camera, renderer.domElement);
+
+        const rootObjectForScene = transformControlsInstance._root;
+        const isRootObject3D = rootObjectForScene?.isObject3D === true;
+        const sceneIsActuallyScene = scene?.isScene === true;
+
+        if (rootObjectForScene && isRootObject3D && sceneIsActuallyScene) {
+            scene.add(rootObjectForScene);
+            transformControlsRef.current = transformControlsInstance;
+
+            // Configure handles for uniform scaling - THIS WAS THE MISPLACED LOGIC BLOCK
+            // It needs to be applied to transformControlsInstance directly after creation
+            // or when the mode is known (but mode is not a direct dep of this effect)
+            // The primary place to set showX/Y/Z based on mode is the OTHER useEffect further down.
+            // However, we can set initial sensible defaults here or specifically for scale mode if we could detect it.
+            // For now, let's ensure the other useEffect handles mode-specific visibility.
+            // Default to all visible initially.
+            transformControlsInstance.showX = true;
+            transformControlsInstance.showY = true;
+            transformControlsInstance.showZ = true;
+
+            transformControlsInstance.addEventListener('dragging-changed', (event) => {
+                const currentTC = transformControlsRef.current; // Use current ref for safety
+                if (!currentTC) return;
+                const obj = currentTC.object;
+
+                if (controlsRef.current) controlsRef.current.enabled = !event.value;
+                
+                if (event.value && obj) { // Dragging started
+                    if (currentTC.mode === 'scale') {
+                        uniformScaleDragDataRef.current = { 
+                            scaleAtDragStart: obj.scale.clone(), 
+                            // drivingAxis: 'x' // Assuming X is primary due to handle visibility
+                        };
+                    }
+                    // Store original materials for each mesh child
+                    if (!originalMaterialsRef.current.has(obj.uuid)) {
+                        const originalMaterials = new Map();
+                        obj.traverse((child) => {
+                            if (child.isMesh && child.material) {
+                                originalMaterials.set(child.uuid, child.material);
+                            }
+                        });
+                        originalMaterialsRef.current.set(obj.uuid, originalMaterials);
+                    }
+                    // Apply transparency to all mesh children
+                    obj.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            child.material = child.material.clone();
+                            child.material.opacity = 0.5;
+                            child.material.transparent = true;
+                            child.material.needsUpdate = true;
+                        }
+                    });
+                } else if (!event.value && obj) { // Dragging ended
+                    uniformScaleDragDataRef.current = null; // Clear scaling data
+                    // Restore original materials for each mesh
+                    const originalMaterials = originalMaterialsRef.current.get(obj.uuid);
+                    if (originalMaterials) {
+                        obj.traverse((child) => {
+                            if (child.isMesh && child.material) {
+                                const originalMaterial = originalMaterials.get(child.uuid);
+                                if (originalMaterial) {
+                                    child.material.dispose();
+                                    child.material = originalMaterial;
+                                    child.material.needsUpdate = true;
+                                }
+                            }
+                        });
+                        originalMaterialsRef.current.delete(obj.uuid);
+                    }
+                }
+            });
+
+            transformControlsInstance.addEventListener('objectChange', () => {
+                const currentTC = transformControlsRef.current; // Use current ref
+                if (!currentTC || !currentTC.object) return;
+
+                if (currentTC.mode === 'scale' && uniformScaleDragDataRef.current) {
+                    const obj = currentTC.object;
+                    const { scaleAtDragStart } = uniformScaleDragDataRef.current;
+                    const epsilon = 0.00001;
+
+                    const initialX = scaleAtDragStart.x;
+                    const currentX = obj.scale.x;
+
+                    if (Math.abs(initialX) < epsilon) { // Initial X was zero or very small
+                        if (Math.abs(currentX) > epsilon) {
+                            if (Math.abs(obj.scale.y - currentX) > epsilon || Math.abs(obj.scale.z - currentX) > epsilon) {
+                                obj.scale.y = currentX;
+                                obj.scale.z = currentX;
+                            }
+                        } else {
+                            if (Math.abs(obj.scale.y) > epsilon || Math.abs(obj.scale.z) > epsilon) {
+                                obj.scale.y = 0;
+                                obj.scale.z = 0;
+                            }
+                        }
+                    } else { // Initial X was non-zero
+                        const scaleFactor = currentX / initialX;
+                        const targetY = scaleAtDragStart.y * scaleFactor;
+                        const targetZ = scaleAtDragStart.z * scaleFactor;
+
+                        if (Math.abs(obj.scale.y - targetY) > epsilon || Math.abs(obj.scale.z - targetZ) > epsilon) {
+                            obj.scale.y = targetY;
+                            obj.scale.z = targetZ;
+                        }
+                    }
+                    
+                    // Real-time terrain snapping during scaling
+                    if (terrainModelRef.current) {
+                        // Update matrix to get accurate bounding box after scale change
+                        obj.updateMatrixWorld(true);
+                        const bbox = new THREE.Box3().setFromObject(obj, true);
+                        
+                        // Calculate how much the object extends below its origin
+                        const modelBottom = bbox.min.y;
+                        const modelOrigin = obj.position.y;
+                        const heightBelowOrigin = modelOrigin - modelBottom;
+                        
+                        // Raycast from high above down to the terrain
+                        const rayOrigin = new THREE.Vector3(obj.position.x, 200, obj.position.z);
+                        const rayDirection = new THREE.Vector3(0, -1, 0);
+                        raycasterRef.current.set(rayOrigin, rayDirection);
+                        const intersectsTerrain = raycasterRef.current.intersectObject(terrainModelRef.current, true);
+
+                        if (intersectsTerrain.length > 0) {
+                            const terrainY = intersectsTerrain[0].point.y;
+                            const targetY = terrainY + heightBelowOrigin;
+                            
+                            // Only update if there's a significant difference to avoid jitter
+                            if (Math.abs(obj.position.y - targetY) > 0.001) {
+                                obj.position.y = targetY;
+                            }
+                        }
+                    }
+                }
+            });
+
+            transformControlsInstance.addEventListener('mouseUp', () => {
+                if (transformControlsInstance.object && onPlacedAssetMoved && terrainModelRef.current) {
+                    const transformedObject = transformControlsInstance.object;
+                    
+                    // Improved snapping logic for both translate and scale modes
+                    if (transformControlsInstance.mode === 'translate' || transformControlsInstance.mode === 'scale') {
+                        // Update matrix to get accurate bounding box
+                        transformedObject.updateMatrixWorld(true);
+                        const bbox = new THREE.Box3().setFromObject(transformedObject, true);
+                        
+                        // Calculate how much the object extends below its origin
+                        const modelBottom = bbox.min.y;
+                        const modelOrigin = transformedObject.position.y;
+                        const heightBelowOrigin = modelOrigin - modelBottom;
+            
+                        const rayOrigin = new THREE.Vector3(transformedObject.position.x, 200, transformedObject.position.z);
+                        const rayDirection = new THREE.Vector3(0, -1, 0);
+            
+                        raycasterRef.current.set(rayOrigin, rayDirection);
+                        const intersectsTerrain = raycasterRef.current.intersectObject(terrainModelRef.current, true);
+            
+                        if (intersectsTerrain.length > 0) {
+                            const terrainY = intersectsTerrain[0].point.y;
+                            const targetY = terrainY + heightBelowOrigin;
+                            transformedObject.position.y = targetY;
+                        }
+                    }
+                    
+                    // Update parent component with new transform
+                    onPlacedAssetMoved(
+                        transformedObject.userData.assetId,
+                        transformedObject.position.clone(),
+                        transformedObject.rotation.clone(),
+                        transformedObject.scale.clone()
+                    );
+                }
+            });
+
+            // Rotation Snap
+            transformControlsInstance.setRotationSnap(THREE.MathUtils.degToRad(15));
+            // Scale Snap (optional, can be a bit aggressive)
+            // transformControlsInstance.setScaleSnap(0.25);
+
+        } else {
+            if (onError) onError("Transform controls could not be initialized correctly.");
+        }
+
+    } catch(e) {
+        if(onError) onError("Error setting up transform tools: " + e.message);
+    }
+
+
+    // Load terrain model
+    if (terrainUrl) {
+        const loader = new GLTFLoader();
+        const fullTerrainUrl = terrainUrl.startsWith('http') ? terrainUrl : `${CONFIG.API.BASE_URL}${terrainUrl.startsWith('/') ? '' : '/'}${terrainUrl}`;
+        
+        // Add a cache buster to the URL if it's not already there
+        const finalUrl = fullTerrainUrl.includes('?') ? `${fullTerrainUrl}&cb=${Date.now()}` : `${fullTerrainUrl}?cb=${Date.now()}`;
+
+        if (!finalUrl || finalUrl.endsWith('undefined')) {
+            setError('Invalid terrain URL provided.');
+            setIsLoading(false);
+        } else {
+            loader.load(
+                finalUrl,
+                (gltf) => {
+                    if (!sceneRef.current) return; // Scene might have been cleaned up
+
+                    if (terrainModelRef.current) {
+                        sceneRef.current.remove(terrainModelRef.current);
+                    }
+
+                    const model = gltf.scene;
+                    model.position.set(0, 0, 0);
+                    model.scale.set(currentScale, currentScale, currentScale);
+
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if (child.material) {
+                                if (child.material.isMeshBasicMaterial) {
+                                    const newMaterial = new THREE.MeshStandardMaterial({
+                                        color: child.material.color,
+                                        map: child.material.map,
+                                        emissive: child.material.color.clone().multiplyScalar(0.1), // Reduced emissive
+                                        emissiveIntensity: 0.1,
+                                        roughness: 0.8,
+                                        metalness: 0.0
+                                    });
+                                    child.material.dispose();
+                                    child.material = newMaterial;
+                                } else if (child.material.isMeshPhongMaterial) {
+                                    const newMaterial = new THREE.MeshStandardMaterial({
+                                        color: child.material.color,
+                                        map: child.material.map,
+                                        roughness: 0.7,
+                                        metalness: 0.1
+                                    });
+                                    child.material.dispose();
+                                    child.material = newMaterial;
+                                }
+                                // Ensure all materials are bright enough
+                                if (child.material.isMeshStandardMaterial) {
+                                    // Make materials less metallic and more diffuse for better lighting
+                                    child.material.metalness = Math.min(0.3, child.material.metalness);
+                                    child.material.roughness = Math.max(0.4, child.material.roughness);
+                                    
+                                    // Brighten dark materials
+                                    const hsl = {};
+                                    child.material.color.getHSL(hsl);
+                                    if (hsl.l < 0.3) {
+                                        child.material.color.setHSL(hsl.h, hsl.s, Math.max(0.3, hsl.l));
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    
+                    sceneRef.current.add(model);
+                    terrainModelRef.current = model;
+                    
+                    const box = new THREE.Box3().setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+
+                    // Set directional light target to terrain center
+                    if (lightRef.current) {
+                        lightRef.current.target.position.copy(center);
+                        lightRef.current.target.updateMatrixWorld(); // Important for target change to take effect
+                    }
+
+                    updateCustomGrid(size.x, size.z, center);
+                    setIsGridVisible(initialShowGrid); // Ensure grid visibility is reset based on prop
+
+                    if (onTerrainMetricsUpdate) {
+                        onTerrainMetricsUpdate({
+                            width: size.x, depth: size.z, height: size.y,
+                            centerX: center.x, centerY: center.y, centerZ: center.z,
+                        });
+                    }
+
+                    // Adjust camera
+                    const fitOffset = 1.2; // Zoom out a bit
+                    const fov = camera.fov * (Math.PI / 180);
+                    const distance = Math.max(size.x, size.y, size.z) / (2 * Math.tan(fov / 2));
+                    camera.position.set(center.x + distance * fitOffset, center.y + distance * fitOffset * 0.7, center.z + distance * fitOffset);
+                    camera.lookAt(center);
+                    orbitControls.target.copy(center);
+                    orbitControls.update();
+                    setIsLoading(false);
+                },
+                undefined, // onProgress
+                (loadError) => {
+                    setError(`Failed to load terrain: ${terrainName}. Details: ${loadError.message}`);
+                    if (onError) onError(`Failed to load terrain: ${terrainName}. Check console for details.`);
+                    setIsLoading(false);
+                }
+            );
+        }
+    } else {
+        setIsLoading(false); // No terrain URL, not loading
+    }
+    
 
     // Animation loop
     const animate = () => {
       animationFrameIdRef.current = requestAnimationFrame(animate);
-      controls.update(); // Only required if controls.enableDamping or controls.autoRotate are set to true
+        orbitControls.update(); // Only required if enableDamping or autoRotate are set
+        if (transformControlsRef.current && transformControlsRef.current.object && selectionBoxRef.current) {
+             selectionBoxRef.current.setFromObject(transformControlsRef.current.object); // Keep selection box updated
+        }
       renderer.render(scene, camera);
     };
     animate();
 
     // Resize handler
     const handleResize = () => {
-      if (!currentMount || !rendererRef.current || !cameraRef.current) return;
-      const newWidth = currentMount.clientWidth;
-      const newHeight = currentMount.clientHeight;
+        if (!mountRef.current || !rendererRef.current || !cameraRef.current) return;
+        const newWidth = mountRef.current.clientWidth;
+        const newHeight = mountRef.current.clientHeight;
       rendererRef.current.setSize(newWidth, newHeight);
       cameraRef.current.aspect = newWidth / newHeight;
       cameraRef.current.updateProjectionMatrix();
@@ -186,530 +551,579 @@ const TerrainViewer = ({
     return () => {
       if (animationFrameIdRef.current) cancelAnimationFrame(animationFrameIdRef.current);
       window.removeEventListener('resize', handleResize);
-      controls.dispose();
-      if (renderer.domElement && currentMount.contains(renderer.domElement)) {
-        currentMount.removeChild(renderer.domElement);
-      }
-      renderer.dispose();
-      // Dispose scene objects if necessary (omitted for brevity, but important for complex scenes)
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount
 
-  // Effect to setup DragControls when an asset is selected
-  useEffect(() => {
-    const scene = sceneRef.current;
-    const camera = cameraRef.current;
-    const rendererDomElement = rendererRef.current?.domElement;
-    const orbitControls = controlsRef.current; // OrbitControls instance
+        if (transformControlsRef.current) {
+            const tcInstance = transformControlsRef.current;
+            tcInstance.removeEventListener('dragging-changed');
+            tcInstance.removeEventListener('objectChange');
+            tcInstance.removeEventListener('mouseUp');
+            if (tcInstance.object) tcInstance.detach();
 
-    // Clean up existing DragControls
-    if (dragControlsRef.current) {
-      dragControlsRef.current.dispose();
-      dragControlsRef.current = null;
-    }
+            if (tcInstance._root && tcInstance._root.parent) {
+                tcInstance._root.parent.remove(tcInstance._root);
+            }
+            tcInstance._root?.dispose?.();
 
-    // Only setup DragControls if an asset is selected, and we are NOT placing a new one,
-    // and all necessary refs are available.
-    if (selectedPlacedAssetId && !selectedAsset && assetInstancesRef.current[selectedPlacedAssetId] && scene && camera && rendererDomElement && orbitControls && terrainModelRef.current) {
-      const selectedInstance = assetInstancesRef.current[selectedPlacedAssetId];
-      const dragItems = [selectedInstance];
-      
-      const newDragControls = new DragControls(dragItems, camera, rendererDomElement);
-      dragControlsRef.current = newDragControls;
-
-      let originalMaterials = new Map(); // To store original material properties
-
-      newDragControls.addEventListener('dragstart', function (event) {
-        orbitControls.enabled = false; // Disable OrbitControls during drag
-        
-        originalMaterials.clear();
-        event.object.traverse((child) => {
-          if (child.isMesh && child.material) {
-            const materials = Array.isArray(child.material) ? child.material : [child.material];
-            materials.forEach(material => {
-              if (!originalMaterials.has(material.uuid)) {
-                originalMaterials.set(material.uuid, {
-                  opacity: material.opacity,
-                  transparent: material.transparent,
-                });
-              }
-              material.opacity = 0.6;
-              material.transparent = true;
-              material.needsUpdate = true;
-            });
-          }
-        });
-      });
-
-      newDragControls.addEventListener('drag', function (event) {
-        // Constrain dragging to XZ plane by resetting Y.
-        // Note: The object's Y might be its center. We'll snap to terrain on dragend.
-        // For now, let's allow free dragging in 3D space and rely on dragend for final positioning
-        // For simple XZ plane dragging:
-        // event.object.position.y = assetInstancesRef.current[selectedPlacedAssetId]?.userData?.originalY || 0; 
-      });
-      
-      newDragControls.addEventListener('dragend', function (event) {
-        orbitControls.enabled = true; // Re-enable OrbitControls
-        
-        event.object.traverse((child) => {
-          if (child.isMesh && child.material) {
-            const materials = Array.isArray(child.material) ? child.material : [child.material];
-            materials.forEach(material => {
-              if (originalMaterials.has(material.uuid)) {
-                const originalProps = originalMaterials.get(material.uuid);
-                material.opacity = originalProps.opacity;
-                material.transparent = originalProps.transparent;
-                material.needsUpdate = true;
-              }
-            });
-          }
-        });
-        originalMaterials.clear();
-
-        const draggedAsset = event.object;
-        const assetId = draggedAsset.userData?.assetId;
-
-        if (assetId && onPlacedAssetMoved && terrainModelRef.current) {
-          // New X and Z are from the drag
-          const newX = draggedAsset.position.x;
-          const newZ = draggedAsset.position.z;
-
-          // Raycast downwards from above the new X,Z to find the terrain Y
-          const raycaster = new THREE.Raycaster();
-          const down = new THREE.Vector3(0, -1, 0);
-          // Start raycast from a point above the asset's new X,Z position
-          const origin = new THREE.Vector3(newX, draggedAsset.position.y + 10, newZ); // Start 10 units above current dragged Y
-          raycaster.set(origin, down);
-
-          const mainTerrainObject = terrainModelRef.current;
-          const intersectsTerrain = raycaster.intersectObject(mainTerrainObject, true); // Recursive check
-
-          let newY = draggedAsset.position.y; // Default to dragged Y if no intersection
-          if (intersectsTerrain.length > 0) {
-            newY = intersectsTerrain[0].point.y; // Y from terrain
-            // Now, adjust Y so the bottom of the asset model sits on the terrain
-            const bbox = new THREE.Box3().setFromObject(draggedAsset);
-            newY -= bbox.min.y; // Shift model up by its "depth" below its origin
-          } else {
-            console.warn(`[DragControls] DragEnd: Could not snap asset ${assetId} to terrain. Using its current Y.`);
-          }
-          
-          const finalPosition = new THREE.Vector3(newX, newY, newZ);
-          onPlacedAssetMoved(assetId, finalPosition);
-          
-          // Update the instance's position directly for immediate visual feedback
-          // The parent will update state, which will re-render, but this can avoid flicker.
-          // However, this might conflict if parent state update is slow or different.
-          // For now, let parent handle state.
+            tcInstance.dispose();
+            transformControlsRef.current = null;
         }
-      });
+        if (controlsRef.current) {
+            controlsRef.current.dispose();
+            controlsRef.current = null;
+        }
+        if (assetInstancesRef.current) {
+            Object.values(assetInstancesRef.current).forEach(instance => {
+                if (instance.parent) instance.parent.remove(instance);
+            });
+            assetInstancesRef.current = {};
+        }
+        if (selectionBoxRef.current) {
+            if (selectionBoxRef.current.parent) selectionBoxRef.current.parent.remove(selectionBoxRef.current);
+            selectionBoxRef.current.dispose?.();
+            selectionBoxRef.current = null;
+        }
+        if (terrainModelRef.current) {
+            if (sceneRef.current) sceneRef.current.remove(terrainModelRef.current);
+            terrainModelRef.current = null;
+      }
+        if (gridHelperRef.current) {
+            if (sceneRef.current) sceneRef.current.remove(gridHelperRef.current);
+            gridHelperRef.current.geometry?.dispose();
+            gridHelperRef.current.material?.dispose();
+            gridHelperRef.current = null;
+        }
+        if (lightRef.current && sceneRef.current) sceneRef.current.remove(lightRef.current);
+        if (ambientLightRef.current && sceneRef.current) sceneRef.current.remove(ambientLightRef.current);
+        
+        if (rendererRef.current) {
+            rendererRef.current.dispose();
+            if (rendererRef.current.domElement && currentMount.contains(rendererRef.current.domElement)) {
+                 currentMount.removeChild(rendererRef.current.domElement);
+            }
+            rendererRef.current = null;
+        }
+        if (sceneRef.current) {
+            sceneRef.current = null;
+        }
+        cameraRef.current = null;
+        originalMaterialsRef.current.clear();
+    };
+  }, [terrainUrl, terrainId, currentScale, initialShowGrid, onTerrainMetricsUpdate, onError, onPlacedAssetMoved]); // Ensure all relevant dependencies are listed
+
+  // Effect to attach TransformControls when an asset is selected
+  useEffect(() => {
+    const tcInstanceInEffect = transformControlsRef.current;
+    if (!tcInstanceInEffect) {
+        return;
     }
 
-    return () => { // Cleanup when effect re-runs or component unmounts
-      if (dragControlsRef.current) {
-        dragControlsRef.current.dispose();
-        dragControlsRef.current = null;
+    if (selectedPlacedAssetId) {
+      const objectToTransform = assetInstancesRef.current[selectedPlacedAssetId];
+      if (objectToTransform) {
+        tcInstanceInEffect.setMode(transformMode); // Set mode before attaching
+        tcInstanceInEffect.attach(objectToTransform);
+        tcInstanceInEffect.enabled = true;
+        
+        // IMPROVED RE-SNAP LOGIC - Fix sinking issue
+        if (terrainModelRef.current) {
+          const objToSnap = tcInstanceInEffect.object;
+          if (objToSnap) {
+            // Update the object's matrix to get accurate bounding box
+            objToSnap.updateMatrixWorld(true);
+
+            // Calculate the bounding box more accurately
+            const worldBBox = new THREE.Box3().setFromObject(objToSnap, true);
+            
+            // Calculate how much the object extends below its origin
+            const modelBottom = worldBBox.min.y;
+            const modelOrigin = objToSnap.position.y;
+            const heightBelowOrigin = modelOrigin - modelBottom;
+            
+            // Raycast from high above down to the terrain
+            const rayOrigin = new THREE.Vector3(objToSnap.position.x, 200, objToSnap.position.z); 
+            const rayDirection = new THREE.Vector3(0, -1, 0);
+            raycasterRef.current.set(rayOrigin, rayDirection);
+            const intersectsTerrain = raycasterRef.current.intersectObject(terrainModelRef.current, true);
+
+            if (intersectsTerrain.length > 0) {
+              const terrainIntersectionY = intersectsTerrain[0].point.y;
+              
+              // Set the object's position so its bottom sits on the terrain
+              const targetY = terrainIntersectionY + heightBelowOrigin;
+              
+              if (Math.abs(objToSnap.position.y - targetY) > 0.001) {
+                objToSnap.position.y = targetY;
+                objToSnap.updateMatrixWorld(true);
+
+                if (onPlacedAssetMoved) {
+                  onPlacedAssetMoved(
+                    objToSnap.userData.assetId,
+                    objToSnap.position.clone(), 
+                    objToSnap.rotation.clone(), 
+                    objToSnap.scale.clone()
+                  );
+                }
+              }
+            } else {
+              console.warn(`[TransformControlsEffect] Re-snap for ${objToSnap.userData.assetId} failed: Raycaster did not intersect terrain.`);
+            }
+          }
+        }
+
+      } else {
+        if (tcInstanceInEffect.object) {
+          // Restore original material before detaching
+          restoreOriginalMaterial(tcInstanceInEffect.object);
+          
+          tcInstanceInEffect.detach();
+          tcInstanceInEffect.enabled = false;
+          
+          // Force update the controls to ensure they're properly disabled
+          if (controlsRef.current) {
+            controlsRef.current.enabled = true;
+          }
+        }
       }
-    };
-  // Depend on selectedPlacedAssetId, selectedAsset (to disable drag when placing), and refs
-  }, [selectedPlacedAssetId, selectedAsset, onPlacedAssetMoved, terrainModelRef]); 
+    } else { // No selectedPlacedAssetId - IMPROVED DESELECTION
+      if (tcInstanceInEffect.object) {
+        // Restore original material before detaching
+        restoreOriginalMaterial(tcInstanceInEffect.object);
+        
+        tcInstanceInEffect.detach();
+        tcInstanceInEffect.enabled = false;
+        
+        // Force update the controls to ensure they're properly disabled
+        if (controlsRef.current) {
+          controlsRef.current.enabled = true;
+        }
+      }
+    }
+  }, [selectedPlacedAssetId, transformMode, onPlacedAssetMoved, restoreOriginalMaterial]);
 
   // Effect to update visual selection indicator (BoxHelper)
   useEffect(() => {
-    const scene = sceneRef.current;
-    if (!scene) return;
+        const scene = sceneRef.current;
+        if (!scene) return;
 
-    // Remove existing selection box if any
     if (selectionBoxRef.current) {
       scene.remove(selectionBoxRef.current);
-      selectionBoxRef.current.dispose?.(); // Dispose geometry/material if applicable (BoxHelper does this internally)
+      selectionBoxRef.current.dispose?.();
       selectionBoxRef.current = null;
     }
 
-    if (selectedPlacedAssetId && assetInstancesRef.current[selectedPlacedAssetId]) {
-      const selectedInstance = assetInstancesRef.current[selectedPlacedAssetId];
-      const boxHelper = new THREE.BoxHelper(selectedInstance, 0xffff00); // Yellow color for selection
+    const selectedInstance = assetInstancesRef.current[selectedPlacedAssetId];
+    if (selectedInstance) { // Check if instance actually exists for the ID
+      const boxHelper = new THREE.BoxHelper(selectedInstance, 0xffff00);
       scene.add(boxHelper);
       selectionBoxRef.current = boxHelper;
     }
-  }, [selectedPlacedAssetId, assetsToDisplayProp]); // Re-run if selection or displayed assets change (instances might re-render)
+  }, [selectedPlacedAssetId, assetsToDisplay, assetInstancesRef]); // Re-run if selection or displayed assets change (instances might re-render or be removed)
+
 
   // Call onPlacedAssetSelected when selectedPlacedAssetId changes
   useEffect(() => {
     if (onPlacedAssetSelected) {
-      onPlacedAssetSelected(selectedPlacedAssetId);
+      const selectedInstance = selectedPlacedAssetId ? assetInstancesRef.current[selectedPlacedAssetId] : null;
+      onPlacedAssetSelected(selectedPlacedAssetId, selectedInstance);
     }
-  }, [selectedPlacedAssetId, onPlacedAssetSelected]);
+  }, [selectedPlacedAssetId, onPlacedAssetSelected, assetInstancesRef]);
 
   // Effect for handling click-to-place OR click-to-select
   useEffect(() => {
-    if (!rendererRef.current || !rendererRef.current.domElement) return;
+    const rendererDomElement = rendererRef.current?.domElement;
+    if (!rendererDomElement) return;
     
     const scene = sceneRef.current;
     const camera = cameraRef.current;
     if (!scene || !camera) return;
 
     const handleClick = (event) => {
-      // --- DEBUG LOG ---
-      // console.log(
-      //   '[TV handleClick] Start. selectedAsset:', selectedAsset, 
-      //   'selectedAsset.modelUrl:', selectedAsset ? selectedAsset.modelUrl : 'N/A', 
-      //   'terrainModelRef.current:', !!terrainModelRef.current
-      // );
+      if (!mountRef.current || !cameraRef.current || !sceneRef.current ) {
+        return;
+      }
 
-      const rect = rendererRef.current.domElement.getBoundingClientRect();
-      mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mouseRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-      raycasterRef.current.setFromCamera(mouseRef.current, camera);
+      const currentMount = mountRef.current;
+      mouseRef.current.x = (event.clientX - currentMount.getBoundingClientRect().left) / currentMount.clientWidth * 2 - 1;
+      mouseRef.current.y = -((event.clientY - currentMount.getBoundingClientRect().top) / currentMount.clientHeight) * 2 + 1;
 
-      // Case 1: Placing a NEW asset (selectedAsset prop is provided)
-      if (selectedAsset && selectedAsset.modelUrl && terrainModelRef.current) {
-        const mainTerrainObject = terrainModelRef.current;
+      const raycaster = raycasterRef.current;
+      raycaster.setFromCamera(mouseRef.current, cameraRef.current);
 
-        // --- DEBUG LOG (ensure this is reached) ---
-        // console.log('[TV handleClick] Raycasting Check. mainTerrainObject:', mainTerrainObject, 'Children:', mainTerrainObject.children);
-
-        const intersectsTerrain = raycasterRef.current.intersectObjects(mainTerrainObject.children, true);
-
-        // --- DEBUG LOG ---
-        // console.log('[TV handleClick] Placing new asset. Intersects terrain:', intersectsTerrain.length > 0, intersectsTerrain);
+      // If an asset is selected FOR PLACEMENT, prioritize placing it.
+      if (selectedAsset && selectedAsset.modelUrl && onAssetPlaced && terrainModelRef.current) { 
+        const intersectsTerrain = raycaster.intersectObject(terrainModelRef.current, true);
 
         if (intersectsTerrain.length > 0) {
           const intersectionPoint = intersectsTerrain[0].point;
           const newAssetData = {
-            id: `asset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            modelUrl: selectedAsset.modelUrl, // Ensure this is correct
-            name: selectedAsset.name || 'Asset',
-            position: { 
-              x: intersectionPoint.x, 
-              y: intersectionPoint.y,
-              z: intersectionPoint.z 
-            },
-            rotation: selectedAsset.rotation || { x: 0, y: Math.random() * Math.PI * 2, z: 0 },
-            scale: selectedAsset.scale || { x: 1, y: 1, z: 1 },
-            instance: null 
+            id: `manual-${Date.now()}-${Math.random().toString(36).substring(2,9)}`,
+            modelUrl: selectedAsset.modelUrl,
+            name: selectedAsset.name || 'Placed Asset',
+            position: { x: intersectionPoint.x, y: intersectionPoint.y, z: intersectionPoint.z },
+            rotation: { x: 0, y: selectedAsset.rotation?.y || 0, z: 0 },
+            scale: { x: selectedAsset.scale?.x || 1, y: selectedAsset.scale?.y || 1, z: selectedAsset.scale?.z || 1 },
           };
-          if (onAssetPlaced) {
-            // --- DEBUG LOG ---
-            // console.log('[TV handleClick] Calling onAssetPlaced with:', newAssetData);
-            onAssetPlaced(newAssetData); 
+          onAssetPlaced(newAssetData); 
+        }
+        return; 
+      } else {
+      }
+
+      // Check if we have a selected asset in transform mode
+      if (transformControlsRef.current && transformControlsRef.current.object) {
+          // Check if the click was on the active TransformControls gizmo itself
+          // We need to get the gizmo parts. transformControlsRef.current.children[0] is usually the gizmo group.
+          const gizmoChildren = transformControlsRef.current.children?.[0]?.children || [];
+          const intersectsGizmo = raycaster.intersectObjects(gizmoChildren, true);
+          if (intersectsGizmo.length > 0) {
+              return; 
+          }
+      }
+
+      const placedAssetInstances = Object.values(assetInstancesRef.current).filter(Boolean); // Filter out any null/undefined
+      
+      if (placedAssetInstances.length === 0) { // No assets to intersect
+        if (selectedPlacedAssetId) { // Deselect if clicking empty space
+            setSelectedPlacedAssetId(null);
+            
+            // Force detach transform controls immediately
+            if (transformControlsRef.current && transformControlsRef.current.object) {
+              transformControlsRef.current.detach();
+              transformControlsRef.current.enabled = false;
+            }
+            
+            // Re-enable orbit controls
+            if (controlsRef.current) {
+              controlsRef.current.enabled = true;
+            }
+        }
+        return;
+      }
+      const intersectsPlacedAssets = raycaster.intersectObjects(placedAssetInstances, true);
+      
+      let clickedOnExistingAsset = false;
+      if (intersectsPlacedAssets.length > 0) {
+        for (const intersect of intersectsPlacedAssets) {
+          let currentObject = intersect.object;
+          let traversalCount = 0;
+          while (currentObject && (!currentObject.userData || typeof currentObject.userData.assetId === 'undefined')) { // Check for userData and assetId
+            currentObject = currentObject.parent;
+            traversalCount++;
+            if (traversalCount > 10) { // Prevent infinite loops
+              break;
+            }
+          }
+          if (currentObject && currentObject.userData && typeof currentObject.userData.assetId !== 'undefined') {
+            const assetId = currentObject.userData.assetId;
+            if (selectedPlacedAssetId !== assetId) {
+              setSelectedPlacedAssetId(assetId);
+            } else { // Clicked on already selected asset - could be a toggle or no-op. For now, no-op.
+            }
+            clickedOnExistingAsset = true;
+            break; 
           }
         }
-      } 
-      // Case 2: Selecting an EXISTING placed asset (no new asset being placed)
-      else if (!selectedAsset) {
-        const placedAssetInstances = Object.values(assetInstancesRef.current).filter(Boolean);
-        const intersectsAssets = raycasterRef.current.intersectObjects(placedAssetInstances, true);
+      }
 
-        if (intersectsAssets.length > 0) {
-          // Find the highest-level parent that is a direct child of the scene (or the asset group)
-          // and has our userData.assetId
-          let clickedAssetInstance = intersectsAssets[0].object;
-          while (clickedAssetInstance.parent !== scene && clickedAssetInstance.parent !== null) {
-            if (clickedAssetInstance.userData?.assetId) break; // Found the main group for the asset
-            clickedAssetInstance = clickedAssetInstance.parent;
+      if (!clickedOnExistingAsset) {
+        if (selectedPlacedAssetId) {
+          setSelectedPlacedAssetId(null);
+          
+          // Force detach transform controls immediately
+          if (transformControlsRef.current && transformControlsRef.current.object) {
+            transformControlsRef.current.detach();
+            transformControlsRef.current.enabled = false;
           }
           
-          if (clickedAssetInstance?.userData?.assetId) {
-            setSelectedPlacedAssetId(clickedAssetInstance.userData.assetId);
-          } else {
-            // Clicked on a part of an asset that doesn't have the ID, or logic error. Deselect.
-            setSelectedPlacedAssetId(null);
-          }
-        } else {
-          // Clicked on empty space (or terrain, if we don't re-check terrain here), deselect.
-          // Check if terrain was clicked to avoid deselecting if user just clicks terrain
-          const mainTerrainObject = terrainModelRef.current;
-          if (mainTerrainObject) {
-            const intersectsTerrain = raycasterRef.current.intersectObject(mainTerrainObject, true);
-            if (intersectsTerrain.length > 0) {
-              // Clicked on terrain, deselect any selected asset
-               setSelectedPlacedAssetId(null);
-            }
-            // If not terrain and not asset, it's empty space - also deselect
-            else {
-                 setSelectedPlacedAssetId(null);
-            }
-          } else {
-            // No terrain model, just empty space
-            setSelectedPlacedAssetId(null);
+          // Re-enable orbit controls
+          if (controlsRef.current) {
+            controlsRef.current.enabled = true;
           }
         }
       }
     };
 
-    const rendererDomElement = rendererRef.current.domElement;
-    rendererDomElement.addEventListener('click', handleClick);
+    // Add escape key handler for deselection
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && selectedPlacedAssetId) {
+        setSelectedPlacedAssetId(null);
+        
+        // Force detach transform controls
+        if (transformControlsRef.current && transformControlsRef.current.object) {
+          transformControlsRef.current.detach();
+          transformControlsRef.current.enabled = false;
+        }
+        
+        // Re-enable orbit controls
+        if (controlsRef.current) {
+          controlsRef.current.enabled = true;
+        }
+      }
+    };
 
+    rendererDomElement.addEventListener('click', handleClick);
+    document.addEventListener('keydown', handleKeyDown);
+    
     return () => {
       if (rendererDomElement) { 
         rendererDomElement.removeEventListener('click', handleClick);
       }
+      document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedAsset, onAssetPlaced, assetsToDisplayProp, onPlacedAssetSelected]); // Added assetsToDisplayProp and onPlacedAssetSelected
+  }, [selectedAsset, onAssetPlaced, assetsToDisplay, onPlacedAssetSelected, terrainModelRef, assetInstancesRef, selectedPlacedAssetId, restoreOriginalMaterial]);
+
 
   // Effect for loading and managing placed asset models in the scene
   useEffect(() => {
     const scene = sceneRef.current;
-    if (!scene) return;
-
-    const currentInstanceIds = Object.keys(assetInstancesRef.current);
-    const propAssetIds = assetsToDisplayProp.map(a => a.id);
-
-    // 1. Remove assets that are in currentInstances but no longer in props
-    currentInstanceIds.forEach(instanceId => {
-      if (!propAssetIds.includes(instanceId)) {
-        const instanceToRemove = assetInstancesRef.current[instanceId];
-        if (instanceToRemove) {
-          scene.remove(instanceToRemove);
-          // TODO: Proper disposal of geometry and material
-        }
-        delete assetInstancesRef.current[instanceId];
-      }
-    });
-
-    // 2. Load and add new assets that are in props but not yet in currentInstances
-    assetsToDisplayProp.forEach(assetData => {
-      // --- DIAGNOSTIC LOG --- 
-      console.log(`[TV AssetSync] Processing asset: ${assetData.name} (ID: ${assetData.id}), Already loaded: ${!!assetInstancesRef.current[assetData.id]}`);
-      
-      if (!assetInstancesRef.current[assetData.id] && assetData.modelUrl) {
-        const fullAssetUrl = assetData.modelUrl.startsWith('http') 
-          ? assetData.modelUrl 
-          : `${CONFIG.API.BASE_URL}${assetData.modelUrl.startsWith('/') ? '' : '/'}${assetData.modelUrl}`;
-
-        assetLoaderRef.current.load(
-          fullAssetUrl,
-          (gltf) => {
-            const modelInstance = gltf.scene.clone();
-            
-            // Set scale and rotation first, as these can affect the bounding box
-            modelInstance.scale.set(assetData.scale.x, assetData.scale.y, assetData.scale.z);
-            modelInstance.rotation.set(assetData.rotation.x, assetData.rotation.y, assetData.rotation.z);
-            
-            // Calculate bounding box AFTER scaling and rotation (rotation might not be critical for axis-aligned bbox height)
-            const bbox = new THREE.Box3().setFromObject(modelInstance);
-            
-            // The goal is to have the world-coordinate bottom of the model (bbox.min.y after world transform)
-            // sit at assetData.position.y (the click point on the terrain).
-            // modelInstance.position is the model's origin.
-            // The offset from the model's origin to its bottom is bbox.min.y (in its local, scaled space).
-            // So, modelInstance.position.y + bbox.min.y (world) = assetData.position.y (world)
-            // modelInstance.position.y = assetData.position.y - bbox.min.y (where bbox.min.y is relative to origin after scale)
-            // Let's try to set the origin to the click point, then shift it based on bbox.
-            modelInstance.position.set(assetData.position.x, assetData.position.y, assetData.position.z);
-            modelInstance.position.y -= bbox.min.y; // Subtracting bbox.min.y will shift the model up if min.y is negative, down if positive.
-
-            modelInstance.userData = { assetId: assetData.id }; // Essential for identification
-
-            modelInstance.traverse((child) => {
-              if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-                
-                // --- BEGIN MATERIAL LOGGING ---
-                if (child.material) {
-                  console.log(`[Asset Material] Asset: ${assetData.name}, Mesh: ${child.name}, Material Type: ${child.material.type}`);
-                  if (child.material.isMeshStandardMaterial) {
-                    console.log(`  Original Color:`, child.material.color.getHexString());
-                    console.log(`  Original Metalness: ${child.material.metalness}, Roughness: ${child.material.roughness}`);
-                    
-                    // --- BEGIN RUNTIME MATERIAL ADJUSTMENT ---
-                    child.material.metalness = 0.5; // Reduce metalness
-                    child.material.roughness = 0.5; // Reduce roughness
-                    // child.material.color.setHex(0xffffff); // Ensure base color is white if it's not
-                    console.log(`  Adjusted Metalness: ${child.material.metalness}, Roughness: ${child.material.roughness}`);
-                    // --- END RUNTIME MATERIAL ADJUSTMENT ---
-
-                    console.log(`  Emissive:`, child.material.emissive.getHexString(), `Intensity: ${child.material.emissiveIntensity}`);
-                  } else if (child.material.isMeshBasicMaterial) {
-                    console.log(`  Color:`, child.material.color.getHexString());
-                    console.warn(`  WARN: MeshBasicMaterial used, will not respond to scene lighting.`);
-                  }
-                  // Log if material is an array (MultiMaterial)
-                  if (Array.isArray(child.material)) {
-                    console.log(`  Material is an array (MultiMaterial). Count: ${child.material.length}`);
-                    child.material.forEach((mat, index) => {
-                      console.log(`    Sub-material ${index}: Type: ${mat.type}`);
-                      if (mat.isMeshStandardMaterial) {
-                        console.log(`      Color:`, mat.color.getHexString());
-                        console.log(`      Metalness: ${mat.metalness}, Roughness: ${mat.roughness}`);
-                      } else if (mat.isMeshBasicMaterial) {
-                        console.log(`      Color:`, mat.color.getHexString());
-                        console.warn(`      WARN: Sub-material MeshBasicMaterial used.`);
-                      }
-                    });
-                  }
-                } else {
-                  console.log(`[Asset Material] Asset: ${assetData.name}, Mesh: ${child.name}, No material found.`);
-                }
-                // --- END MATERIAL LOGGING ---
-              }
-            });
-            
-            scene.add(modelInstance);
-            assetInstancesRef.current[assetData.id] = modelInstance; // Store instance
-          },
-          undefined, // onProgress
-          (error) => {
-            console.error(`Error loading asset ${fullAssetUrl}:`, error);
-            if (onError) onError(`Failed to load asset: ${assetData.name || assetData.modelUrl}`);
-            // If an asset fails to load, it simply won't be added to assetInstancesRef.current
-            // The parent component (ViewTerrains) is responsible for the list of assets that *should* exist.
-          }
-        );
-      }
-    });
-
-  }, [assetsToDisplayProp, onError]); // Depend on the prop `assetsToDisplayProp`
-
-  // Load terrain model
-  useEffect(() => {
-    if (!terrainUrl || !sceneRef.current) {
-        setIsLoading(false);
+    if (!scene) {
         return;
     }
 
-    setIsLoading(true);
-    setError(null);
-    console.log(`[TerrainViewer] Loading terrain: ${terrainUrl}`);
+    const currentInstanceIds = Object.keys(assetInstancesRef.current);
+    const propAssetIds = (assetsToDisplay || []).map(a => a.id);
 
-    const loader = new GLTFLoader();
-    loader.load(
-      terrainUrl,
-      (gltf) => {
-        console.log('[TerrainViewer] GLTF loaded successfully', gltf);
-        const scene = sceneRef.current;
-        if (!scene) return;
-
-        // Remove previous model
-        if (terrainModelRef.current) {
-          scene.remove(terrainModelRef.current);
-          // TODO: Proper disposal of old model resources
-        }
-
-        const model = gltf.scene;
-        model.position.set(0, 0, 0);
-        model.scale.set(currentScale, currentScale, currentScale); // Apply initial/current scale
-
-        model.traverse((child) => {
+    // 1. Remove assets no longer in props
+    currentInstanceIds.forEach(instanceId => {
+      if (!propAssetIds.includes(instanceId)) {
+        const instanceData = assetInstancesRef.current[instanceId];
+        if (instanceData) { // instanceData is the THREE.Object3D
+          if (transformControlsRef.current && transformControlsRef.current.object === instanceData) {
+            transformControlsRef.current.detach();
+          }
+          scene.remove(instanceData);
+          instanceData.traverse(child => {
           if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-            // Ensure material maps are correctly handled (flipY often not needed for GLTF)
-            if (child.material && child.material.map) {
-              // child.material.map.flipY = false; // Usually GLTF handles this
+              child.geometry?.dispose();
+              if (child.material) {
+                if (Array.isArray(child.material)) {
+                  child.material.forEach(mat => mat.dispose());
+                } else {
+                  child.material.dispose();
+                }
+              }
+            }
+          });
+        }
+        delete assetInstancesRef.current[instanceId];
+        if (selectedPlacedAssetId === instanceId) {
+            setSelectedPlacedAssetId(null); // Deselect if the removed asset was selected
             }
           }
         });
         
-        scene.add(model);
-        terrainModelRef.current = model;
-        setIsLoading(false);
+    // 2. Load and add new assets from props or update existing ones
+    (assetsToDisplay || []).forEach(assetData => {
+      if (!assetData || !assetData.id || !assetData.modelUrl) {
+        return;
+      }
+      
+      const fullAssetUrl = assetData.modelUrl.startsWith('http') 
+        ? assetData.modelUrl 
+        : `${CONFIG.API.BASE_URL}${assetData.modelUrl.startsWith('/') ? '' : '/'}${assetData.modelUrl}`;
 
-        // Get model dimensions for camera and grid adjustments
-        const box = new THREE.Box3().setFromObject(model); 
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
+      if (assetInstancesRef.current[assetData.id]) {
+        // Asset already exists, update its transform if necessary (e.g. after a programmatic move, not user drag)
+        const existingInstance = assetInstancesRef.current[assetData.id];
+        const pos = assetData.position;
+        const rot = assetData.rotation;
+        const scl = assetData.scale;
 
-        // Create and add the custom grid
-        updateCustomGrid(size.x, size.z, center);
-
-        // <-- ADDED CALL to onTerrainMetricsUpdate -->
-        if (onTerrainMetricsUpdate) {
-          onTerrainMetricsUpdate({
-            width: size.x,
-            depth: size.z,
-            height: size.y, // Include height in case it's useful later
-            centerX: center.x,
-            centerY: center.y,
-            centerZ: center.z,
-          });
+        if (!existingInstance.position.equals(new THREE.Vector3(pos.x, pos.y, pos.z))) {
+            existingInstance.position.set(pos.x, pos.y, pos.z);
+        }
+        if (existingInstance.rotation.x !== rot.x || existingInstance.rotation.y !== rot.y || existingInstance.rotation.z !== rot.z) {
+            existingInstance.rotation.set(rot.x, rot.y, rot.z);
+        }
+         if (!existingInstance.scale.equals(new THREE.Vector3(scl.x, scl.y, scl.z))) {
+            existingInstance.scale.set(scl.x, scl.y, scl.z);
         }
 
-        // Center camera on the new model
-        if (controlsRef.current && cameraRef.current) {
-            // --- Camera fit logic for 90% viewport ---
-            const aspect = cameraRef.current.aspect;
-            const fov = cameraRef.current.fov * (Math.PI / 180);
-            // Get model size (already scaled)
-            const boxWidth = size.x;
-            const boxHeight = size.y;
-            const boxDepth = size.z;
-            // Fit 90% of viewport
-            const fitRatio = 0.9;
-            // Distance for height
-            const distanceForHeight = (boxHeight / fitRatio) / (2 * Math.tan(fov / 2));
-            // Distance for width
-            const hfov = 2 * Math.atan(Math.tan(fov / 2) * aspect);
-            const distanceForWidth = (boxWidth / fitRatio) / (2 * Math.tan(hfov / 2));
-            // Use the greater distance to ensure full fit
-            let cameraDist = Math.max(distanceForHeight, distanceForWidth);
-            // Add a small buffer for depth
-            cameraDist += boxDepth * 0.5;
-            // Camera targets the XZ center of the model, at Y=0 (top surface)
-            const targetY = 0; 
-            const camX = center.x + cameraDist / Math.sqrt(2); 
-            const camY = targetY + cameraDist; // Position camera relative to Y=0               
-            const camZ = center.z + cameraDist / Math.sqrt(2); 
-            cameraRef.current.position.set(camX, camY, camZ);
-            controlsRef.current.target.set(center.x, targetY, center.z); // Look at (center.x, 0, center.z)
-            controlsRef.current.update();
+      } else { // Asset does not exist, load it
+        
+        // Create a temporary placeholder to prevent multiple loads
+        const placeholder = new THREE.Group();
+        placeholder.userData = { assetId: assetData.id, name: assetData.name, isPlaceholder: true };
+        assetInstancesRef.current[assetData.id] = placeholder;
+        
+        assetLoaderRef.current.load(
+          fullAssetUrl,
+          (gltf) => {
+            if (!sceneRef.current) {
+                return; 
+            }
+
+            const modelInstance = gltf.scene.clone(); // Clone to allow multiple instances of same model
+            
+            // Initial position from assetData (agent places at y=0 by default)
+            modelInstance.position.set(assetData.position.x, assetData.position.y, assetData.position.z);
+            modelInstance.rotation.set(assetData.rotation.x, assetData.rotation.y, assetData.rotation.z);
+            modelInstance.scale.set(assetData.scale.x, assetData.scale.y, assetData.scale.z);
+            
+            modelInstance.userData = { assetId: assetData.id, name: assetData.name };
+
+            let meshCount = 0;
+            modelInstance.traverse((child) => {
+              if (child.isMesh) {
+                meshCount++;
+                child.castShadow = true;
+                child.receiveShadow = true;
+                // Convert materials for better lighting
+                if (child.material) {
+                    if (child.material.isMeshBasicMaterial) {
+                        const newMaterial = new THREE.MeshStandardMaterial({
+                            color: child.material.color,
+                            map: child.material.map,
+                            emissive: child.material.color.clone().multiplyScalar(0.1), // Reduced emissive
+                            emissiveIntensity: 0.1,
+                            roughness: 0.8,
+                            metalness: 0.0
+                        });
+                        child.material.dispose();
+                        child.material = newMaterial;
+                    } else if (child.material.isMeshPhongMaterial) {
+                        const newMaterial = new THREE.MeshStandardMaterial({
+                            color: child.material.color,
+                            map: child.material.map,
+                            roughness: 0.7,
+                            metalness: 0.1
+                        });
+                        child.material.dispose();
+                        child.material = newMaterial;
+                    }
+                    if (child.material.isMeshStandardMaterial) {
+                        child.material.metalness = Math.min(0.3, child.material.metalness);
+                        child.material.roughness = Math.max(0.4, child.material.roughness);
+                        
+                        const hsl = {};
+                        child.material.color.getHSL(hsl);
+                        if (hsl.l < 0.3) {
+                            child.material.color.setHSL(hsl.h, hsl.s, Math.max(0.3, hsl.l));
+                        }
+                    }
+                }
+              }
+            });
+            
+            // Remove placeholder and add the real model
+            if (placeholder.parent) {
+              placeholder.parent.remove(placeholder);
+            }
+            sceneRef.current.add(modelInstance);
+            assetInstancesRef.current[assetData.id] = modelInstance;
+
+            // --- BEGIN: Snap to terrain immediately after loading for initial placement (Revised Logic) ---
+            if (terrainModelRef.current) {
+                // First, place the model at the intended position to get accurate bounding box
+                modelInstance.position.set(assetData.position.x, assetData.position.y, assetData.position.z);
+                modelInstance.updateMatrixWorld(true);
+                
+                // Get the bounding box of the model at its current position
+                const bbox = new THREE.Box3().setFromObject(modelInstance, true);
+                
+                // Calculate the height of the model (how much it extends below its origin)
+                const modelBottom = bbox.min.y;
+                const modelOrigin = modelInstance.position.y;
+                const heightBelowOrigin = modelOrigin - modelBottom;
+
+                // Raycast from high above the asset's XZ position down to find the terrain surface
+                const rayOrigin = new THREE.Vector3(assetData.position.x, 200, assetData.position.z);
+                const rayDirection = new THREE.Vector3(0, -1, 0);
+                raycasterRef.current.set(rayOrigin, rayDirection);
+                const intersectsTerrain = raycasterRef.current.intersectObject(terrainModelRef.current, true);
+
+                if (intersectsTerrain.length > 0) {
+                    const terrainSurfaceY = intersectsTerrain[0].point.y;
+                    // Place the model so its bottom sits exactly on the terrain surface
+                    const targetY = terrainSurfaceY + heightBelowOrigin;
+                    modelInstance.position.y = targetY;
+                    
+                    // Update the parent component with the corrected position
+                    if (onPlacedAssetMoved) {
+                        onPlacedAssetMoved(
+                            assetData.id,
+                            modelInstance.position.clone(),
+                            modelInstance.rotation.clone(),
+                            modelInstance.scale.clone()
+                        );
+                    }
+                } else {
+                    // Fallback: if no terrain intersection, place at a reasonable height
+                    const fallbackY = Math.max(0, heightBelowOrigin);
+                    modelInstance.position.y = fallbackY;
+                }
+            } else {
+                // Fallback if terrain model isn't ready - place on ground with calculated offset
+                modelInstance.position.set(assetData.position.x, assetData.position.y, assetData.position.z);
+                modelInstance.updateMatrixWorld(true);
+                const bbox = new THREE.Box3().setFromObject(modelInstance, true);
+                const heightBelowOrigin = Math.max(0, modelInstance.position.y - bbox.min.y);
+                modelInstance.position.y = heightBelowOrigin;
+            }
+            // --- END: Snap to terrain (Revised Logic) ---
+            
+            // If this newly loaded asset is the one that should be selected, attach transform controls
+            if (selectedPlacedAssetId === assetData.id && transformControlsRef.current && !transformControlsRef.current.object) {
+                 if (transformMode) transformControlsRef.current.setMode(transformMode);
+                 transformControlsRef.current.attach(modelInstance);
+                 transformControlsRef.current.enabled = true;
         }
+
       },
       (xhr) => {
-        // console.log(`[TerrainViewer] ${(xhr.loaded / xhr.total * 100).toFixed(2)}% loaded`);
+            // Optional: Log progress if needed
       },
-      (errorEvent) => {
-        console.error('[TerrainViewer] Error loading GLTF:', errorEvent);
-        const errorMessage = errorEvent.message || (errorEvent.target && errorEvent.target.statusText) || 'Failed to load terrain model.';
-        setError(errorMessage);
-        setIsLoading(false);
-        if (onError) onError(errorMessage);
+          (loadError) => {
+            console.error(`Error loading asset: ${assetData.name || assetData.id}`, loadError);
+            
+            // Remove the placeholder on error
+            if (assetInstancesRef.current[assetData.id]?.userData?.isPlaceholder) {
+              delete assetInstancesRef.current[assetData.id];
+            }
+            
+            if (onError) onError(`Failed to load asset: ${assetData.name || assetData.id}`);
       }
     );
-  }, [terrainUrl, onError, currentScale, onTerrainMetricsUpdate]); // Re-run if terrainUrl or currentScale changes, also add onTerrainMetricsUpdate
+      }
+    });
 
-  // Function to create/update the custom rectangular grid
-  const updateCustomGrid = (width, depth, gridCenter) => {
+  }, [assetsToDisplay, onError, selectedPlacedAssetId, transformMode]);
+
+
+  // Function to update or create the custom grid
+  const updateCustomGrid = useCallback((width, depth, gridCenter) => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+
     if (gridHelperRef.current) {
-      sceneRef.current.remove(gridHelperRef.current);
-      gridHelperRef.current.geometry.dispose();
-      gridHelperRef.current.material.dispose();
+      scene.remove(gridHelperRef.current);
+      gridHelperRef.current.geometry?.dispose();
+      gridHelperRef.current.material?.dispose();
+      gridHelperRef.current = null;
     }
 
-    const points = [];
-    const halfWidth = width / 2;
-    const halfDepth = depth / 2;
-    const divisionsX = Math.ceil(width);
-    const divisionsZ = Math.ceil(depth);
-
-    // Lines parallel to Z-axis (covering X-dimension)
-    for (let i = 0; i <= divisionsX; i++) {
-      const x = (i / divisionsX) * width - halfWidth;
-      points.push(new THREE.Vector3(x, 0, -halfDepth));
-      points.push(new THREE.Vector3(x, 0, halfDepth));
+    if (width > 0 && depth > 0) {
+        const divisions = Math.max(10, Math.floor(Math.max(width, depth) / 2)); // Dynamic divisions
+        // Use brighter colors for better visibility: white center lines, light gray grid lines
+        const gridHelper = new THREE.GridHelper(Math.max(width, depth) * 1.2, divisions, 0xffffff, 0xcccccc);
+        
+        // Calculate the terrain surface Y position
+        let terrainSurfaceY = 0;
+        if (terrainModelRef.current) {
+          // Get the bounding box of the terrain
+          const terrainBBox = new THREE.Box3().setFromObject(terrainModelRef.current);
+          // Use the top surface of the terrain (max Y) as the grid position
+          terrainSurfaceY = terrainBBox.max.y + 0.01; // Small offset to prevent z-fighting
+        }
+        
+        gridHelper.position.set(gridCenter.x, terrainSurfaceY, gridCenter.z);
+        gridHelper.material.opacity = 0.8; // Increased opacity for better visibility
+        gridHelper.material.transparent = true;
+        gridHelper.visible = isGridVisible; // Use state here
+        scene.add(gridHelper);
+        gridHelperRef.current = gridHelper;
     }
-
-    // Lines parallel to X-axis (covering Z-dimension)
-    for (let i = 0; i <= divisionsZ; i++) {
-      const z = (i / divisionsZ) * depth - halfDepth;
-      points.push(new THREE.Vector3(-halfWidth, 0, z));
-      points.push(new THREE.Vector3(halfWidth, 0, z));
-    }
-
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({ color: 0xffffff }); // White grid lines
-    const customGrid = new THREE.LineSegments(geometry, material);
-    
-    customGrid.position.set(gridCenter.x, 0, gridCenter.z);
-    customGrid.visible = isGridVisible;
-    
-    sceneRef.current.add(customGrid);
-    gridHelperRef.current = customGrid;
-  };
+  }, [isGridVisible]); // Added isGridVisible dependency
 
   // Toggle grid visibility
   const handleToggleGrid = useCallback(() => {
@@ -722,156 +1136,194 @@ const TerrainViewer = ({
     });
   }, []);
 
-  // Handle scale change
+  // Handle scale change from input
   const handleScaleChange = (event) => {
     const newScale = parseFloat(event.target.value);
-    setCurrentScale(newScale);
+    if (isNaN(newScale) || newScale <=0) return; // Basic validation
+
+    setCurrentScale(newScale); // Update local state for input
 
     if (terrainModelRef.current && sceneRef.current) {
       terrainModelRef.current.scale.set(newScale, newScale, newScale);
-
+      // After scaling, update grid and metrics
       const scaledBox = new THREE.Box3().setFromObject(terrainModelRef.current);
       const scaledSizeVec = scaledBox.getSize(new THREE.Vector3());
       const scaledCenterVec = scaledBox.getCenter(new THREE.Vector3());
-
       updateCustomGrid(scaledSizeVec.x, scaledSizeVec.z, scaledCenterVec);
-      
-      // <-- ADDED CALL to onTerrainMetricsUpdate -->
       if (onTerrainMetricsUpdate) {
         onTerrainMetricsUpdate({
-          width: scaledSizeVec.x,
-          depth: scaledSizeVec.z,
-          height: scaledSizeVec.y,
-          centerX: scaledCenterVec.x,
-          centerY: scaledCenterVec.y,
-          centerZ: scaledCenterVec.z,
+          width: scaledSizeVec.x, depth: scaledSizeVec.z, height: scaledSizeVec.y,
+          centerX: scaledCenterVec.x, centerY: scaledCenterVec.y, centerZ: scaledCenterVec.z,
         });
       }
     }
-    // TODO: Add API call here to persist the scale if desired
-    // e.g., onScaleChange(terrainId, newScale);
   };
 
   // Handle name editing
   const handleNameInputChange = (e) => setEditedName(e.target.value);
-  const handleNameEditSubmit = () => {
-    if (editedName.trim() && editedName.trim() !== terrainName) {
-      onTerrainNameChange(editedName.trim());
+  const handleNameEditSubmit = async () => { // Made async for API call
+    if (!terrainId || !editedName.trim() || editedName.trim() === terrainName) {
+      setIsEditingName(false);
+      return;
     }
-    setIsEditingName(false);
-  };
-
-  // Handle terrain deletion
-  const handleDeleteTerrain = async () => {
-    if (!terrainId || !onTerrainDeleted) return;
-    // Construct the API base URL correctly, assuming terrainUrl contains the full path to the GLB
-    // Example terrainUrl: http://localhost:3001/assets/terrains/terrain_id.glb
-    const baseUrlParts = terrainUrl.split('/').slice(0, 3); // Gets http://localhost:3001
-    const apiBaseUrl = baseUrlParts.join('/');
-
     try {
-        const response = await fetch(`${apiBaseUrl}/api/terrains/${terrainId}`, { // Use constructed API base
-            method: 'DELETE',
-        });
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: `Failed to delete terrain: ${response.status}` }));
-            throw new Error(errorData.message);
-        }
-        const result = await response.json();
-        onTerrainDeleted(terrainId, result.message);
+      // Assume onTerrainNameChange handles backend update and parent state
+      await onTerrainNameChange(terrainId, editedName.trim()); // Pass terrainId
+    setIsEditingName(false);
+      // Optimistically updated, or onTerrainNameChange updates parent which re-renders
     } catch (err) {
-        console.error('Error deleting terrain:', err);
-        if (onError) onError(err.message);
+      console.error("Failed to update terrain name:", err);
+      if (onError) onError("Failed to update terrain name.");
+      // Potentially revert editedName or show error
     }
   };
   
   useEffect(() => setEditedName(terrainName || ''), [terrainName]);
 
-  // Key for re-rendering the entire viewer if terrainUrl changes, forcing a clean setup
-  // This helps if direct state updates to Three.js objects become unreliable.
+  // Handle terrain deletion
+  const handleDeleteTerrain = async () => {
+    if (!terrainId || !onTerrainDeleted) return;
+    if (selectedPlacedAssetId && transformControlsRef.current) {
+        setSelectedPlacedAssetId(null); 
+    }
+    // onTerrainDeleted should handle backend and parent state update
+    try {
+        await onTerrainDeleted(terrainId); 
+    } catch (err) {
+        console.error('Error deleting terrain:', err);
+        if (onError) onError(err.message || "Failed to delete terrain.");
+    }
+  };
+  
   const viewerKey = terrainUrl || 'no-terrain';
 
-  return (
-    <div key={viewerKey} style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: THEME.bgLight || '#f0f0f0' }}>
-      <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
+  // Effect to update TransformControls mode and visibility of handles based on transformMode prop
+  useEffect(() => {
+    const currentTC = transformControlsRef.current;
+    if (currentTC) {
+      currentTC.setMode(transformMode);
+      if (transformMode === 'scale') {
+        currentTC.showX = true; // Keep X for uniform scaling (or allow center point)
+        currentTC.showY = false; 
+        currentTC.showZ = false;
+      } else {
+        currentTC.showX = true;
+        currentTC.showY = true;
+        currentTC.showZ = true;
+      }
+    }
+  }, [transformMode]); // Only re-run if transformMode changes
 
+  return (
+    <div key={viewerKey} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+      {error && <div style={{ color: 'red', position: 'absolute', top: '10px', left: '10px', background: 'rgba(0,0,0,0.5)', padding: '10px', borderRadius: '5px', zIndex: 10 }}>Error: {error}</div>}
       {isLoading && (
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', zIndex: 10 }}>
-          <div style={{ borderWidth: '4px', borderStyle: 'solid', borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', width: '40px', height: '40px', animation: 'spinViewer 1s linear infinite', marginBottom: '15px' }} />
-          Loading terrain...
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'rgba(0,0,0,0.7)', zIndex: 20, color: 'white' }}>
+          Loading Terrain...
         </div>
       )}
-      {error && (
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(220,53,69,0.9)', color: 'white', zIndex: 10, padding: '20px', textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', marginBottom: '15px' }}>⚠️</div>
-          <div>Error: {error}</div>
+      <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
+      
+      {/* Transform Selected Asset Panel */}
+      {selectedPlacedAssetId && (
+        <div style={{ 
+          position: 'absolute', 
+          top: '10px', 
+          left: '10px', 
+          zIndex: 15, 
+          background: THEME.bgLighter, 
+          padding: '12px', 
+          borderRadius: '6px',
+          border: `2px solid ${THEME.accent}`,
+          minWidth: '200px'
+        }}>
+          <div style={{ color: THEME.textPrimary, fontWeight: 'bold', marginBottom: '8px' }}>
+            Transform Selected Asset
+          </div>
+          <div style={{ color: THEME.textSecondary, fontSize: '12px', marginBottom: '8px' }}>
+            Mode: {transformMode}
+          </div>
+          
+          {/* Transform Mode Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'space-around', gap: '5px', marginBottom: '8px' }}>
+            <Button 
+              onClick={() => onTransformModeChange && onTransformModeChange('translate')}
+              variant={transformMode === 'translate' ? 'primary' : 'secondary'}
+              size="small"
+              style={{flexGrow: 1, fontSize: '10px', padding: '4px'}}
+            >
+              Move (T)
+            </Button>
+            <Button 
+              onClick={() => onTransformModeChange && onTransformModeChange('rotate')}
+              variant={transformMode === 'rotate' ? 'primary' : 'secondary'}
+              size="small"
+              style={{flexGrow: 1, fontSize: '10px', padding: '4px'}}
+            >
+              Rotate (R)
+            </Button>
+            <Button 
+              onClick={() => onTransformModeChange && onTransformModeChange('scale')}
+              variant={transformMode === 'scale' ? 'primary' : 'secondary'}
+              size="small"
+              style={{flexGrow: 1, fontSize: '10px', padding: '4px'}}
+            >
+              Scale (S)
+            </Button>
+          </div>
+          
+          <Button 
+            onClick={() => setSelectedPlacedAssetId(null)} 
+            size="small" 
+            variant="secondary"
+            style={{ width: '100%', marginBottom: '5px' }}
+          >
+            Deselect (Esc)
+          </Button>
+          
+          <Button 
+            onClick={() => onPlacedAssetDeleted && onPlacedAssetDeleted(selectedPlacedAssetId)} 
+            variant="danger"
+            size="small"
+            style={{ width: '100%', backgroundColor: THEME.dangerButton || '#dc3545', color: 'white' }}
+          >
+            Delete Selected Asset
+          </Button>
         </div>
       )}
 
       {!hideControls && (
-        <div style={{ position: 'absolute', top: '10px', left: '10px', right: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 5, pointerEvents: 'none' }}>
-          <div style={{ pointerEvents: 'auto', backgroundColor: 'rgba(40,44,52,0.8)', padding: '8px 12px', borderRadius: '6px' }}>
-            {isEditingName ? (
-              <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 5, background: THEME.bgLighter, padding: '8px', borderRadius: '4px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label htmlFor="scaleInput" style={{color: THEME.textPrimary, fontSize: '12px'}}>Terrain Scale:</label>
                 <input
-                  type="text"
-                  value={editedName}
-                  onChange={handleNameInputChange}
-                  onBlur={handleNameEditSubmit}
-                  onKeyPress={(e) => e.key === 'Enter' && handleNameEditSubmit()}
-                  style={{ color: THEME.textPrimary, backgroundColor: THEME.bgSecondary, border: `1px solid ${THEME.accentPrimary}`, borderRadius: '4px', padding: '6px 8px', marginRight: '8px' }}
-                  autoFocus
-                />
-                <Button onClick={handleNameEditSubmit} variant="primary" size="small">Save</Button>
-              </div>
-            ) : (
-              <h2 onClick={() => setIsEditingName(true)} title="Click to edit name" style={{ margin: 0, color: THEME.accentPrimary, fontSize: '18px', cursor: 'pointer' }}>
-                {terrainName || 'Untitled Terrain'}
-              </h2>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', pointerEvents: 'auto', alignItems: 'flex-end' }}>
-            <div style={{ display: 'flex', gap: '10px'}}>
-              <Button onClick={handleToggleGrid} variant={isGridVisible ? 'primary' : 'secondary'} style={{ padding: '8px 12px', fontSize: '14px' }}>
-                Grid: {isGridVisible ? 'ON' : 'OFF'}
-              </Button>
-              <Button onClick={handleDeleteTerrain} variant="danger" style={{ padding: '8px 12px', fontSize: '14px' }}>
-                Delete
-              </Button>
-            </div>
-            {/* Scale Slider */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(40,44,52,0.8)', padding: '8px 12px', borderRadius: '6px' }}>
-              <label htmlFor="scaleSlider" style={{ color: THEME.textSecondary, fontSize: '12px', whiteSpace: 'nowrap' }}>Scale:</label>
-              <input 
-                type="range" 
-                id="scaleSlider"
+                type="number" 
+                id="scaleInput"
+                value={currentScale} 
+                onChange={handleScaleChange} 
                 min="0.1" 
-                max="5" 
-                step="0.05" 
-                value={currentScale}
-                onChange={handleScaleChange}
-                style={{ width: '120px' /* Adjust as needed */ }}
-              />
-              <span style={{ color: THEME.textPrimary, fontSize: '12px', minWidth: '30px' }}>{currentScale.toFixed(2)}</span>
-              <Button onClick={handleSaveScale} variant="primary" size="small" style={{ marginLeft: '8px' }}>Save Scale</Button>
-              {saveStatus === 'saving' && <span style={{ color: THEME.textSecondary, fontSize: '12px', marginLeft: '6px' }}>Saving...</span>}
-              {saveStatus === 'success' && <span style={{ color: 'lime', fontSize: '12px', marginLeft: '6px' }}>Saved!</span>}
-              {saveStatus === 'error' && <span style={{ color: 'red', fontSize: '12px', marginLeft: '6px' }}>Error</span>}
-            </div>
+                step="0.1" 
+                style={{width: '60px', padding: '4px', background: THEME.bgPrimary, color: THEME.textPrimary, border: `1px solid ${THEME.border}`}}
+            />
+            <Button onClick={handleSaveScale} size="small" variant={saveStatus === 'success' ? 'success' : saveStatus === 'error' ? 'danger' : 'primary'}>
+              {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'success' ? 'Saved!' : saveStatus === 'error' ? 'Error!' : 'Save Scale'}
+            </Button>
           </div>
+          <Button onClick={handleToggleGrid} size="small">{isGridVisible ? 'Hide Grid' : 'Show Grid'}</Button>
+          {isEditingName ? (
+            <div style={{display: 'flex', gap: '5px'}}>
+              <input type="text" value={editedName} onChange={handleNameInputChange} style={{padding: '4px', background: THEME.bgPrimary, color: THEME.textPrimary, border: `1px solid ${THEME.border}`}} />
+              <Button onClick={handleNameEditSubmit} size="small">Save</Button>
+              <Button onClick={() => setIsEditingName(false)} size="small" variant="secondary">Cancel</Button>
+            </div>
+          ) : (
+            <Button onClick={() => setIsEditingName(true)} size="small">Edit Name</Button>
+          )}
+          <Button onClick={handleDeleteTerrain} variant="danger" size="small">Delete Terrain</Button>
         </div>
       )}
-      
-      {/* Add keyframes for spinner to avoid style conflicts */}
-      <style>{`
-        @keyframes spinViewer {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 };
 
-export default TerrainViewer; 
+export default React.memo(TerrainViewer); 

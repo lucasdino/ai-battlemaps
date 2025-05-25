@@ -130,9 +130,10 @@ const ViewTerrains = () => {
   const [currentSelectedAssetForPlacement, setCurrentSelectedAssetForPlacement] = useState(null);
   const [placedAssetsOnTerrain, setPlacedAssetsOnTerrain] = useState([]);
   const [currentAssetPlacementRotationY, setCurrentAssetPlacementRotationY] = useState(0); // Degrees
-  const [agentPlacementConfig, setAgentPlacementConfig] = useState([]); // NEW state for per-asset agent placement counts
-  const [terrainViewerMetrics, setTerrainViewerMetrics] = useState(null); // <-- ADDED STATE
-  const [globallySelectedPlacedAssetId, setGloballySelectedPlacedAssetId] = useState(null); // <-- ADDED STATE
+  const [agentPlacementConfig, setAgentPlacementConfig] = useState([]);
+  const [terrainViewerMetrics, setTerrainViewerMetrics] = useState(null);
+  const [globallySelectedPlacedAssetId, setGloballySelectedPlacedAssetId] = useState(null);
+  const [transformMode, setTransformMode] = useState('translate'); // New state for transform mode
   
   // Refs
   const fileInputRef = useRef(null);
@@ -161,6 +162,11 @@ const ViewTerrains = () => {
   const handleTerrainViewerError = useCallback((errorText) => {
     showMessage(errorText, 'error');
   }, [showMessage]);
+
+  // Callback from TerrainViewer to update local state with terrain's actual dimensions and center
+  const handleTerrainMetricsUpdate = useCallback((metrics) => {
+    setTerrainViewerMetrics(metrics);
+  }, []); // No dependencies, setTerrainViewerMetrics is stable
 
   // Fetch terrains from API
   const fetchTerrains = useCallback(async () => {
@@ -238,13 +244,24 @@ const ViewTerrains = () => {
     setCurrentSelectedAssetForPlacement(null);
     setCurrentAssetPlacementRotationY(0); 
     setTerrainViewerMetrics(null); 
-    setGloballySelectedPlacedAssetId(null); // <-- RESET on new terrain selection
-    if (terrain && terrain.placedAssets && Array.isArray(terrain.placedAssets)) {
-      setPlacedAssetsOnTerrain(terrain.placedAssets);
-    } else {
-      setPlacedAssetsOnTerrain([]); 
-    }
+    setGloballySelectedPlacedAssetId(null);
+    setTransformMode('translate'); // Reset transform mode on new terrain
+    // Logic for setPlacedAssetsOnTerrain is now moved to a dedicated useEffect below
   }, []);
+
+  // Effect to initialize/reset placedAssetsOnTerrain when the selectedTerrain genuinely changes
+  useEffect(() => {
+    if (selectedTerrain) {
+      if (selectedTerrain.placedAssets && Array.isArray(selectedTerrain.placedAssets)) {
+        setPlacedAssetsOnTerrain(selectedTerrain.placedAssets);
+      } else {
+        setPlacedAssetsOnTerrain([]);
+      }
+    } else {
+      // No terrain selected, clear assets
+      setPlacedAssetsOnTerrain([]);
+    }
+  }, [selectedTerrain]); // React to changes in the selectedTerrain object reference
 
   // Handle terrain name change
   const handleTerrainNameChange = useCallback(async (newName) => {
@@ -482,9 +499,6 @@ const ViewTerrains = () => {
 
   // Handle manual asset placement callback from TerrainViewer
   const handleManualAssetPlaced = useCallback((newAssetData) => {
-    // --- DEBUG LOG ---
-    // console.log('[VT handleManualAssetPlaced] Called with:', newAssetData);
-
     setPlacedAssetsOnTerrain(prev => [...prev, { ...newAssetData, id: newAssetData.id || `manual-${Date.now()}` }]);
     // setCurrentSelectedAssetForPlacement(null); // Do not automatically exit placement mode
     setGloballySelectedPlacedAssetId(null); // Deselect any placed asset when placing a new one
@@ -583,10 +597,8 @@ const ViewTerrains = () => {
     });
 
     if (newAgentAssets.length > 0) {
-      console.log('[AgentPlacement] newAgentAssets to be added:', JSON.stringify(newAgentAssets, null, 2)); // LOG NEW ASSETS
       setPlacedAssetsOnTerrain(prev => {
         const updatedAssets = [...prev, ...newAgentAssets];
-        console.log('[AgentPlacement] placedAssetsOnTerrain after update (inside setter):', JSON.stringify(updatedAssets, null, 2)); // LOG UPDATED STATE
         return updatedAssets;
       });
       showMessage(`${newAgentAssets.length} assets placed by agent.`, 'success');
@@ -606,8 +618,6 @@ const ViewTerrains = () => {
     try {
       // We need to strip the 'instance' field before saving if it exists
       const assetsToSave = placedAssetsOnTerrain.map(({ instance, ...rest }) => rest);
-
-      console.log('Attempting to save layout for terrain ID:', selectedTerrain.id);
 
       const response = await fetch(
         `${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.BASE}/${selectedTerrain.id}/layout`,
@@ -726,27 +736,29 @@ const ViewTerrains = () => {
 
   // Callback from TerrainViewer when a placed asset is selected or deselected
   const handlePlacedAssetSelectionChange = useCallback((assetId) => {
-    // console.log('[VT handlePlacedAssetSelectionChange] Called with assetId:', assetId);
     setGloballySelectedPlacedAssetId(assetId);
-    // if (assetId) {
-    //     // If a placed asset is selected (e.g. by clicking on it for dragging/manipulation),
-    //     // then we should probably exit the mode of "placing a new asset from the palette".
-    //     setCurrentSelectedAssetForPlacement(null); 
-    //     // console.log('[VT handlePlacedAssetSelectionChange] Cleared currentSelectedAssetForPlacement because a placed asset was selected.');
-    // }
   }, []);
 
   // Callback from TerrainViewer when a placed asset has been moved
-  const handlePlacedAssetMoved = useCallback((assetId, newPosition) => {
-    setPlacedAssetsOnTerrain(prevAssets => 
-      prevAssets.map(asset => 
-        asset.id === assetId 
-          ? { ...asset, position: { x: newPosition.x, y: newPosition.y, z: newPosition.z } } 
-          : asset
-      )
+  const handlePlacedAssetMoved = useCallback((assetId, newPosition, newRotation, newScale) => {
+    setPlacedAssetsOnTerrain(prevAssets =>
+      prevAssets.map(asset => {
+        if (asset.id === assetId) {
+          // newPosition is a THREE.Vector3
+          // newRotation is a THREE.Euler
+          // newScale is a THREE.Vector3
+          return {
+            ...asset,
+            position: { x: newPosition.x, y: newPosition.y, z: newPosition.z },
+            // Storing Euler angles; ensure your loading logic expects this or convert as needed
+            rotation: { x: newRotation.x, y: newRotation.y, z: newRotation.z },
+            scale: { x: newScale.x, y: newScale.y, z: newScale.z },
+          };
+        }
+        return asset;
+      })
     );
-    // No need to show a message for every move, but you could if desired.
-    // console.log(`Asset ${assetId} moved to`, newPosition);
+    // No immediate save, user should click "Save Layout"
   }, []);
 
   // Handle deleting the currently selected placed asset
@@ -760,15 +772,35 @@ const ViewTerrains = () => {
     showMessage('Selected asset deleted.', 'success');
   }, [globallySelectedPlacedAssetId, showMessage]);
 
-  // Add Escape key listener to cancel asset placement
+  // Handle Escape key for deselecting placement asset AND selected placed asset, and T,R,S for transform modes
   useEffect(() => {
     const handleKeyDown = (event) => {
-      // console.log('[ViewTerrains handleKeyDown] Key pressed:', event.key);
       if (event.key === 'Escape') {
-        // console.log('[ViewTerrains handleKeyDown] Escape pressed. currentSelectedAssetForPlacement:', currentSelectedAssetForPlacement);
+        let escapeHandled = false;
         if (currentSelectedAssetForPlacement) {
           setCurrentSelectedAssetForPlacement(null);
-          showMessage('Asset placement cancelled', 'info'); // Changed message slightly for clarity
+          escapeHandled = true;
+        }
+        if (globallySelectedPlacedAssetId) {
+          setGloballySelectedPlacedAssetId(null); // Deselect asset
+          escapeHandled = true;
+        }
+        if (escapeHandled) {
+          event.preventDefault(); // Prevent other escape actions if we handled it.
+        }
+      } else if (globallySelectedPlacedAssetId) { 
+        let newMode = null;
+        if (event.key.toLowerCase() === 't') {
+          newMode = 'translate';
+        } else if (event.key.toLowerCase() === 'r') {
+          newMode = 'rotate';
+        } else if (event.key.toLowerCase() === 's') {
+          newMode = 'scale';
+        }
+        
+        if (newMode && newMode !== transformMode) {
+          setTransformMode(newMode);
+          event.preventDefault(); // Prevent typing 't', 'r', 's' into other inputs
         }
       }
     };
@@ -777,7 +809,7 @@ const ViewTerrains = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [currentSelectedAssetForPlacement, showMessage]);
+  }, [currentSelectedAssetForPlacement, globallySelectedPlacedAssetId, transformMode]);
 
   return (
     <div style={combinedStyles.container}>
@@ -796,31 +828,23 @@ const ViewTerrains = () => {
         {selectedTerrain ? (
           <div style={combinedStyles.terrainViewer}>
             <TerrainViewer
-              terrainUrl={`${CONFIG.API.BASE_URL}/assets/terrains/${selectedTerrain.id}`}
-              terrainName={selectedTerrain.name}
-              terrainId={selectedTerrain.id}
+              key={selectedTerrain ? selectedTerrain.id : 'no-terrain'}
+              terrainUrl={selectedTerrain ? `${CONFIG.API.BASE_URL}${selectedTerrain.url}` : null}
+              terrainName={selectedTerrain ? selectedTerrain.name : null}
+              terrainId={selectedTerrain ? selectedTerrain.id : null}
               onError={handleTerrainViewerError}
-              onTerrainNameChange={handleTerrainNameChange}
+              onTerrainNameChange={(newName) => handleTerrainNameChange(selectedTerrain.id, newName)}
               onTerrainDeleted={handleTerrainDeleted}
-              onTerrainMetricsUpdate={setTerrainViewerMetrics} 
-              onPlacedAssetSelected={handlePlacedAssetSelectionChange} // <-- PASS CALLBACK
-              onPlacedAssetMoved={handlePlacedAssetMoved} // <-- PASS NEW CALLBACK
-              showGrid={true}
-              scale={selectedTerrain.scale}
-              selectedAsset={
-                currentSelectedAssetForPlacement 
-                  ? { 
-                      ...currentSelectedAssetForPlacement, 
-                      modelUrl: currentSelectedAssetForPlacement.url, // Ensure modelUrl is populated
-                      rotation: { 
-                        ...(currentSelectedAssetForPlacement.rotation || { x:0, y:0, z:0 }), 
-                        y: currentAssetPlacementRotationY * (Math.PI / 180) // Convert degrees to radians for THREE
-                      } 
-                    } 
-                  : null
-              }
+              onTerrainMetricsUpdate={handleTerrainMetricsUpdate} // Pass callback
+              scale={selectedTerrain?.metadata?.scale} // Pass scale from metadata if available
+              selectedAsset={currentSelectedAssetForPlacement ? { ...currentSelectedAssetForPlacement, rotation: { x: 0, y: THREE.MathUtils.degToRad(currentAssetPlacementRotationY), z: 0 } } : null}
               onAssetPlaced={handleManualAssetPlaced}
-              placedAssets={placedAssetsOnTerrain}
+              rawPlacedAssets={placedAssetsOnTerrain} // CHANGED PROP
+              onPlacedAssetSelected={handlePlacedAssetSelectionChange}
+              onPlacedAssetMoved={handlePlacedAssetMoved} // Updated handler
+              transformMode={transformMode} // <-- PASS THE NEW PROP
+              onTransformModeChange={setTransformMode} // <-- NEW PROP
+              onPlacedAssetDeleted={handleDeleteSelectedAsset} // <-- NEW PROP
             />
           </div>
         ) : (
@@ -993,9 +1017,20 @@ const ViewTerrains = () => {
               <Button
                 key={asset.url}
                 onClick={() => {
-                  setCurrentSelectedAssetForPlacement(asset);
+                  // Ensure the selected asset object for placement has modelUrl
+                  const assetToPlace = {
+                    ...asset,
+                    modelUrl: asset.url // Copy relative url to modelUrl
+                  };
+                  setCurrentSelectedAssetForPlacement(assetToPlace);
+                  
                   // Set initial rotation from asset's default, or 0 if none
-                  const initialYRotationDegrees = asset.rotation?.y ? asset.rotation.y * (180 / Math.PI) : 0;
+                  // Convert radians to degrees for the slider if stored in radians, or ensure consistency
+                  let initialYRotationDegrees = 0;
+                  if (asset.rotation?.y) {
+                    // Assuming asset.rotation.y is in radians, convert to degrees
+                    initialYRotationDegrees = THREE.MathUtils.radToDeg(asset.rotation.y);
+                  }
                   setCurrentAssetPlacementRotationY(initialYRotationDegrees);
                 }}
                 style={{

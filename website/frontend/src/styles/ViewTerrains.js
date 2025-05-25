@@ -392,6 +392,16 @@ const styles = {
     minWidth: '220px',
     display: 'flex',
     flexDirection: 'column',
+    gap: '15px',
+  },
+  transformControlsContainer: {
+    padding: '12px',
+    backgroundColor: 'rgba(50, 55, 65, 0.9)',
+    borderRadius: '6px',
+    border: `1px solid ${THEME.bgLight}`,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
   },
   assetControlsTitle: {
     fontSize: '16px',
@@ -406,8 +416,6 @@ const styles = {
     marginBottom: '15px',
   },
   assetButton: {
-    // Using common button styles from './common' is preferred if they fit
-    // These are overrides or specific styles if common Button can't be fully styled via props
     padding: '8px 12px',
     fontSize: '13px',
     backgroundColor: THEME.bgSecondary,
@@ -419,7 +427,7 @@ const styles = {
   },
   assetButtonSelected: {
     backgroundColor: THEME.accentPrimary,
-    color: THEME.bgPrimary, // Or THEME.textLight if accentPrimary is dark
+    color: THEME.bgPrimary,
     borderColor: THEME.accentPrimary,
     boxShadow: `0 0 5px ${THEME.accentPrimary}`,
   },
@@ -431,21 +439,18 @@ const styles = {
     alignItems: 'stretch',
   },
   actionButton: {
-    // Again, prefer common Button component and style via its props if possible
     padding: '8px 15px',
     fontSize: '13px',
-    // Uses default Button styling primarily
   },
   clearButton: {
-    backgroundColor: THEME.dangerBg, // Example for a danger action
+    backgroundColor: THEME.dangerBg,
     color: THEME.textLight,
-    // Add hover effects if Button component doesn't provide them sufficiently
   },
   infoText: {
     fontSize: '12px',
     color: THEME.textSecondary,
     marginTop: '5px',
-    minHeight: '18px', // Reserve space to prevent layout shifts
+    minHeight: '18px',
   },
 };
 
@@ -481,30 +486,30 @@ export const getMobileStyles = (windowWidth) => {
       overflowX: 'hidden',
     };
     mobileStyles.paginationControls = {
-      marginBottom: '5px', // Smaller margin on mobile
+      marginBottom: '5px',
     };
     mobileStyles.terrainGrid = {
-      gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', // Smaller items on mobile
+      gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
       gap: '8px',
     };
     mobileStyles.terrainItem = {
       padding: '8px',
-      height: '80px', // Smaller height on mobile
+      height: '80px',
     };
     mobileStyles.dimensionsContainer = {
-      gridTemplateColumns: '1fr', // Stack vertically on mobile
+      gridTemplateColumns: '1fr',
       gap: '8px',
     };
   }
   
   if (windowWidth <= SINGLE_COLUMN_BREAKPOINT) {
     mobileStyles.terrainGrid = {
-      gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', // Even smaller on very small screens
+      gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
       gap: '6px',
     };
     mobileStyles.terrainItem = {
       padding: '6px',
-      height: '70px', // Even smaller height on very small screens
+      height: '70px',
     };
   }
   

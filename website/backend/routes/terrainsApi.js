@@ -56,6 +56,7 @@ router.get('/terrains', (req, res) => {
         id: filename,
         name: metadata.name || path.basename(filename, path.extname(filename)),
         type: 'terrain',
+        url: `/assets/terrains/${filename}`,
         created: metadata.created,
         icon: metadata.icon ? metadata.icon.path : null,
         sourceImage: metadata.sourceImage ? metadata.sourceImage.path : null,
