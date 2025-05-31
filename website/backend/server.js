@@ -21,6 +21,7 @@ const imagesRouter = require('./routes/images');
 const trellisRouter = require('./routes/trellis');
 const systemPromptRouter = require('./routes/systemPrompt');
 const debugRouter = require('./routes/debug');
+const dungeonAssetsRouter = require('./routes/dungeonAssets');
 
 // Initialize Express app
 const app = express();
@@ -90,6 +91,9 @@ setupRouters(app, {
   systemPrompt: systemPromptRouter,
   debug: debugRouter
 });
+
+// Register the dungeon assets filter router
+app.use('/api/assets/dungeon', dungeonAssetsRouter);
 
 // Add a verification endpoint to check if the server is running
 app.get('/api/status', (req, res) => {
