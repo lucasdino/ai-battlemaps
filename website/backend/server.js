@@ -22,6 +22,7 @@ const trellisRouter = require('./routes/trellis');
 const systemPromptRouter = require('./routes/systemPrompt');
 const debugRouter = require('./routes/debug');
 const dungeonAssetsRouter = require('./routes/dungeonAssets');
+const dungeonRouter = require('./routes/dungeon');
 
 // Initialize Express app
 const app = express();
@@ -38,7 +39,8 @@ const ensureDirectoriesExist = () => {
     CONFIG.DIRECTORIES.ASSET_VIDEOS,
     CONFIG.DIRECTORIES.TERRAINS,
     CONFIG.DIRECTORIES.TERRAIN_IMAGES,
-    CONFIG.DIRECTORIES.TERRAIN_ICONS
+    CONFIG.DIRECTORIES.TERRAIN_ICONS,
+    CONFIG.DIRECTORIES.DUNGEON
   ];
 
   directories.forEach(dir => {
@@ -94,6 +96,9 @@ setupRouters(app, {
 
 // Register the dungeon assets filter router
 app.use('/api/assets/dungeon', dungeonAssetsRouter);
+
+// Register the dungeon router for floor plans and asset mapping
+app.use('/api/dungeon', dungeonRouter);
 
 // Add a verification endpoint to check if the server is running
 app.get('/api/status', (req, res) => {

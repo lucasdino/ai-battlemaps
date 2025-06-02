@@ -25,7 +25,8 @@ const TerrainViewer = ({
   onPlacedAssetMoved,
   transformMode,
   onTransformModeChange,
-  onPlacedAssetDeleted
+  onPlacedAssetDeleted,
+  floorPlanUrl,
 }) => {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
@@ -42,6 +43,10 @@ const TerrainViewer = ({
   const selectionBoxRef = useRef(null);
   const lightRef = useRef(null);
   const ambientLightRef = useRef(null);
+  const modelCacheRef = useRef(new Map()); // reference for model cache
+  const uniformScaleDragDataRef = useRef(null);
+  const debugMarkersRef = useRef([]);
+  const floorPlanAssetsRef = useRef([]); // reference for tracking floor plan assets
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -50,10 +55,58 @@ const TerrainViewer = ({
   const [isGridVisible, setIsGridVisible] = useState(initialShowGrid);
   const [currentScale, setCurrentScale] = useState(initialScaleProp || 1);
   const [saveStatus, setSaveStatus] = useState(null);
+  const [scaledBox, setScaledBox] = useState(new THREE.Box3());
+  const [scaledSize, setScaledSize] = useState(new THREE.Vector3());
+  const [scaledCenter, setScaledCenter] = useState(new THREE.Vector3());
   const assetInstancesRef = useRef({});
   const [selectedPlacedAssetId, setSelectedPlacedAssetId] = useState(null);
   const originalMaterialsRef = useRef(new Map());
-  const uniformScaleDragDataRef = useRef(null); // For uniform scaling
+  const debugMarkerRef = useRef(null);
+
+  // function to place debug markers
+  const placeDebugMarker = useCallback((position, deleteExisting = true) => {
+    if (!sceneRef.current) return;
+
+    // delete existing markers
+    if (debugMarkerRef.current && deleteExisting) {
+      sceneRef.current.remove(debugMarkerRef.current);
+      debugMarkerRef.current.geometry?.dispose();
+      debugMarkerRef.current.material?.dispose();
+      debugMarkerRef.current = null;
+    }
+
+    // create new marker
+    const geometry = new THREE.SphereGeometry(0.5, 32, 32);
+    const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const marker = new THREE.Mesh(geometry, material);
+    marker.position.copy(position);
+
+    sceneRef.current.add(marker);
+    if (deleteExisting) {
+      debugMarkerRef.current = marker;
+    } else {
+      debugMarkersRef.current.push(marker);
+    }
+  }, []);
+
+  // function to clear all debug markers
+  const clearDebugMarkers = useCallback(() => {
+    if (!sceneRef.current) return;
+
+    debugMarkersRef.current.forEach(marker => {
+      sceneRef.current.remove(marker);
+      marker.geometry?.dispose();
+      marker.material?.dispose();
+    });
+    debugMarkersRef.current = [];
+  }, []);
+
+  // delete markers when component unmounts
+  useEffect(() => {
+    return () => {
+      clearDebugMarkers();
+    };
+  }, [clearDebugMarkers]);
 
   // Helper function to restore original material
   const restoreOriginalMaterial = useCallback((object) => {
@@ -151,6 +204,28 @@ const TerrainViewer = ({
     }
     setIsLoading(true);
     setError(null);
+
+    // clean up existing floor plan assets when scene setup starts
+    if (floorPlanAssetsRef.current.length > 0) {
+      floorPlanAssetsRef.current.forEach(asset => {
+        if (sceneRef.current && asset.parent) {
+          sceneRef.current.remove(asset);
+        }
+        asset.traverse((child) => {
+          if (child.isMesh) {
+            child.geometry?.dispose();
+            if (child.material) {
+              if (Array.isArray(child.material)) {
+                child.material.forEach(mat => mat.dispose());
+              } else {
+                child.material.dispose();
+              }
+            }
+          }
+        });
+      });
+      floorPlanAssetsRef.current = [];
+    }
 
     const currentMount = mountRef.current;
     const width = currentMount.clientWidth;
@@ -434,6 +509,7 @@ const TerrainViewer = ({
 
                     const model = gltf.scene;
                     model.position.set(0, 0, 0);
+                    // console.log(`currentScale: ${currentScale}`);
                     model.scale.set(currentScale, currentScale, currentScale);
 
                     model.traverse((child) => {
@@ -485,6 +561,11 @@ const TerrainViewer = ({
                     const box = new THREE.Box3().setFromObject(model);
                     const center = box.getCenter(new THREE.Vector3());
                     const size = box.getSize(new THREE.Vector3());
+
+                    // Set initial scaled size and center
+                    setScaledBox(box);
+                    setScaledSize(size);
+                    setScaledCenter(center);
 
                     // Set directional light target to terrain center
                     if (lightRef.current) {
@@ -594,6 +675,28 @@ const TerrainViewer = ({
         }
         if (lightRef.current && sceneRef.current) sceneRef.current.remove(lightRef.current);
         if (ambientLightRef.current && sceneRef.current) sceneRef.current.remove(ambientLightRef.current);
+        
+        // floor plan asset cleanup
+        if (floorPlanAssetsRef.current.length > 0) {
+          floorPlanAssetsRef.current.forEach(asset => {
+            if (sceneRef.current && asset.parent) {
+              sceneRef.current.remove(asset);
+            }
+            asset.traverse((child) => {
+              if (child.isMesh) {
+                child.geometry?.dispose();
+                if (child.material) {
+                  if (Array.isArray(child.material)) {
+                    child.material.forEach(mat => mat.dispose());
+                  } else {
+                    child.material.dispose();
+                  }
+                }
+              }
+            });
+          });
+          floorPlanAssetsRef.current = [];
+        }
         
         if (rendererRef.current) {
             rendererRef.current.dispose();
@@ -1146,14 +1249,20 @@ const TerrainViewer = ({
     if (terrainModelRef.current && sceneRef.current) {
       terrainModelRef.current.scale.set(newScale, newScale, newScale);
       // After scaling, update grid and metrics
-      const scaledBox = new THREE.Box3().setFromObject(terrainModelRef.current);
-      const scaledSizeVec = scaledBox.getSize(new THREE.Vector3());
-      const scaledCenterVec = scaledBox.getCenter(new THREE.Vector3());
-      updateCustomGrid(scaledSizeVec.x, scaledSizeVec.z, scaledCenterVec);
+      const newScaledBox = new THREE.Box3().setFromObject(terrainModelRef.current);
+      const newScaledSize = newScaledBox.getSize(new THREE.Vector3()); // newScaledBoxから計算
+      const newScaledCenter = newScaledBox.getCenter(new THREE.Vector3()); // newScaledBoxから計算
+      
+      // console.log("scaledCenter:", scaledCenter);
+      setScaledBox(newScaledBox);
+      setScaledSize(newScaledSize);
+      setScaledCenter(newScaledCenter);
+      
+      updateCustomGrid(newScaledSize.x, newScaledSize.z, newScaledCenter);
       if (onTerrainMetricsUpdate) {
         onTerrainMetricsUpdate({
-          width: scaledSizeVec.x, depth: scaledSizeVec.z, height: scaledSizeVec.y,
-          centerX: scaledCenterVec.x, centerY: scaledCenterVec.y, centerZ: scaledCenterVec.z,
+          width: newScaledSize.x, depth: newScaledSize.z, height: newScaledSize.y,
+          centerX: newScaledCenter.x, centerY: newScaledCenter.y, centerZ: newScaledCenter.z,
         });
       }
     }
@@ -1213,6 +1322,280 @@ const TerrainViewer = ({
       }
     }
   }, [transformMode]); // Only re-run if transformMode changes
+
+  // load floor plan and asset id mapping
+  const loadFloorPlan = useCallback(async (width, depth, gridCenter) => {
+    if (!floorPlanUrl || !sceneRef.current) return;
+    
+    // clean up previous floor plan assets
+    if (floorPlanAssetsRef.current.length > 0) {
+      floorPlanAssetsRef.current.forEach(asset => {
+        if (sceneRef.current && asset.parent) {
+          sceneRef.current.remove(asset);
+        }
+        // memory cleanup
+        asset.traverse((child) => {
+          if (child.isMesh) {
+            child.geometry?.dispose();
+            if (child.material) {
+              if (Array.isArray(child.material)) {
+                child.material.forEach(mat => mat.dispose());
+              } else {
+                child.material.dispose();
+              }
+            }
+          }
+        });
+      });
+      floorPlanAssetsRef.current = []; // clear array
+    }
+    
+    try {
+      // load floor plan
+      const planResponse = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.DUNGEON.FLOOR_PLAN}`);
+      if (!planResponse.ok) {
+        throw new Error(`Failed to fetch floor plan: ${planResponse.statusText}`);
+      }
+      const planData = await planResponse.json();
+
+      // load asset id mapping
+      const idxResponse = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.DUNGEON.ASSET_MAPPING}`);
+      if (!idxResponse.ok) {
+        throw new Error(`Failed to fetch asset mapping: ${idxResponse.statusText}`);
+      }
+      const idxData = await idxResponse.json();
+
+      const tiles = planData.plan.tiles;
+      const divisions = Math.max(10, Math.floor(Math.max(width, depth) / 2));
+      const tileSize = Math.max(width, depth) * 1.2 / divisions;
+      const startX = -Math.max(width, depth) * 1.2 / 2 + gridCenter.x;
+      const startZ = -Math.max(width, depth) * 1.2 / 2 + gridCenter.z;
+
+      console.log('デバッグ情報:');
+      console.log('width:', width);
+      console.log('depth:', depth);
+      console.log('gridCenter:', gridCenter);
+      console.log('divisions:', divisions);
+      console.log('tileSize:', tileSize);
+      console.log('startX:', startX);
+      console.log('startZ:', startZ);
+
+      const loader = new GLTFLoader();
+
+      const loadModel = async (modelName) => {
+        // if model is in cache, use it
+        if (modelCacheRef.current.has(modelName)) {
+          return modelCacheRef.current.get(modelName).clone();
+        }
+
+        const modelUrl = `${CONFIG.API.BASE_URL}/assets/dungeon/models/${modelName}.glb`;
+        try {
+          const gltf = await new Promise((resolve, reject) => {
+            loader.load(modelUrl, resolve, undefined, reject);
+          });
+
+          const model = gltf.scene;
+          // improve model settings
+          model.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              if (child.material) {
+                child.material.metalness = 0.1;
+                child.material.roughness = 0.8;
+              }
+            }
+          });
+
+          // save to cache
+          modelCacheRef.current.set(modelName, model);
+          return model.clone();
+        } catch (error) {
+          console.error(`Failed to load model ${modelName}:`, error);
+          throw error;
+        }
+      };
+
+      // place floor first
+      for (let row = 0; row < tiles.length; row++) {
+        for (let col = 0; col < tiles[row].length; col++) {
+          const tileId = tiles[row][col];
+          if (tileId && tileId !== "0" && idxData["1"]) {
+            const modelName = idxData["1"];
+            try {
+              const model = await loadModel(modelName);
+              const boundingBox = new THREE.Box3().setFromObject(model);
+              const modelSize = new THREE.Vector3();
+              boundingBox.getSize(modelSize);
+              const modelCenter = new THREE.Vector3();
+              boundingBox.getCenter(modelCenter);
+
+              const scaleX = tileSize / modelSize.x;
+              const scaleZ = tileSize / modelSize.z;
+              const scale = Math.min(scaleX, scaleZ);
+              model.scale.set(scale, scale, scale);
+
+              const targetX = startX + col * tileSize;
+              const targetZ = startZ + row * tileSize;
+              
+              model.position.set(
+                targetX - (modelCenter.x - modelSize.x / 2) * scale,
+                0 - boundingBox.min.y * (scale * 0.9), 
+                targetZ - (modelCenter.z - modelSize.z / 2) * scale
+              );
+
+              model.userData = {
+                assetId: `${modelName}_${row}_${col}`,
+                type: modelName,
+                position: { x: targetX, y: 0, z: targetZ },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: { x: 1, y: 1, z: 1 }
+              };
+
+              sceneRef.current.add(model);
+              floorPlanAssetsRef.current.push(model); // add to tracking list
+            } catch (modelError) {
+              console.error(`Failed to load model ${modelName} at position (${row}, ${col}):`, modelError);
+            }
+          }
+        }
+      }
+      /////////////////////
+      // place walls
+      for (let row = 0; row < tiles.length; row++) {
+        for (let col = 0; col < tiles[row].length; col++) {
+          const tileId = tiles[row][col];
+          if (tileId && tileId !== "0") {
+            const dirs = [[-1, 0], [0, -1], [1, 0], [0, 1]];
+            for (let dir = 0; dir < 4; dir++) {
+              const [drow, dcol] = dirs[dir];
+              if (row + drow < 0 || row + drow >= tiles.length || col + dcol < 0 || col + dcol >= tiles[row].length) {
+                continue;
+              }
+              if (tiles[row + drow][col + dcol] !== "0") {
+                continue;
+              }
+              const modelName = idxData["w"];
+              try {
+                const model = await loadModel(modelName);
+                const boundingBox = new THREE.Box3().setFromObject(model);
+                const modelSize = new THREE.Vector3();
+                boundingBox.getSize(modelSize);
+                const modelCenter = new THREE.Vector3();
+                boundingBox.getCenter(modelCenter);
+                
+                const scaleX = tileSize / modelSize.x;
+                const scaleZ = tileSize / modelSize.z;
+                const scale = Math.min(scaleX, scaleZ);
+                model.scale.set(scale, scale, scale);
+                
+                model.rotation.y = Math.PI / 2 * dir;
+                const newCenterX = modelCenter.x * Math.cos(-Math.PI / 2 * dir) -
+                  modelCenter.z * Math.sin(-Math.PI / 2 * dir);
+                const newCenterZ = modelCenter.x * Math.sin(-Math.PI / 2 * dir) +
+                  modelCenter.z * Math.cos(-Math.PI / 2 * dir);
+  
+                const targetX = startX + col * tileSize;
+                const targetZ = startZ + row * tileSize;
+                const thickness = Math.min(modelSize.x * scale, modelSize.z * scale);
+                
+                model.position.set(
+                  targetX - (newCenterX) * scale + tileSize / 2 + (tileSize) / 2 * dcol,
+                  // targetX - (newCenterX) * scale + tileSize / 2 + (tileSize + thickness) / 2 * dcol,
+                  0 - boundingBox.min.y * (scale * 0.9), 
+                  targetZ - (newCenterZ) * scale + tileSize / 2 + (tileSize) / 2 * drow
+                  // targetZ - (newCenterZ) * scale + tileSize / 2 + (tileSize + thickness) / 2 * drow
+                );
+  
+                model.userData = {
+                  assetId: `${modelName}_${row}_${col}`,
+                  type: modelName,
+                  position: { x: targetX, y: 0, z: targetZ },
+                  rotation: { x: 0, y: 0, z: 0 },
+                  scale: { x: 1, y: 1, z: 1 }
+                };
+  
+                sceneRef.current.add(model);
+                floorPlanAssetsRef.current.push(model); // add to tracking list
+              } catch (modelError) {
+                console.error(`Failed to load model ${modelName} at position (${row}, ${col}):`, modelError);
+              }
+            }
+          }
+        }
+      }
+      /////////////////////
+      // place assets on each tile
+      for (let row = 0; row < tiles.length; row++) {
+        for (let col = 0; col < tiles[row].length; col++) {
+          const tileId = tiles[row][col];
+          if (tileId && tileId !== "0" && tileId !== "1" && idxData[tileId]) {
+            const modelName = idxData[tileId];
+            try {
+              const model = await loadModel(modelName);
+              const boundingBox = new THREE.Box3().setFromObject(model);
+              const modelSize = new THREE.Vector3();
+              boundingBox.getSize(modelSize);
+              const modelCenter = new THREE.Vector3();
+              boundingBox.getCenter(modelCenter);
+
+              const scaleX = tileSize / modelSize.x;
+              const scaleZ = tileSize / modelSize.z;
+              const scale = Math.min(scaleX, scaleZ) * 0.9;
+              model.scale.set(scale, scale, scale);
+
+              const targetX = startX + col * tileSize;
+              const targetZ = startZ + row * tileSize;
+
+              model.position.set(
+                targetX - modelCenter.x * scale + tileSize / 2,
+                0 - boundingBox.min.y * (scale * 0.9), 
+                targetZ - modelCenter.z * scale + tileSize / 2
+              );
+
+              model.userData = {
+                assetId: `${modelName}_${row}_${col}`,
+                type: modelName,
+                position: { x: targetX, y: 0, z: targetZ },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: { x: 1, y: 1, z: 1 }
+              };
+
+              sceneRef.current.add(model);
+              floorPlanAssetsRef.current.push(model); // add to tracking list
+            } catch (modelError) {
+              console.error(`Failed to load model ${modelName} at position (${row}, ${col}):`, modelError);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading floor plan:', error);
+      if (onError) {
+        onError(error.message);
+      }
+    }
+  }, [floorPlanUrl, onError]);
+
+  // load floor plan when scaled size and center change
+  useEffect(() => {
+    // debounce function: prevent multiple executions within a short period
+    const timeoutId = setTimeout(() => {
+      if (floorPlanUrl && scaledSize.x > 0 && scaledSize.z > 0) {
+        console.log('loadFloorPlan called:', { width: scaledSize.x, depth: scaledSize.z, center: scaledCenter });
+        loadFloorPlan(scaledSize.x, scaledSize.z, scaledCenter);
+      }
+    }, 100); // 100ms wait
+
+    return () => clearTimeout(timeoutId); // cleanup
+  }, [floorPlanUrl, scaledSize.x, scaledSize.z, scaledCenter.x, scaledCenter.z, loadFloorPlan]);
+
+  // clear model cache when component unmounts
+  useEffect(() => {
+    return () => {
+      modelCacheRef.current.clear();
+    };
+  }, []);
 
   return (
     <div key={viewerKey} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>

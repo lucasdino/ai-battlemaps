@@ -835,16 +835,17 @@ const ViewTerrains = () => {
               onError={handleTerrainViewerError}
               onTerrainNameChange={(newName) => handleTerrainNameChange(selectedTerrain.id, newName)}
               onTerrainDeleted={handleTerrainDeleted}
-              onTerrainMetricsUpdate={handleTerrainMetricsUpdate} // Pass callback
-              scale={selectedTerrain?.metadata?.scale} // Pass scale from metadata if available
+              onTerrainMetricsUpdate={handleTerrainMetricsUpdate}
+              scale={selectedTerrain?.metadata?.scale}
               selectedAsset={currentSelectedAssetForPlacement ? { ...currentSelectedAssetForPlacement, rotation: { x: 0, y: THREE.MathUtils.degToRad(currentAssetPlacementRotationY), z: 0 } } : null}
               onAssetPlaced={handleManualAssetPlaced}
-              rawPlacedAssets={placedAssetsOnTerrain} // CHANGED PROP
+              rawPlacedAssets={placedAssetsOnTerrain}
               onPlacedAssetSelected={handlePlacedAssetSelectionChange}
-              onPlacedAssetMoved={handlePlacedAssetMoved} // Updated handler
-              transformMode={transformMode} // <-- PASS THE NEW PROP
-              onTransformModeChange={setTransformMode} // <-- NEW PROP
-              onPlacedAssetDeleted={handleDeleteSelectedAsset} // <-- NEW PROP
+              onPlacedAssetMoved={handlePlacedAssetMoved}
+              transformMode={transformMode}
+              onTransformModeChange={setTransformMode}
+              onPlacedAssetDeleted={handleDeleteSelectedAsset}
+              floorPlanUrl="/assets/dungeon/floor_plan/plan1.json"
             />
           </div>
         ) : (

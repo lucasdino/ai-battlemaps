@@ -15,6 +15,10 @@ const CONFIG = {
         UPLOAD: '/api/terrains/upload',
         ICON: '/api/terrains/:id/icon'
       },
+      DUNGEON: {
+        FLOOR_PLAN: '/api/dungeon/floor_plan',
+        ASSET_MAPPING: '/api/dungeon/asset_mapping'
+      },
       TRELLIS: '/api/trellis', // 3D asset generation endpoint that connects to external service
       GENERATE_IMAGE: '/api/generate-image', // Endpoint to generate images with AI
       IMAGE_PROVIDERS: '/api/image-providers', // Endpoint to get available image generation providers
