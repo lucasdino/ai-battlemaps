@@ -23,6 +23,7 @@ const systemPromptRouter = require('./routes/systemPrompt');
 const debugRouter = require('./routes/debug');
 const dungeonAssetsRouter = require('./routes/dungeonAssets');
 const dungeonRouter = require('./routes/dungeon');
+const layoutRouter = require('./routes/layout');
 
 // Initialize Express app
 const app = express();
@@ -99,6 +100,9 @@ app.use('/api/assets/dungeon', dungeonAssetsRouter);
 
 // Register the dungeon router for floor plans and asset mapping
 app.use('/api/dungeon', dungeonRouter);
+
+// Register the layout router for layout generation
+app.use('/api/layout', layoutRouter);
 
 // Add a verification endpoint to check if the server is running
 app.get('/api/status', (req, res) => {
