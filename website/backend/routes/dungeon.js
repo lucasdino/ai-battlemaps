@@ -18,7 +18,8 @@ router.get('/floor_plan', async (req, res) => {
 // Endpoint to get the asset mapping
 router.get('/asset_mapping', async (req, res) => {
   try {
-    const mappingPath = path.join(__dirname, '../assets/dungeon/id_idx.json');
+    const mappingPath = path.join(__dirname, '../assets/dungeon/asset_mapping.json');
+    // const mappingPath = path.join(__dirname, '../assets/dungeon/id_idx.json');
     const mappingData = await fs.readFile(mappingPath, 'utf8');
     res.json(JSON.parse(mappingData));
   } catch (error) {

@@ -1371,15 +1371,6 @@ const TerrainViewer = ({
       const startX = -Math.max(width, depth) * 1.2 / 2 + gridCenter.x;
       const startZ = -Math.max(width, depth) * 1.2 / 2 + gridCenter.z;
 
-      console.log('デバッグ情報:');
-      console.log('width:', width);
-      console.log('depth:', depth);
-      console.log('gridCenter:', gridCenter);
-      console.log('divisions:', divisions);
-      console.log('tileSize:', tileSize);
-      console.log('startX:', startX);
-      console.log('startZ:', startZ);
-
       const loader = new GLTFLoader();
 
       const loadModel = async (modelName) => {
@@ -1460,7 +1451,6 @@ const TerrainViewer = ({
           }
         }
       }
-      /////////////////////
       // place walls
       for (let row = 0; row < tiles.length; row++) {
         for (let col = 0; col < tiles[row].length; col++) {
@@ -1524,7 +1514,6 @@ const TerrainViewer = ({
           }
         }
       }
-      /////////////////////
       // place assets on each tile
       for (let row = 0; row < tiles.length; row++) {
         for (let col = 0; col < tiles[row].length; col++) {
