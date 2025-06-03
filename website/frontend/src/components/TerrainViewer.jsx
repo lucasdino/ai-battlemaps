@@ -15,7 +15,7 @@ const TerrainViewer = ({
   onTerrainNameChange,
   onTerrainDeleted,
   onTerrainMetricsUpdate,
-  hideControls = false,
+  hideTerrainControls = false,
   showGrid: initialShowGrid = true,
   scale: initialScaleProp,
   selectedAsset, 
@@ -26,7 +26,7 @@ const TerrainViewer = ({
   transformMode,
   onTransformModeChange,
   onPlacedAssetDeleted,
-  floorPlanUrl,
+  floorPlan,
 }) => {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
@@ -47,6 +47,9 @@ const TerrainViewer = ({
   const uniformScaleDragDataRef = useRef(null);
   const debugMarkersRef = useRef([]);
   const floorPlanAssetsRef = useRef([]); // reference for tracking floor plan assets
+  const divisionsRef = useRef(10); // reference for grid divisions
+  const gridSizeRef = useRef(20); // reference for grid size
+  const fixedDivisionsRef = useRef(null); // reference for fixed divisions in Generated Dungeon
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -198,11 +201,11 @@ const TerrainViewer = ({
 
   // Main scene setup effect
   useEffect(() => {
-    if (!mountRef.current || !terrainUrl) { // Ensure terrainUrl is present
-        setIsLoading(false); // Not loading if no URL
+    if (!mountRef.current) {
+        setIsLoading(false);
         return;
     }
-    setIsLoading(true);
+    setIsLoading(!!terrainUrl); // Only show loading if there's a terrain URL
     setError(null);
 
     // clean up existing floor plan assets when scene setup starts
@@ -429,13 +432,28 @@ const TerrainViewer = ({
                             if (Math.abs(obj.position.y - targetY) > 0.001) {
                                 obj.position.y = targetY;
                             }
+                        } else {
+                            // No terrain - snap to ground plane (y=0) during scaling
+                            obj.updateMatrixWorld(true);
+                            const bbox = new THREE.Box3().setFromObject(obj, true);
+                            
+                            const modelBottom = bbox.min.y;
+                            const modelOrigin = obj.position.y;
+                            const heightBelowOrigin = modelOrigin - modelBottom;
+                            
+                            const targetY = 0 + heightBelowOrigin;
+                            
+                            // Only update if there's a significant difference to avoid jitter
+                            if (Math.abs(obj.position.y - targetY) > 0.001) {
+                                obj.position.y = targetY;
+                            }
                         }
                     }
                 }
             });
 
             transformControlsInstance.addEventListener('mouseUp', () => {
-                if (transformControlsInstance.object && onPlacedAssetMoved && terrainModelRef.current) {
+                if (transformControlsInstance.object && onPlacedAssetMoved) {
                     const transformedObject = transformControlsInstance.object;
                     
                     // Improved snapping logic for both translate and scale modes
@@ -449,15 +467,22 @@ const TerrainViewer = ({
                         const modelOrigin = transformedObject.position.y;
                         const heightBelowOrigin = modelOrigin - modelBottom;
             
-                        const rayOrigin = new THREE.Vector3(transformedObject.position.x, 200, transformedObject.position.z);
-                        const rayDirection = new THREE.Vector3(0, -1, 0);
-            
-                        raycasterRef.current.set(rayOrigin, rayDirection);
-                        const intersectsTerrain = raycasterRef.current.intersectObject(terrainModelRef.current, true);
-            
-                        if (intersectsTerrain.length > 0) {
-                            const terrainY = intersectsTerrain[0].point.y;
-                            const targetY = terrainY + heightBelowOrigin;
+                        if (terrainModelRef.current) {
+                            // Snap to terrain if available
+                            const rayOrigin = new THREE.Vector3(transformedObject.position.x, 200, transformedObject.position.z);
+                            const rayDirection = new THREE.Vector3(0, -1, 0);
+                
+                            raycasterRef.current.set(rayOrigin, rayDirection);
+                            const intersectsTerrain = raycasterRef.current.intersectObject(terrainModelRef.current, true);
+                
+                            if (intersectsTerrain.length > 0) {
+                                const terrainY = intersectsTerrain[0].point.y;
+                                const targetY = terrainY + heightBelowOrigin;
+                                transformedObject.position.y = targetY;
+                            }
+                        } else {
+                            // No terrain - snap to ground plane (y=0)
+                            const targetY = 0 + heightBelowOrigin;
                             transformedObject.position.y = targetY;
                         }
                     }
@@ -486,7 +511,7 @@ const TerrainViewer = ({
     }
 
 
-    // Load terrain model
+    // Load terrain model or setup default view
     if (terrainUrl) {
         const loader = new GLTFLoader();
         const fullTerrainUrl = terrainUrl.startsWith('http') ? terrainUrl : `${CONFIG.API.BASE_URL}${terrainUrl.startsWith('/') ? '' : '/'}${terrainUrl}`;
@@ -602,7 +627,74 @@ const TerrainViewer = ({
             );
         }
     } else {
-        setIsLoading(false); // No terrain URL, not loading
+        // No terrain URL - setup default view for "None" terrain
+        setIsLoading(false);
+        
+        // Calculate grid size based on floor plan if available
+        const calculateGridSize = async () => {
+            let defaultWidth = 20; // fallback default
+            let defaultDepth = 20;
+            
+            try {
+                // load floor plan data
+                let planData;
+                if (floorPlan) {
+                    planData = floorPlan;
+                } else {
+                    const planResponse = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.DUNGEON.FLOOR_PLAN}`);
+                    if (planResponse.ok) {
+                        planData = await planResponse.json();
+                    }
+                }
+                
+                if (planData && planData.tiles && Array.isArray(planData.tiles)) {
+                    const rowNum = planData.tiles.length;
+                    const colNum = planData.tiles[0] ? planData.tiles[0].length : 0;
+                    const maxDimension = Math.max(rowNum, colNum);
+                    
+                    // Save fixed divisions for Generated Dungeon (this should not change with scale)
+                    fixedDivisionsRef.current = maxDimension;
+                    
+                    // gridSize = max(row_num, col_num) * 2 (each cell size is 2)
+                    const cellSize = 2;
+                    const baseGridSize = maxDimension * cellSize;
+                    const gridSize = baseGridSize * currentScale; // Apply current scale
+                    
+                    defaultWidth = gridSize;
+                    defaultDepth = gridSize;
+                    
+                    // console.log(`Dynamic grid size calculated: ${gridSize} (${rowNum}x${colNum}, max: ${maxDimension}, scale: ${currentScale})`);
+                }
+            } catch (error) {
+                console.warn('Could not load floor plan for grid size calculation, using default:', error);
+            }
+            
+            const defaultCenter = new THREE.Vector3(0, 0, 0);
+            
+            // Set default scaled values
+            setScaledSize(new THREE.Vector3(defaultWidth, 0, defaultDepth));
+            setScaledCenter(defaultCenter);
+            
+            // Create default grid
+            updateCustomGrid(defaultWidth, defaultDepth, defaultCenter);
+            setIsGridVisible(initialShowGrid);
+            
+            // Update metrics for "None" terrain
+            if (onTerrainMetricsUpdate) {
+                onTerrainMetricsUpdate({
+                    width: defaultWidth, depth: defaultDepth, height: 0,
+                    centerX: defaultCenter.x, centerY: defaultCenter.y, centerZ: defaultCenter.z,
+                });
+            }
+        };
+        
+        calculateGridSize();
+        
+        // Position camera for default view
+        camera.position.set(15, 15, 15);
+        camera.lookAt(new THREE.Vector3(0, 0, 0));
+        orbitControls.target.copy(new THREE.Vector3(0, 0, 0));
+        orbitControls.update();
     }
     
 
@@ -711,7 +803,7 @@ const TerrainViewer = ({
         cameraRef.current = null;
         originalMaterialsRef.current.clear();
     };
-  }, [terrainUrl, terrainId, currentScale, initialShowGrid, onTerrainMetricsUpdate, onError, onPlacedAssetMoved]); // Ensure all relevant dependencies are listed
+  }, [terrainUrl, terrainId, initialShowGrid, onTerrainMetricsUpdate, onError, onPlacedAssetMoved, floorPlan]); // currentScaleを削除
 
   // Effect to attach TransformControls when an asset is selected
   useEffect(() => {
@@ -769,6 +861,38 @@ const TerrainViewer = ({
               }
             } else {
               console.warn(`[TransformControlsEffect] Re-snap for ${objToSnap.userData.assetId} failed: Raycaster did not intersect terrain.`);
+            }
+          }
+        } else {
+          // No terrain - snap to ground plane (None terrain case)
+          const objToSnap = tcInstanceInEffect.object;
+          if (objToSnap) {
+            // Update the object's matrix to get accurate bounding box
+            objToSnap.updateMatrixWorld(true);
+
+            // Calculate the bounding box more accurately
+            const worldBBox = new THREE.Box3().setFromObject(objToSnap, true);
+            
+            // Calculate how much the object extends below its origin
+            const modelBottom = worldBBox.min.y;
+            const modelOrigin = objToSnap.position.y;
+            const heightBelowOrigin = modelOrigin - modelBottom;
+            
+            // Set the object's position so its bottom sits on the ground plane (y=0)
+            const targetY = 0 + heightBelowOrigin;
+            
+            if (Math.abs(objToSnap.position.y - targetY) > 0.001) {
+              objToSnap.position.y = targetY;
+              objToSnap.updateMatrixWorld(true);
+
+              if (onPlacedAssetMoved) {
+                onPlacedAssetMoved(
+                  objToSnap.userData.assetId,
+                  objToSnap.position.clone(), 
+                  objToSnap.rotation.clone(), 
+                  objToSnap.scale.clone()
+                );
+              }
             }
           }
         }
@@ -853,11 +977,25 @@ const TerrainViewer = ({
       raycaster.setFromCamera(mouseRef.current, cameraRef.current);
 
       // If an asset is selected FOR PLACEMENT, prioritize placing it.
-      if (selectedAsset && selectedAsset.modelUrl && onAssetPlaced && terrainModelRef.current) { 
-        const intersectsTerrain = raycaster.intersectObject(terrainModelRef.current, true);
+      if (selectedAsset && selectedAsset.modelUrl && onAssetPlaced) { 
+        let intersectionPoint = null;
+        
+        if (terrainModelRef.current) {
+          // Place on terrain if available
+          const intersectsTerrain = raycaster.intersectObject(terrainModelRef.current, true);
+          if (intersectsTerrain.length > 0) {
+            intersectionPoint = intersectsTerrain[0].point;
+          }
+        } else {
+          // Place on ground plane when no terrain (None terrain case)
+          const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Y=0 plane
+          const planeIntersect = new THREE.Vector3();
+          if (raycaster.ray.intersectPlane(groundPlane, planeIntersect)) {
+            intersectionPoint = planeIntersect;
+          }
+        }
 
-        if (intersectsTerrain.length > 0) {
-          const intersectionPoint = intersectsTerrain[0].point;
+        if (intersectionPoint) {
           const newAssetData = {
             id: `manual-${Date.now()}-${Math.random().toString(36).substring(2,9)}`,
             modelUrl: selectedAsset.modelUrl,
@@ -1156,12 +1294,29 @@ const TerrainViewer = ({
                     modelInstance.position.y = fallbackY;
                 }
             } else {
-                // Fallback if terrain model isn't ready - place on ground with calculated offset
+                // No terrain model - place on ground plane (None terrain case)
                 modelInstance.position.set(assetData.position.x, assetData.position.y, assetData.position.z);
                 modelInstance.updateMatrixWorld(true);
+                
+                // Get the bounding box to calculate proper ground placement
                 const bbox = new THREE.Box3().setFromObject(modelInstance, true);
-                const heightBelowOrigin = Math.max(0, modelInstance.position.y - bbox.min.y);
-                modelInstance.position.y = heightBelowOrigin;
+                const modelBottom = bbox.min.y;
+                const modelOrigin = modelInstance.position.y;
+                const heightBelowOrigin = modelOrigin - modelBottom;
+                
+                // Place the model so its bottom sits on the ground plane (y=0)
+                const targetY = 0 + heightBelowOrigin;
+                modelInstance.position.y = targetY;
+                
+                // Update the parent component with the corrected position
+                if (onPlacedAssetMoved) {
+                    onPlacedAssetMoved(
+                        assetData.id,
+                        modelInstance.position.clone(),
+                        modelInstance.rotation.clone(),
+                        modelInstance.scale.clone()
+                    );
+                }
             }
             // --- END: Snap to terrain (Revised Logic) ---
             
@@ -1206,9 +1361,26 @@ const TerrainViewer = ({
     }
 
     if (width > 0 && depth > 0) {
-        const divisions = Math.max(10, Math.floor(Math.max(width, depth) / 2)); // Dynamic divisions
+        // For "None" terrain (no terrainUrl), use fixed divisions based on floorPlan
+        // For actual terrains, use dynamic divisions
+        let divisions, gridSize;
+        
+        if (!terrainUrl) {
+          // Generated Dungeon - use fixed divisions, change grid size to scale
+          gridSize = Math.max(width, depth);
+          divisions = fixedDivisionsRef.current || Math.max(width, depth) / 2; // Use fixed divisions if available
+        } else {
+          // Dynamic grid for actual terrains
+          divisions = Math.max(10, Math.floor(Math.max(width, depth) / 2));
+          gridSize = Math.max(width, depth) * 1.2;
+        }
+        
+        // Save values to refs for use by other functions
+        divisionsRef.current = divisions;
+        gridSizeRef.current = gridSize;
+        
         // Use brighter colors for better visibility: white center lines, light gray grid lines
-        const gridHelper = new THREE.GridHelper(Math.max(width, depth) * 1.2, divisions, 0xffffff, 0xcccccc);
+        const gridHelper = new THREE.GridHelper(gridSize, divisions, 0xffffff, 0xcccccc);
         
         // Calculate the terrain surface Y position
         let terrainSurfaceY = 0;
@@ -1226,7 +1398,7 @@ const TerrainViewer = ({
         scene.add(gridHelper);
         gridHelperRef.current = gridHelper;
     }
-  }, [isGridVisible]); // Added isGridVisible dependency
+  }, [isGridVisible, terrainUrl]); // Added terrainUrl dependency
 
   // Toggle grid visibility
   const handleToggleGrid = useCallback(() => {
@@ -1244,28 +1416,7 @@ const TerrainViewer = ({
     const newScale = parseFloat(event.target.value);
     if (isNaN(newScale) || newScale <=0) return; // Basic validation
 
-    setCurrentScale(newScale); // Update local state for input
-
-    if (terrainModelRef.current && sceneRef.current) {
-      terrainModelRef.current.scale.set(newScale, newScale, newScale);
-      // After scaling, update grid and metrics
-      const newScaledBox = new THREE.Box3().setFromObject(terrainModelRef.current);
-      const newScaledSize = newScaledBox.getSize(new THREE.Vector3()); // newScaledBoxから計算
-      const newScaledCenter = newScaledBox.getCenter(new THREE.Vector3()); // newScaledBoxから計算
-      
-      // console.log("scaledCenter:", scaledCenter);
-      setScaledBox(newScaledBox);
-      setScaledSize(newScaledSize);
-      setScaledCenter(newScaledCenter);
-      
-      updateCustomGrid(newScaledSize.x, newScaledSize.z, newScaledCenter);
-      if (onTerrainMetricsUpdate) {
-        onTerrainMetricsUpdate({
-          width: newScaledSize.x, depth: newScaledSize.z, height: newScaledSize.y,
-          centerX: newScaledCenter.x, centerY: newScaledCenter.y, centerZ: newScaledCenter.z,
-        });
-      }
-    }
+    setCurrentScale(newScale); // Update local state for input - useEffectが残りの処理を行う
   };
 
   // Handle name editing
@@ -1325,7 +1476,7 @@ const TerrainViewer = ({
 
   // load floor plan and asset id mapping
   const loadFloorPlan = useCallback(async (width, depth, gridCenter) => {
-    if (!floorPlanUrl || !sceneRef.current) return;
+    if (!sceneRef.current) return;
     
     // clean up previous floor plan assets
     if (floorPlanAssetsRef.current.length > 0) {
@@ -1352,11 +1503,18 @@ const TerrainViewer = ({
     
     try {
       // load floor plan
-      const planResponse = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.DUNGEON.FLOOR_PLAN}`);
-      if (!planResponse.ok) {
-        throw new Error(`Failed to fetch floor plan: ${planResponse.statusText}`);
+      let planData;
+      if (floorPlan) {
+        // floorPlan is passed as an object directly
+        planData = floorPlan;
+      } else {
+        // fallback to API endpoint when floorPlan is not provided
+        const planResponse = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.DUNGEON.FLOOR_PLAN}`);
+        if (!planResponse.ok) {
+          throw new Error(`Failed to fetch floor plan: ${planResponse.statusText}`);
+        }
+        planData = await planResponse.json();
       }
-      const planData = await planResponse.json();
 
       // load asset id mapping
       const idxResponse = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.DUNGEON.ASSET_MAPPING}`);
@@ -1365,11 +1523,10 @@ const TerrainViewer = ({
       }
       const idxData = await idxResponse.json();
 
-      const tiles = planData.plan.tiles;
-      const divisions = Math.max(10, Math.floor(Math.max(width, depth) / 2));
-      const tileSize = Math.max(width, depth) * 1.2 / divisions;
-      const startX = -Math.max(width, depth) * 1.2 / 2 + gridCenter.x;
-      const startZ = -Math.max(width, depth) * 1.2 / 2 + gridCenter.z;
+      const tiles = planData.tiles;
+      const tileSize = gridSizeRef.current / divisionsRef.current;
+      const startX = -gridSizeRef.current / 2 + gridCenter.x;
+      const startZ = -gridSizeRef.current / 2 + gridCenter.z;
 
       const loader = new GLTFLoader();
 
@@ -1564,20 +1721,25 @@ const TerrainViewer = ({
         onError(error.message);
       }
     }
-  }, [floorPlanUrl, onError]);
+  }, [floorPlan, onError]);
 
   // load floor plan when scaled size and center change
   useEffect(() => {
+    // Only load floor plan for "Generated Dungeon" (when terrainUrl is null/undefined)
+    if (terrainUrl) {
+      return; // Skip floor plan loading for regular terrains
+    }
+    
     // debounce function: prevent multiple executions within a short period
     const timeoutId = setTimeout(() => {
-      if (floorPlanUrl && scaledSize.x > 0 && scaledSize.z > 0) {
-        console.log('loadFloorPlan called:', { width: scaledSize.x, depth: scaledSize.z, center: scaledCenter });
+      if (scaledSize.x > 0 && scaledSize.z > 0) {
+        // console.log('loadFloorPlan called:', { width: scaledSize.x, depth: scaledSize.z, center: scaledCenter });
         loadFloorPlan(scaledSize.x, scaledSize.z, scaledCenter);
       }
     }, 100); // 100ms wait
 
     return () => clearTimeout(timeoutId); // cleanup
-  }, [floorPlanUrl, scaledSize.x, scaledSize.z, scaledCenter.x, scaledCenter.z, loadFloorPlan]);
+  }, [terrainUrl, floorPlan, scaledSize.x, scaledSize.z, scaledCenter.x, scaledCenter.z, loadFloorPlan]);
 
   // clear model cache when component unmounts
   useEffect(() => {
@@ -1585,6 +1747,51 @@ const TerrainViewer = ({
       modelCacheRef.current.clear();
     };
   }, []);
+
+  // 新しいエフェクト: スケール変更のみを処理（シーンの再作成を避ける）
+  useEffect(() => {
+    if (terrainModelRef.current && sceneRef.current) {
+      // Regular terrain with 3D model
+      terrainModelRef.current.scale.set(currentScale, currentScale, currentScale);
+      
+      // スケール変更後の計算を実行
+      const newScaledBox = new THREE.Box3().setFromObject(terrainModelRef.current);
+      const newScaledSize = newScaledBox.getSize(new THREE.Vector3());
+      const newScaledCenter = newScaledBox.getCenter(new THREE.Vector3());
+      
+      setScaledBox(newScaledBox);
+      setScaledSize(newScaledSize);
+      setScaledCenter(newScaledCenter);
+      
+      updateCustomGrid(newScaledSize.x, newScaledSize.z, newScaledCenter);
+      if (onTerrainMetricsUpdate) {
+        onTerrainMetricsUpdate({
+          width: newScaledSize.x, depth: newScaledSize.z, height: newScaledSize.y,
+          centerX: newScaledCenter.x, centerY: newScaledCenter.y, centerZ: newScaledCenter.z,
+        });
+      }
+    } else if (!terrainUrl) {
+      // Generated Dungeon - scale by changing cell size while keeping cell count (divisions) fixed
+      if (fixedDivisionsRef.current) {
+        const cellSize = 2; // Base cell size
+        const newCellSize = cellSize * currentScale;
+        const newGridSize = fixedDivisionsRef.current * newCellSize;
+        const newScaledSize = new THREE.Vector3(newGridSize, 0, newGridSize);
+        const newScaledCenter = new THREE.Vector3(0, 0, 0);
+        
+        setScaledSize(newScaledSize);
+        setScaledCenter(newScaledCenter);
+        
+        updateCustomGrid(newGridSize, newGridSize, newScaledCenter);
+        if (onTerrainMetricsUpdate) {
+          onTerrainMetricsUpdate({
+            width: newGridSize, depth: newGridSize, height: 0,
+            centerX: newScaledCenter.x, centerY: newScaledCenter.y, centerZ: newScaledCenter.z,
+          });
+        }
+      }
+    }
+  }, [currentScale, updateCustomGrid, onTerrainMetricsUpdate, terrainUrl]); // スケール変更のみを監視
 
   return (
     <div key={viewerKey} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
@@ -1664,7 +1871,7 @@ const TerrainViewer = ({
         </div>
       )}
 
-      {!hideControls && (
+      {(
         <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 5, background: THEME.bgLighter, padding: '8px', borderRadius: '4px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <label htmlFor="scaleInput" style={{color: THEME.textPrimary, fontSize: '12px'}}>Terrain Scale:</label>
@@ -1677,21 +1884,27 @@ const TerrainViewer = ({
                 step="0.1" 
                 style={{width: '60px', padding: '4px', background: THEME.bgPrimary, color: THEME.textPrimary, border: `1px solid ${THEME.border}`}}
             />
-            <Button onClick={handleSaveScale} size="small" variant={saveStatus === 'success' ? 'success' : saveStatus === 'error' ? 'danger' : 'primary'}>
-              {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'success' ? 'Saved!' : saveStatus === 'error' ? 'Error!' : 'Save Scale'}
-            </Button>
+            {terrainUrl && ( // Only show Save Scale button for regular terrains
+              <Button onClick={handleSaveScale} size="small" variant={saveStatus === 'success' ? 'success' : saveStatus === 'error' ? 'danger' : 'primary'}>
+                {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'success' ? 'Saved!' : saveStatus === 'error' ? 'Error!' : 'Save Scale'}
+              </Button>
+            )}
           </div>
           <Button onClick={handleToggleGrid} size="small">{isGridVisible ? 'Hide Grid' : 'Show Grid'}</Button>
-          {isEditingName ? (
-            <div style={{display: 'flex', gap: '5px'}}>
-              <input type="text" value={editedName} onChange={handleNameInputChange} style={{padding: '4px', background: THEME.bgPrimary, color: THEME.textPrimary, border: `1px solid ${THEME.border}`}} />
-              <Button onClick={handleNameEditSubmit} size="small">Save</Button>
-              <Button onClick={() => setIsEditingName(false)} size="small" variant="secondary">Cancel</Button>
-            </div>
-          ) : (
-            <Button onClick={() => setIsEditingName(true)} size="small">Edit Name</Button>
+          {terrainUrl && ( // Only show Edit Name and Delete buttons for regular terrains
+            <>
+              {isEditingName ? (
+                <div style={{display: 'flex', gap: '5px'}}>
+                  <input type="text" value={editedName} onChange={handleNameInputChange} style={{padding: '4px', background: THEME.bgPrimary, color: THEME.textPrimary, border: `1px solid ${THEME.border}`}} />
+                  <Button onClick={handleNameEditSubmit} size="small">Save</Button>
+                  <Button onClick={() => setIsEditingName(false)} size="small" variant="secondary">Cancel</Button>
+                </div>
+              ) : (
+                <Button onClick={() => setIsEditingName(true)} size="small">Edit Name</Button>
+              )}
+              <Button onClick={handleDeleteTerrain} variant="danger" size="small">Delete Terrain</Button>
+            </>
           )}
-          <Button onClick={handleDeleteTerrain} variant="danger" size="small">Delete Terrain</Button>
         </div>
       )}
     </div>
