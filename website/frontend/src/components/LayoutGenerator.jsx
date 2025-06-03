@@ -33,7 +33,7 @@ const LayoutGenerator = () => {
     setError(null);
     
     try {
-      const response = await fetch(`${CONFIG.API.BASE_URL}/api/layout/generate`, {
+      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.LAYOUT.GENERATE}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -208,6 +208,25 @@ const LayoutGenerator = () => {
           {layoutResult && (
             <div style={styles.resultInfo}>
               <p>Generated {layoutResult.rooms?.length || 0} rooms with {layoutResult.doors?.length || 0} doors in {(layoutResult.generation_time * 1000).toFixed(1)}ms</p>
+              {layoutResult.validation && (
+                <div style={styles.validationInfo}>
+                  <p><strong>Validation:</strong></p>
+                  <p>✓ Entrance rooms: {layoutResult.validation.entrance_count}</p>
+                  <p>✓ Boss rooms: {layoutResult.validation.boss_count}</p>
+                  <p>✓ Connectivity: {layoutResult.validation.connectivity_validated ? 'Valid' : 'Invalid'}</p>
+                  <p>✓ Total rooms: {layoutResult.validation.total_rooms}</p>
+                  {layoutResult.validation.room_type_distribution && (
+                    <div style={styles.roomDistribution}>
+                      <p><strong>Room Types:</strong></p>
+                      {Object.entries(layoutResult.validation.room_type_distribution).map(([type, count]) => (
+                        <span key={type} style={styles.roomType}>
+                          {type}: {count}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div style={styles.downloadButtons}>
                 <button onClick={downloadJSON} style={styles.downloadButton}>
                   Download JSON
@@ -400,6 +419,12 @@ const styles = {
     backgroundColor: '#0a4d0a',
     borderRadius: '4px'
   },
+  validationInfo: {
+    marginBottom: '20px',
+    padding: '10px',
+    backgroundColor: '#0a4d0a',
+    borderRadius: '4px'
+  },
   downloadButtons: {
     display: 'flex',
     gap: '10px',
@@ -475,6 +500,18 @@ const styles = {
     color: '#ff6b35'
   },
   moreIndicator: {
+    fontSize: '12px',
+    color: '#ff6b35'
+  },
+  roomDistribution: {
+    marginTop: '10px',
+    padding: '10px',
+    backgroundColor: '#0a4d0a',
+    borderRadius: '4px'
+  },
+  roomType: {
+    display: 'block',
+    marginBottom: '5px',
     fontSize: '12px',
     color: '#ff6b35'
   }

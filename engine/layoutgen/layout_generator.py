@@ -32,6 +32,10 @@ class PolyominoLayoutGenerator(LayoutGenerator):
         try:
             graph = GraphBuilder.create_graph(layout_params.graph_type, layout_params.rooms)
             placed_rooms = self._place_rooms(layout_params, graph)
+            
+            # Validate connectivity before creating grid
+            connectivity_valid = self._validate_connectivity(graph, placed_rooms)
+            
             grid = self._create_grid(placed_rooms, layout_params, graph)
             rooms = self._convert_rooms(placed_rooms, layout_params.room_scale)
             
@@ -40,11 +44,19 @@ class PolyominoLayoutGenerator(LayoutGenerator):
                 rooms=rooms,
                 metadata={
                     'graph_edges': list(graph.edges()),
+                    'graph_data': {
+                        'nodes': list(graph.nodes()),
+                        'edges': list(graph.edges()),
+                        'room_count': len(placed_rooms),
+                        'edge_count': len(list(graph.edges()))
+                    },
+                    'connectivity_validated': connectivity_valid,
+                    'room_type_counts': self._count_room_types(placed_rooms),
                     'params': params
                 },
                 algorithm=self.algorithm_name,
                 generation_time=time.time() - start_time,
-                success=len(placed_rooms) > 0
+                success=len(placed_rooms) > 0 and connectivity_valid
             )
         except Exception as e:
             return LayoutResult(
@@ -59,7 +71,11 @@ class PolyominoLayoutGenerator(LayoutGenerator):
     def _place_rooms(self, params: LayoutParams, graph) -> List[Dict]:
         placed = []
         
-        first_block = ShapeLibrary.select_block(self.blocks)
+        # Create a deterministic room type assignment plan
+        room_types = self._assign_room_types(params.rooms, params.graph_type)
+        
+        # Place first room (always entrance)
+        first_block = self._get_block_for_type(room_types[0])
         first_shape = ShapeLibrary.select_variant(first_block)
         
         x = self.width // 2 - (first_shape.width * params.room_scale) // 2
@@ -74,7 +90,7 @@ class PolyominoLayoutGenerator(LayoutGenerator):
         })
         
         for room_id in range(1, params.rooms):
-            block = ShapeLibrary.select_block(self.blocks)
+            block = self._get_block_for_type(room_types[room_id])
             shape = ShapeLibrary.select_variant(block)
             
             for _ in range(params.max_attempts):
@@ -82,6 +98,55 @@ class PolyominoLayoutGenerator(LayoutGenerator):
                     break
         
         return placed
+    
+    def _assign_room_types(self, num_rooms: int, graph_type: str) -> List[str]:
+        """Assign room types ensuring exactly one entrance and proper distribution"""
+        if num_rooms <= 0:
+            return []
+        
+        room_types = ['entrance']  # First room is always entrance
+        
+        if num_rooms == 1:
+            return room_types
+        
+        # Last room is boss for linear/tree graphs
+        if graph_type in ['linear', 'tree']:
+            boss_room = num_rooms - 1
+        else:
+            # For mesh/complex graphs, put boss at a strategic position
+            boss_room = min(3, num_rooms - 1)
+        
+        # Assign boss room
+        boss_assigned = False
+        
+        # Fill in remaining rooms
+        available_types = ['chamber', 'treasure', 'corridor']
+        weights = [3.0, 1.5, 2.5]  # Based on original weights
+        
+        for room_id in range(1, num_rooms):
+            if room_id == boss_room and not boss_assigned:
+                room_types.append('boss')
+                boss_assigned = True
+            else:
+                # Randomly select from non-unique types
+                selected_type = random.choices(available_types, weights=weights)[0]
+                room_types.append(selected_type)
+        
+        return room_types
+    
+    def _get_block_for_type(self, room_type: str) -> BuildingBlock:
+        """Get a building block of the specified type"""
+        # Filter blocks by room type
+        type_blocks = [block for block in self.blocks if block.room_type == room_type]
+        
+        if not type_blocks:
+            # Fallback to chamber if type not found
+            type_blocks = [block for block in self.blocks if block.room_type == 'chamber']
+            if not type_blocks:
+                # Final fallback to any block
+                type_blocks = self.blocks
+        
+        return ShapeLibrary.select_block(type_blocks)
     
     def _try_place_room(self, room_id: int, block: BuildingBlock, shape: Polyomino,
                        placed: List[Dict], params: LayoutParams, graph) -> bool:
@@ -259,4 +324,42 @@ class PolyominoLayoutGenerator(LayoutGenerator):
                 }
             ))
         
-        return rooms 
+        return rooms
+    
+    def _validate_connectivity(self, graph, placed_rooms) -> bool:
+        """Validate that all placed rooms are reachable from the entrance"""
+        if not placed_rooms:
+            return False
+        
+        # Build adjacency list from actual placed rooms and graph edges
+        placed_ids = {room['id'] for room in placed_rooms}
+        adjacency = {room_id: [] for room_id in placed_ids}
+        
+        for edge in graph.edges():
+            room1, room2 = edge
+            if room1 in placed_ids and room2 in placed_ids:
+                adjacency[room1].append(room2)
+                adjacency[room2].append(room1)
+        
+        # BFS from entrance (room 0) to check reachability
+        visited = set()
+        queue = [0]  # Start from entrance
+        visited.add(0)
+        
+        while queue:
+            current = queue.pop(0)
+            for neighbor in adjacency.get(current, []):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append(neighbor)
+        
+        # All placed rooms should be reachable
+        return len(visited) == len(placed_ids)
+    
+    def _count_room_types(self, placed_rooms) -> Dict[str, int]:
+        """Count occurrences of each room type"""
+        counts = {}
+        for room in placed_rooms:
+            room_type = room['block'].room_type
+            counts[room_type] = counts.get(room_type, 0) + 1
+        return counts 

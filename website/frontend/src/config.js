@@ -1,7 +1,7 @@
 // Frontend API Configuration
 const CONFIG = {
   API: {
-    BASE_URL: 'http://localhost:3001',
+    BASE_URL: 'http://localhost:3000',
     ENDPOINTS: {
       MODELS: {
         BASE: '/api/models',
@@ -18,6 +18,12 @@ const CONFIG = {
       DUNGEON: {
         FLOOR_PLAN: '/api/dungeon/floor_plan',
         ASSET_MAPPING: '/api/dungeon/asset_mapping'
+      },
+      LAYOUT: {
+        GENERATE: '/api/layout/generate',
+        TEST: '/api/layout/test',
+        SAVED: '/api/layout/saved',
+        LOAD: '/api/layout/load'
       },
       TRELLIS: '/api/trellis', // 3D asset generation endpoint that connects to external service
       GENERATE_IMAGE: '/api/generate-image', // Endpoint to generate images with AI
