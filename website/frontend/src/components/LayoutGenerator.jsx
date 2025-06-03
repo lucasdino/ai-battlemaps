@@ -18,7 +18,14 @@ const LayoutGenerator = () => {
   const canvasRef = useRef(null);
 
   const handleParamChange = (key, value) => {
-    setParams(prev => ({ ...prev, [key]: value }));
+    // Handle numeric conversions with proper validation
+    if (typeof value === 'string' && ['rooms', 'room_scale', 'width', 'height', 'margin', 'max_attempts'].includes(key)) {
+      const numValue = parseInt(value);
+      const validatedValue = isNaN(numValue) ? params[key] : numValue; // Keep current value if NaN
+      setParams(prev => ({ ...prev, [key]: validatedValue }));
+    } else {
+      setParams(prev => ({ ...prev, [key]: value }));
+    }
   };
 
   const generateLayout = async () => {
@@ -124,8 +131,8 @@ const LayoutGenerator = () => {
                 type="range"
                 min="3"
                 max="15"
-                value={params.rooms}
-                onChange={(e) => handleParamChange('rooms', parseInt(e.target.value))}
+                value={params.rooms || 8}
+                onChange={(e) => handleParamChange('rooms', e.target.value)}
                 style={styles.slider}
               />
             </label>
@@ -149,8 +156,8 @@ const LayoutGenerator = () => {
                 type="range"
                 min="1"
                 max="10"
-                value={params.room_scale}
-                onChange={(e) => handleParamChange('room_scale', parseInt(e.target.value))}
+                value={params.room_scale || 3}
+                onChange={(e) => handleParamChange('room_scale', e.target.value)}
                 style={styles.slider}
               />
             </label>
@@ -160,16 +167,16 @@ const LayoutGenerator = () => {
               <div style={styles.gridSizeControls}>
                 <input
                   type="number"
-                  value={params.width}
-                  onChange={(e) => handleParamChange('width', parseInt(e.target.value))}
+                  value={params.width || 50}
+                  onChange={(e) => handleParamChange('width', e.target.value)}
                   style={styles.numberInput}
                   placeholder="Width"
                 />
                 <span>×</span>
                 <input
                   type="number"
-                  value={params.height}
-                  onChange={(e) => handleParamChange('height', parseInt(e.target.value))}
+                  value={params.height || 50}
+                  onChange={(e) => handleParamChange('height', e.target.value)}
                   style={styles.numberInput}
                   placeholder="Height"
                 />
@@ -200,7 +207,7 @@ const LayoutGenerator = () => {
           
           {layoutResult && (
             <div style={styles.resultInfo}>
-              <p>Generated {layoutResult.rooms?.length || 0} rooms in {(layoutResult.generation_time * 1000).toFixed(1)}ms</p>
+              <p>Generated {layoutResult.rooms?.length || 0} rooms with {layoutResult.doors?.length || 0} doors in {(layoutResult.generation_time * 1000).toFixed(1)}ms</p>
               <div style={styles.downloadButtons}>
                 <button onClick={downloadJSON} style={styles.downloadButton}>
                   Download JSON
@@ -216,34 +223,64 @@ const LayoutGenerator = () => {
             <canvas ref={canvasRef} style={styles.canvas} />
           </div>
           
+          {layoutResult && layoutResult.doors && layoutResult.doors.length > 0 && (
+            <div style={styles.doorsSection}>
+              <h3 style={styles.subsectionTitle}>Doors ({layoutResult.doors.length})</h3>
+              <div style={styles.doorsList}>
+                {layoutResult.doors.slice(0, 10).map(door => (
+                  <div key={door.id} style={styles.doorItem}>
+                    <span>Door {door.id}: </span>
+                    <span style={styles.doorPosition}>({door.position[0]}, {door.position[1]})</span>
+                    <span style={styles.doorType}>{door.type}</span>
+                  </div>
+                ))}
+                {layoutResult.doors.length > 10 && (
+                  <div style={styles.moreIndicator}>
+                    ... and {layoutResult.doors.length - 10} more doors
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
           {layoutResult && (
             <div style={styles.legend}>
-              <h3>Legend:</h3>
+              <h3>Grid Legend:</h3>
               <div style={styles.legendItems}>
-                <div style={styles.legendItem}>
-                  <div style={{...styles.legendColor, backgroundColor: '#8B4513'}}></div>
-                  <span>Floor</span>
-                </div>
-                <div style={styles.legendItem}>
-                  <div style={{...styles.legendColor, backgroundColor: '#404040'}}></div>
-                  <span>Wall</span>
-                </div>
-                <div style={styles.legendItem}>
-                  <div style={{...styles.legendColor, backgroundColor: '#FF6B35'}}></div>
-                  <span>Door</span>
-                </div>
-                <div style={styles.legendItem}>
-                  <div style={{...styles.legendColor, backgroundColor: '#32CD32'}}></div>
-                  <span>Entrance</span>
-                </div>
-                <div style={styles.legendItem}>
-                  <div style={{...styles.legendColor, backgroundColor: '#DC143C'}}></div>
-                  <span>Boss Room</span>
-                </div>
-                <div style={styles.legendItem}>
-                  <div style={{...styles.legendColor, backgroundColor: '#FFD700'}}></div>
-                  <span>Treasure</span>
-                </div>
+                {layoutResult.grid_key && Object.entries(layoutResult.grid_key).map(([value, info]) => (
+                  <div key={value} style={styles.legendItem}>
+                    <div style={{...styles.legendColor, backgroundColor: info.color}}></div>
+                    <span>{info.name}: {info.description}</span>
+                  </div>
+                ))}
+                {!layoutResult.grid_key && (
+                  <>
+                    <div style={styles.legendItem}>
+                      <div style={{...styles.legendColor, backgroundColor: '#8B4513'}}></div>
+                      <span>Floor</span>
+                    </div>
+                    <div style={styles.legendItem}>
+                      <div style={{...styles.legendColor, backgroundColor: '#404040'}}></div>
+                      <span>Wall</span>
+                    </div>
+                    <div style={styles.legendItem}>
+                      <div style={{...styles.legendColor, backgroundColor: '#FF6B35'}}></div>
+                      <span>Door</span>
+                    </div>
+                    <div style={styles.legendItem}>
+                      <div style={{...styles.legendColor, backgroundColor: '#32CD32'}}></div>
+                      <span>Entrance</span>
+                    </div>
+                    <div style={styles.legendItem}>
+                      <div style={{...styles.legendColor, backgroundColor: '#DC143C'}}></div>
+                      <span>Boss Room</span>
+                    </div>
+                    <div style={styles.legendItem}>
+                      <div style={{...styles.legendColor, backgroundColor: '#FFD700'}}></div>
+                      <span>Treasure</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -407,6 +444,39 @@ const styles = {
     height: '16px',
     borderRadius: '2px',
     border: '1px solid #666'
+  },
+  doorsSection: {
+    marginBottom: '20px',
+    padding: '10px',
+    backgroundColor: '#0a4d0a',
+    borderRadius: '4px'
+  },
+  subsectionTitle: {
+    color: '#ff6b35',
+    marginBottom: '10px',
+    fontSize: '1.2rem'
+  },
+  doorsList: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '10px'
+  },
+  doorItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  doorPosition: {
+    fontSize: '12px',
+    color: '#ff6b35'
+  },
+  doorType: {
+    fontSize: '12px',
+    color: '#ff6b35'
+  },
+  moreIndicator: {
+    fontSize: '12px',
+    color: '#ff6b35'
   }
 };
 
