@@ -1416,7 +1416,7 @@ const TerrainViewer = ({
     const newScale = parseFloat(event.target.value);
     if (isNaN(newScale) || newScale <=0) return; // Basic validation
 
-    setCurrentScale(newScale); // Update local state for input - useEffectが残りの処理を行う
+    setCurrentScale(newScale); // Update local state for input - useEffect will handle the rest
   };
 
   // Handle name editing
@@ -1634,7 +1634,7 @@ const TerrainViewer = ({
                 const scaleX = tileSize / modelSize.x;
                 const scaleZ = tileSize / modelSize.z;
                 const scale = Math.min(scaleX, scaleZ);
-                model.scale.set(scale, scale, scale);
+                model.scale.set(scale, scale * 2, scale); // double the height
                 
                 model.rotation.y = Math.PI / 2 * dir;
                 const newCenterX = modelCenter.x * Math.cos(-Math.PI / 2 * dir) -
@@ -1649,21 +1649,21 @@ const TerrainViewer = ({
                 model.position.set(
                   targetX - (newCenterX) * scale + tileSize / 2 + (tileSize) / 2 * dcol,
                   // targetX - (newCenterX) * scale + tileSize / 2 + (tileSize + thickness) / 2 * dcol,
-                  0 - boundingBox.min.y * (scale * 0.9), 
+                  0 - boundingBox.min.y * (scale * 0.9), // align to ground
                   targetZ - (newCenterZ) * scale + tileSize / 2 + (tileSize) / 2 * drow
                   // targetZ - (newCenterZ) * scale + tileSize / 2 + (tileSize + thickness) / 2 * drow
                 );
-  
+
                 model.userData = {
-                  assetId: `${modelName}_${row}_${col}`,
+                  assetId: `${modelName}_${row}_${col}_wall`,
                   type: modelName,
                   position: { x: targetX, y: 0, z: targetZ },
-                  rotation: { x: 0, y: 0, z: 0 },
-                  scale: { x: 1, y: 1, z: 1 }
+                  rotation: { x: 0, y: Math.PI / 2 * dir, z: 0 },
+                  scale: { x: scale, y: scale * 2, z: scale }
                 };
-  
+
                 sceneRef.current.add(model);
-                floorPlanAssetsRef.current.push(model); // add to tracking list
+                floorPlanAssetsRef.current.push(model);
               } catch (modelError) {
                 console.error(`Failed to load model ${modelName} at position (${row}, ${col}):`, modelError);
               }
@@ -1748,13 +1748,13 @@ const TerrainViewer = ({
     };
   }, []);
 
-  // 新しいエフェクト: スケール変更のみを処理（シーンの再作成を避ける）
+  // new effect: scale change only (avoid scene recreation)
   useEffect(() => {
     if (terrainModelRef.current && sceneRef.current) {
       // Regular terrain with 3D model
       terrainModelRef.current.scale.set(currentScale, currentScale, currentScale);
       
-      // スケール変更後の計算を実行
+      // execute calculations after scale change
       const newScaledBox = new THREE.Box3().setFromObject(terrainModelRef.current);
       const newScaledSize = newScaledBox.getSize(new THREE.Vector3());
       const newScaledCenter = newScaledBox.getCenter(new THREE.Vector3());
@@ -1791,7 +1791,7 @@ const TerrainViewer = ({
         }
       }
     }
-  }, [currentScale, updateCustomGrid, onTerrainMetricsUpdate, terrainUrl]); // スケール変更のみを監視
+  }, [currentScale, updateCustomGrid, onTerrainMetricsUpdate, terrainUrl]); // only scale change is monitored
 
   return (
     <div key={viewerKey} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>

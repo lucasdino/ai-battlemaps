@@ -6,6 +6,8 @@ infinigen/
 **/apiKeys.js
 
 # Logs
+/log
+/logs/
 logs
 *.log
 npm-debug.log*
