@@ -179,11 +179,29 @@ const ViewTerrains = () => {
       }
       
       const data = await response.json();
-      setTerrains(data.terrains || []);
+      const fetchedTerrains = data.terrains || [];
       
-      // Auto-select first terrain if none selected
-      if (data.terrains && data.terrains.length > 0 && !selectedTerrain) {
-        setSelectedTerrain(data.terrains[0]);
+      // Add "None" terrain option at the beginning
+      const noneTerrainOption = {
+        id: 'none',
+        name: 'Generated Dungeon',
+        type: 'none',
+        url: null,
+        created: Date.now(),
+        icon: null,
+        sourceImage: null,
+        dimensions: null,
+        scale: 1.0,
+        placedAssets: [],
+        isNone: true
+      };
+      
+      const terrainsWithNone = [noneTerrainOption, ...fetchedTerrains];
+      setTerrains(terrainsWithNone);
+      
+      // Auto-select "None" if no terrain selected, otherwise first regular terrain
+      if (!selectedTerrain) {
+        setSelectedTerrain(noneTerrainOption);
       }
     } catch (err) {
       console.error('Error fetching terrains:', err);
@@ -264,12 +282,12 @@ const ViewTerrains = () => {
   }, [selectedTerrain]); // React to changes in the selectedTerrain object reference
 
   // Handle terrain name change
-  const handleTerrainNameChange = useCallback(async (newName) => {
-    if (!selectedTerrain || !newName.trim()) return;
+  const handleTerrainNameChange = useCallback(async (terrainId, newName) => {
+    if (!selectedTerrain || !newName.trim() || selectedTerrain.isNone) return;
 
     try {
       const response = await fetch(
-        `${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.BASE}/${selectedTerrain.id}`,
+        `${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.BASE}/${terrainId}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -284,7 +302,7 @@ const ViewTerrains = () => {
       // Update local state
       const updatedTerrain = { ...selectedTerrain, name: newName.trim() };
       setSelectedTerrain(updatedTerrain);
-      setTerrains(prev => prev.map(t => t.id === selectedTerrain.id ? updatedTerrain : t));
+      setTerrains(prev => prev.map(t => t.id === terrainId ? updatedTerrain : t));
       
       showMessage('Terrain name updated successfully');
     } catch (err) {
@@ -295,13 +313,17 @@ const ViewTerrains = () => {
 
   // Handle terrain deletion
   const handleTerrainDeleted = useCallback(async (terrainId, message) => {
+    // Prevent deletion of "None" terrain
+    if (terrainId === 'none') return;
+    
     // Remove from local state
     setTerrains(prev => prev.filter(t => t.id !== terrainId));
     
-    // Select another terrain if the deleted one was selected
+    // Select "None" terrain or another terrain if the deleted one was selected
     if (selectedTerrain && selectedTerrain.id === terrainId) {
       const remainingTerrains = terrains.filter(t => t.id !== terrainId);
-      setSelectedTerrain(remainingTerrains.length > 0 ? remainingTerrains[0] : null);
+      const noneOption = remainingTerrains.find(t => t.isNone);
+      setSelectedTerrain(noneOption || (remainingTerrains.length > 0 ? remainingTerrains[0] : null));
     }
     
     showMessage(message || 'Terrain deleted successfully');
@@ -446,6 +468,25 @@ const ViewTerrains = () => {
 
   // Render terrain thumbnail
   const renderTerrainThumbnail = useCallback((terrain) => {
+    // Handle "None" terrain option
+    if (terrain.isNone) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{
+            ...combinedStyles.terrainThumbnail,
+            backgroundColor: 'transparent',
+            border: `2px dashed ${THEME.textSecondary}`,
+            color: THEME.textSecondary
+          }}>
+            ✕
+          </div>
+          <div style={{ fontSize: '12px', color: '#fff', marginTop: '4px', textAlign: 'center', wordBreak: 'break-word', maxWidth: '100%' }}>
+            {terrain.name}
+          </div>
+        </div>
+      );
+    }
+    
     if (terrain.icon) {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -829,12 +870,12 @@ const ViewTerrains = () => {
           <div style={combinedStyles.terrainViewer}>
             <TerrainViewer
               key={selectedTerrain ? selectedTerrain.id : 'no-terrain'}
-              terrainUrl={selectedTerrain ? `${CONFIG.API.BASE_URL}${selectedTerrain.url}` : null}
+              terrainUrl={selectedTerrain && !selectedTerrain.isNone ? `${CONFIG.API.BASE_URL}${selectedTerrain.url}` : null}
               terrainName={selectedTerrain ? selectedTerrain.name : null}
-              terrainId={selectedTerrain ? selectedTerrain.id : null}
+              terrainId={selectedTerrain && !selectedTerrain.isNone ? selectedTerrain.id : null}
               onError={handleTerrainViewerError}
-              onTerrainNameChange={(newName) => handleTerrainNameChange(selectedTerrain.id, newName)}
-              onTerrainDeleted={handleTerrainDeleted}
+              onTerrainNameChange={!selectedTerrain?.isNone ? (newName) => handleTerrainNameChange(selectedTerrain.id, newName) : undefined}
+              onTerrainDeleted={!selectedTerrain?.isNone ? handleTerrainDeleted : undefined}
               onTerrainMetricsUpdate={handleTerrainMetricsUpdate}
               scale={selectedTerrain?.metadata?.scale}
               selectedAsset={currentSelectedAssetForPlacement ? { ...currentSelectedAssetForPlacement, rotation: { x: 0, y: THREE.MathUtils.degToRad(currentAssetPlacementRotationY), z: 0 } } : null}
