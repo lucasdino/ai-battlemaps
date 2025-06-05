@@ -150,19 +150,27 @@ const Button = ({
   const getButtonStyle = () => {
     // Start with the base
     const baseStyle = getBaseStyles();
+    const hoverStyle = getHoverStyles();
+    const focusStyle = getFocusStyles();
+    const pressedStyle = getPressedStyles();
     
-    // Override with additional styles in correct order
-    return {
+    let combinedStyle = {
       ...baseStyle,
-      ...getFocusStyles(),
-      ...getHoverStyles(),
-      ...getPressedStyles(),
+      ...focusStyle,
+      ...hoverStyle, // Apply hover styles, which might include borderColor
+      ...pressedStyle,
       ...(disabled ? stableStyles.disabled : {}),
-      // Ensure the border style is properly applied
-      border: variant === 'secondary' ? `1px solid ${isHovered ? THEME.textPrimary : THEME.textSecondary}` : baseStyle.border,
-      // Apply custom styles last to allow for overrides
-      ...style
     };
+
+    // For secondary variant, hover directly changes borderColor from hoverStyle.
+    // No need for the specific ternary operator for border here anymore if sharedStyles are correct.
+    // If baseStyle or hoverStyle for secondary now correctly uses longhand, this complex line is simpler:
+    // border: variant === 'secondary' ? `1px solid ${isHovered ? THEME.textPrimary : THEME.textSecondary}` : baseStyle.border,
+
+      // Apply custom styles last to allow for overrides
+    combinedStyle = { ...combinedStyle, ...style };
+
+    return combinedStyle;
   };
 
   return (

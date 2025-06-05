@@ -3,9 +3,11 @@ lucas_windows/
 infinigen/
 
 # API Keys
-apiKeys.js
+**/apiKeys.js
 
 # Logs
+/log
+/logs/
 logs
 *.log
 npm-debug.log*

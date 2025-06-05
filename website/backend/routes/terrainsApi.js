@@ -56,11 +56,13 @@ router.get('/terrains', (req, res) => {
         id: filename,
         name: metadata.name || path.basename(filename, path.extname(filename)),
         type: 'terrain',
+        url: `/assets/terrains/${filename}`,
         created: metadata.created,
         icon: metadata.icon ? metadata.icon.path : null,
         sourceImage: metadata.sourceImage ? metadata.sourceImage.path : null,
         dimensions: metadata.dimensions || { width: 10, height: 10, depth: 0.1 },
-        scale: typeof metadata.scale === 'number' ? metadata.scale : 1.0
+        scale: typeof metadata.scale === 'number' ? metadata.scale : 1.0,
+        placedAssets: metadata.placedAssets || []
       };
     });
     
@@ -91,7 +93,8 @@ router.get('/terrains/:terrainId', (req, res) => {
       id: terrainId,
       ...metadata,
       scale: typeof metadata.scale === 'number' ? metadata.scale : 1.0,
-      path: `/assets/terrains/${terrainId}`
+      path: `/assets/terrains/${terrainId}`,
+      placedAssets: metadata.placedAssets || []
     });
   } catch (error) {
     console.error('Error retrieving terrain metadata:', error);
@@ -237,6 +240,57 @@ router.put('/terrains/:terrainId', async (req, res) => {
   } catch (error) {
     console.error('Error updating terrain:', error);
     return res.status(500).json({ error: 'Server error updating terrain' });
+  }
+});
+
+/**
+ * Save asset layout for a terrain
+ * PUT /api/terrains/:terrainId/layout
+ */
+router.put('/terrains/:terrainId/layout', async (req, res) => {
+  try {
+    const { terrainId } = req.params;
+    const { placedAssets } = req.body;
+
+    console.log(`Received request to save layout for terrain ID: ${terrainId}`);
+    console.log(`Body (placedAssets type): ${typeof placedAssets}, isArray: ${Array.isArray(placedAssets)}`);
+    if (Array.isArray(placedAssets)) {
+      console.log(`Number of assets to save: ${placedAssets.length}`);
+      if (placedAssets.length > 0) {
+        console.log('First asset structure:', JSON.stringify(placedAssets[0]));
+      }
+    }
+
+    if (!Array.isArray(placedAssets)) {
+      return res.status(400).json({ error: 'Invalid placedAssets data: Must be an array.' });
+    }
+
+    // Basic validation for each asset object (can be more detailed)
+    for (const asset of placedAssets) {
+      if (!asset.id || !asset.modelUrl || !asset.position || !asset.rotation || !asset.scale) {
+        console.log('Invalid asset structure detected:', JSON.stringify(asset));
+        return res.status(400).json({ error: 'Invalid asset object structure in placedAssets.' });
+      }
+    }
+
+    const terrainExists = TerrainMetadataUtil.terrainExists(terrainId);
+    console.log(`Terrain exists check for ID (${terrainId}): ${terrainExists}`);
+
+    if (!terrainExists) {
+      return res.status(404).json({ error: 'Terrain not found' });
+    }
+
+    const success = await TerrainMetadataUtil.updateTerrainMetadata(terrainId, { placedAssets });
+    console.log(`Update success status for ID (${terrainId}): ${success}`);
+
+    if (success) {
+      return res.json({ message: 'Terrain layout saved successfully' });
+    } else {
+      return res.status(500).json({ error: 'Failed to save terrain layout' });
+    }
+  } catch (error) {
+    console.error('Error saving terrain layout:', error);
+    return res.status(500).json({ error: 'Server error saving terrain layout' });
   }
 });
 

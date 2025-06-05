@@ -1,3 +1,5 @@
+// require('dotenv').config(); // Load environment variables from .env file -- REMOVED
+
 /**
  * Main server application that sets up the Express server with all routes and middleware.
  */
@@ -19,6 +21,8 @@ const imagesRouter = require('./routes/images');
 const trellisRouter = require('./routes/trellis');
 const systemPromptRouter = require('./routes/systemPrompt');
 const debugRouter = require('./routes/debug');
+const dungeonAssetsRouter = require('./routes/dungeonAssets');
+const dungeonRouter = require('./routes/dungeon');
 
 // Initialize Express app
 const app = express();
@@ -35,7 +39,8 @@ const ensureDirectoriesExist = () => {
     CONFIG.DIRECTORIES.ASSET_VIDEOS,
     CONFIG.DIRECTORIES.TERRAINS,
     CONFIG.DIRECTORIES.TERRAIN_IMAGES,
-    CONFIG.DIRECTORIES.TERRAIN_ICONS
+    CONFIG.DIRECTORIES.TERRAIN_ICONS,
+    CONFIG.DIRECTORIES.DUNGEON
   ];
 
   directories.forEach(dir => {
@@ -88,6 +93,14 @@ setupRouters(app, {
   systemPrompt: systemPromptRouter,
   debug: debugRouter
 });
+
+// Register the dungeon assets filter router
+app.use('/api/assets/dungeon', dungeonAssetsRouter);
+
+// Register the dungeon router for floor plans and asset mapping
+app.use('/api/dungeon', dungeonRouter);
+
+// Layout generation is now handled by the Flask server on port 3000
 
 // Add a verification endpoint to check if the server is running
 app.get('/api/status', (req, res) => {
