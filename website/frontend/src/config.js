@@ -1,7 +1,8 @@
 // Frontend API Configuration
 const CONFIG = {
   API: {
-    BASE_URL: 'http://localhost:3000',
+    BASE_URL: 'http://localhost:3001',
+    LAYOUT_BASE_URL: 'http://localhost:3000',  // Flask server for layout generation
     ENDPOINTS: {
       MODELS: {
         BASE: '/api/models',

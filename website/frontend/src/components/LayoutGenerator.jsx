@@ -33,7 +33,7 @@ const LayoutGenerator = () => {
     setError(null);
     
     try {
-      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.LAYOUT.GENERATE}`, {
+      const response = await fetch(`${CONFIG.API.LAYOUT_BASE_URL}${CONFIG.API.ENDPOINTS.LAYOUT.GENERATE}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
