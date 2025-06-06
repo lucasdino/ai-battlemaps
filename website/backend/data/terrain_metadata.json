@@ -1,18 +1,220 @@
 {
-  "throneroom_1748044430911_o9rvd8.glb": {
+  "throneroom_1749175996463_0wlizx.glb": {
+    "created": 1749175996644,
     "name": "Throne Room",
     "type": "terrain",
-    "originalFilename": null,
+    "originalFilename": "throneroom.jpg",
     "dimensions": {
-      "width": 20,
-      "height": 20,
-      "depth": 0.2
+      "width": 9,
+      "height": 14,
+      "depth": 0.1
     },
-    "scale": 3,
-    "created": 1716577202000,
-    "sourceImage": null,
-    "icon": null,
-    "placedAssets": [],
-    "updated": 1748162215401
+    "scale": 1,
+    "gridScale": 1.45,
+    "sourceImage": {
+      "file": "throneroom_1749175996463_0wlizx.jpg",
+      "path": "/assets/terrain_images/throneroom_1749175996463_0wlizx.jpg"
+    },
+    "icon": {
+      "file": "throneroom_1749175996463_0wlizx_icon.png",
+      "path": "/assets/terrain_icons/throneroom_1749175996463_0wlizx_icon.png"
+    },
+    "updated": 1749191659569,
+    "placedAssets": [
+      {
+        "id": "dragdrop-funkopop_swanson_1747771324935_d59c54e0.glb-1749176012176",
+        "modelUrl": "/assets/3d_models/funkopop_swanson_1747771324935_d59c54e0.glb",
+        "name": "Funkopop Swanson 1747771324935 D59c54e0",
+        "position": {
+          "x": 0,
+          "y": 0.6498998492956162,
+          "z": 4.5
+        },
+        "rotation": {
+          "isEuler": true,
+          "_x": 0,
+          "_y": 0.2,
+          "_z": 0,
+          "_order": "XYZ"
+        },
+        "scale": {
+          "x": 1.3,
+          "y": 1.3,
+          "z": 1.3
+        }
+      },
+      {
+        "id": "dragdrop-wizard_dragon_1747769405175_a8ea3534.glb-1749176017189",
+        "modelUrl": "/assets/3d_models/wizard_dragon_1747769405175_a8ea3534.glb",
+        "name": "Wizard Dragon 1747769405175 A8ea3534",
+        "position": {
+          "x": 1.9911111111111115,
+          "y": 0.8867436230182647,
+          "z": 4.5
+        },
+        "rotation": {
+          "isEuler": true,
+          "_x": 0,
+          "_y": 5.1,
+          "_z": 0,
+          "_order": "XYZ"
+        },
+        "scale": {
+          "x": 1.9,
+          "y": 1.9,
+          "z": 1.9
+        }
+      },
+      {
+        "id": "dragdrop-foxy_1747090714262_06aaa36a.glb-1749176020119",
+        "modelUrl": "/assets/3d_models/foxy_1747090714262_06aaa36a.glb",
+        "name": "Foxy 1747090714262 06aaa36a",
+        "position": {
+          "x": -1.9911111111111115,
+          "y": 0.48849865794181824,
+          "z": 5.5
+        },
+        "rotation": {
+          "isEuler": true,
+          "_x": 0,
+          "_y": 1,
+          "_z": 0,
+          "_order": "XYZ"
+        },
+        "scale": {
+          "x": 1.5,
+          "y": 1.5,
+          "z": 1.5
+        }
+      },
+      {
+        "id": "dragdrop-generated-1746832597913-99167_1746832605220_81e29b7c.glb-1749176033553",
+        "modelUrl": "/assets/3d_models/generated-1746832597913-99167_1746832605220_81e29b7c.glb",
+        "name": "Generated 1746832597913 99167 1746832605220 81e29b7c",
+        "position": {
+          "x": 0,
+          "y": 0.6505995094776154,
+          "z": 6.5
+        },
+        "rotation": {
+          "isEuler": true,
+          "_x": 0,
+          "_y": 3.1,
+          "_z": 0,
+          "_order": "XYZ"
+        },
+        "scale": {
+          "x": 1.3,
+          "y": 1.3,
+          "z": 1.3
+        }
+      },
+      {
+        "id": "dragdrop-dwarfboi_1747090931945_c496af18.glb-1749178150582",
+        "modelUrl": "/assets/3d_models/dwarfboi_1747090931945_c496af18.glb",
+        "name": "Dwarfboi 1747090931945 C496af18",
+        "position": {
+          "x": 1.9911111111111115,
+          "y": 0.46988064125180246,
+          "z": 6.5
+        },
+        "rotation": {
+          "x": 0,
+          "y": 4.5,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.9,
+          "y": 0.9,
+          "z": 0.9
+        }
+      }
+    ],
+    "placed_dungeons": true
+  },
+  "forest_battlemap_1749181490779_qxm8er.glb": {
+    "created": 1749181490982,
+    "name": "Forest",
+    "type": "terrain",
+    "originalFilename": "forest_battlemap.png",
+    "dimensions": {
+      "width": 19,
+      "height": 13,
+      "depth": 0.3
+    },
+    "scale": 1,
+    "gridScale": 1.05,
+    "sourceImage": {
+      "file": "forest_battlemap_1749181490779_qxm8er.png",
+      "path": "/assets/terrain_images/forest_battlemap_1749181490779_qxm8er.png"
+    },
+    "icon": {
+      "file": "forest_battlemap_1749181490779_qxm8er_icon.png",
+      "path": "/assets/terrain_icons/forest_battlemap_1749181490779_qxm8er_icon.png"
+    },
+    "updated": 1749191610585,
+    "placedAssets": [
+      {
+        "id": "dragdrop-wizard_dragon_1747769405175_a8ea3534.glb-1749190187249",
+        "modelUrl": "/assets/3d_models/wizard_dragon_1747769405175_a8ea3534.glb",
+        "name": "Wizard Dragon 1747769405175 A8ea3534",
+        "position": {
+          "x": -2,
+          "y": 0.7667314715683461,
+          "z": 4.095433977786919
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1.6,
+          "y": 1.6,
+          "z": 1.6
+        }
+      },
+      {
+        "id": "dragdrop-edited-1747771432094-386786_1747771466019_fe396e4e.glb-1749190329261",
+        "modelUrl": "/assets/3d_models/edited-1747771432094-386786_1747771466019_fe396e4e.glb",
+        "name": "Edited 1747771432094 386786 1747771466019 Fe396e4e",
+        "position": {
+          "x": -6,
+          "y": 0.46982015743851663,
+          "z": 4.095433977786919
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.9,
+          "y": 0.9,
+          "z": 0.9214726450020567
+        }
+      },
+      {
+        "id": "dragdrop-edited-1747771432094-386786_1747771466019_fe396e4e.glb-1749191388497",
+        "modelUrl": "/assets/3d_models/edited-1747771432094-386786_1747771466019_fe396e4e.glb",
+        "name": "Edited 1747771432094 386786 1747771466019 Fe396e4e",
+        "position": {
+          "x": 7,
+          "y": 0.46982015743851663,
+          "z": 4.095433977786919
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.9,
+          "y": 0.9,
+          "z": 0.9214726450020567
+        }
+      }
+    ],
+    "placed_dungeons": false
   }
 }

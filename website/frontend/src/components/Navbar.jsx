@@ -64,7 +64,7 @@ const Navbar = () => {
           onMouseEnter={() => setHoveredLink('terrains')}
           onMouseLeave={() => setHoveredLink(null)}
         >
-          Terrains
+          Dungeons
           <span 
             style={{
               ...styles.linkFlameEffect,
@@ -72,20 +72,7 @@ const Navbar = () => {
             }}
           />
         </Link>
-        <Link 
-          to="/layout-generator" 
-          style={styles.navbarLink}
-          onMouseEnter={() => setHoveredLink('layout')}
-          onMouseLeave={() => setHoveredLink(null)}
-        >
-          Layout Generator
-          <span 
-            style={{
-              ...styles.linkFlameEffect,
-              ...(hoveredLink === 'layout' ? styles.linkFlameEffectHover : {})
-            }}
-          />
-        </Link>
+
       </div>
     </nav>
   );

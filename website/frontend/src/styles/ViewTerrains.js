@@ -1,27 +1,27 @@
 import THEME from '../theme';
 
-// Media query breakpoint
+// Media query breakpoint (matching ViewAssets)
 export const MOBILE_BREAKPOINT = 768;
 export const SINGLE_COLUMN_BREAKPOINT = 480;
 
-// Add keyframe names
+// Add keyframe names (matching ViewAssets)
 export const KEYFRAMES = {
   FADE_IN: 'fadeIn',
   SPIN: 'spin',
   THUMBNAIL_SPIN: 'thumbnailSpin'
 };
 
-// CSS for styling
+// CSS for styling (matching ViewAssets structure)
 const styles = {
   container: {
     display: 'flex',
     height: 'calc(100vh - 60px)', // Full height minus navbar
-    overflow: 'hidden', // Prevent scrolling on the container itself
+    overflow: 'hidden',
     backgroundColor: THEME.bgPrimary,
-    maxHeight: 'calc(100vh - 60px)', // Enforce maximum height
-    position: 'fixed', // Fix position to avoid spacing issues
+    maxHeight: 'calc(100vh - 60px)',
+    position: 'fixed',
     width: '100%',
-    top: '60px', // Position right below the navbar
+    top: '60px',
     left: 0,
   },
   // Left panel - 2/3 width for terrain visualization
@@ -35,7 +35,7 @@ const styles = {
     backgroundColor: THEME.bgSecondary,
     position: 'relative',
     overflow: 'hidden',
-    height: '100%', // Fill the height of the parent container
+    height: '100%',
   },
   // Right panel - 1/3 width for terrain list
   terrainListPanel: {
@@ -45,9 +45,9 @@ const styles = {
     borderLeft: THEME.border,
     display: 'flex',
     flexDirection: 'column',
-    height: '100%', // Fill the height of the parent container
-    minWidth: '250px', // Ensure panel doesn't get too narrow
-    maxWidth: '320px', // Limit maximum width
+    height: '100%',
+    minWidth: '250px',
+    maxWidth: '400px',
   },
   terrainListHeader: {
     marginBottom: '15px',
@@ -61,27 +61,24 @@ const styles = {
     flex: 1,
     marginBottom: '15px',
     padding: '5px',
-    maxHeight: 'calc(100% - 160px)', // Space for header, pagination, and buttons
+    maxHeight: 'calc(100% - 160px)',
     display: 'flex',
     flexDirection: 'column',
   },
   terrainGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', // Dynamic columns based on container width
+    gridTemplateColumns: '1fr', // Single column - full width cards
     gap: '12px',
     width: '100%',
-    alignContent: 'start', // Align grid items to the top
-    minHeight: 0, // Allow container to shrink
-  },
-  terrainGridSingleColumn: {
-    gridTemplateColumns: '1fr', // 1 column for small screens
+    alignContent: 'start',
+    minHeight: 0,
   },
   terrainItem: {
-    padding: '12px',
+    padding: '16px', // Reduce padding to give more space for content
     borderRadius: '8px',
     backgroundColor: THEME.bgSecondary,
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection: 'column', // Vertical layout - icon above text
     alignItems: 'center',
     boxShadow: THEME.boxShadow,
     border: `1px solid transparent`,
@@ -89,68 +86,47 @@ const styles = {
     cursor: 'pointer',
     outline: 'none',
     minWidth: 0,
-    height: '120px', // Increased height for name text
-    justifyContent: 'flex-start',
+    height: '220px', // 4x the size (2x width, 2x height)
+    justifyContent: 'flex-start', // Align to top to ensure text has space
+    position: 'relative',
   },
-  terrainItemHover: {
-    transform: 'translateY(-2px)',
-    boxShadow: '0 6px 10px rgba(0, 0, 0, 0.3)',
-    border: `1px solid ${THEME.accentPrimary}`,
-    outline: 'none',
-  },
-  terrainItemSelected: {
+    terrainItemSelected: {
     border: `1px solid ${THEME.accentPrimary}`,
     backgroundColor: THEME.bgActive,
     outline: 'none',
   },
   terrainThumbnail: {
-    width: '60px',
-    height: '60px',
+    width: '140px', // Slightly smaller to leave room for text
+    height: '140px', // Slightly smaller to leave room for text
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: THEME.bgActive,
     borderRadius: '8px',
-    marginBottom: '8px',
-    fontSize: '32px',
+    marginBottom: '8px', // Space between icon and text
+    marginTop: '8px', // Space from top
+    fontSize: '70px', // Slightly smaller emoji to fit better
     color: THEME.accentPrimary,
     backgroundSize: 'contain',
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
     overflow: 'hidden',
-    position: 'relative', // For loading indicator positioning
-    flexShrink: 0, // Prevent thumbnail from shrinking
-  },
-  thumbnailLoading: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(25, 25, 25, 0.7)',
-    fontSize: '10px',
-    color: THEME.textSecondary,
-  },
-  thumbnailSpinner: {
-    width: '20px',
-    height: '20px',
-    border: `2px solid ${THEME.bgActive}`,
-    borderTop: `2px solid ${THEME.accentPrimary}`,
-    borderRadius: '50%',
-    animation: `${KEYFRAMES.THUMBNAIL_SPIN} 1s linear infinite`,
+    position: 'relative',
+    flexShrink: 0,
   },
   terrainName: {
-    fontSize: '12px',
-    color: THEME.textPrimary,
-    textAlign: 'center',
+    fontSize: '12px', // Back to smaller font size as requested
+    color: '#fff', // White font as requested
+    textAlign: 'center', // Center align for vertical layout
     width: '100%',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'nowrap', // Prevent wrapping to ensure visibility
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    minWidth: 0, // Allows text to ellipsis properly
+    minWidth: 0,
+    lineHeight: '1.2',
+    fontWeight: '500', // Slightly bold
+    height: 'auto', // Let height be automatic
+    flex: '0 0 auto', // Don't grow or shrink, keep natural size
   },
   dropzone: {
     border: `2px dashed ${THEME.accentPrimary}`,
@@ -167,10 +143,6 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  dropzoneActive: {
-    borderColor: THEME.accentSecondary,
-    backgroundColor: 'rgba(51, 51, 51, 0.7)',
   },
   uploadIcon: {
     fontSize: '48px',
@@ -193,35 +165,27 @@ const styles = {
     width: '100%',
     flexDirection: 'column',
     gap: '10px',
-    marginTop: 'auto', // Push to bottom of container
+    marginTop: 'auto',
   },
   message: {
-    position: 'absolute',
-    top: '20px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    zIndex: 10,
-    padding: '10px 20px',
+    padding: '10px 15px',
     borderRadius: '4px',
     fontSize: '14px',
-    animation: `${KEYFRAMES.FADE_IN} 0.3s ease-in-out`,
-    maxWidth: '90%',
+    marginBottom: '10px',
+    textAlign: 'center',
+    width: '100%',
+    maxWidth: '300px',
+    zIndex: 1000,
   },
   success: {
-    backgroundColor: THEME.successBg,
-    color: THEME.successText,
-    border: `1px solid ${THEME.successBorder}`,
+    backgroundColor: 'rgba(40, 167, 69, 0.2)',
+    color: '#28a745',
+    border: '1px solid rgba(40, 167, 69, 0.3)',
   },
   error: {
-    backgroundColor: THEME.errorBg,
-    color: THEME.errorText,
-    border: `1px solid ${THEME.errorBorder}`,
-  },
-  terrainViewer: {
-    width: '100%',
-    height: '100%',
-    borderRadius: '4px',
-    overflow: 'hidden',
+    backgroundColor: 'rgba(220, 53, 69, 0.2)',
+    color: '#dc3545',
+    border: '1px solid rgba(220, 53, 69, 0.3)',
   },
   loadingContainer: {
     display: 'flex',
@@ -229,21 +193,21 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    width: '100%',
   },
   spinner: {
+    width: '40px',
+    height: '40px',
     border: `4px solid ${THEME.bgActive}`,
     borderTop: `4px solid ${THEME.accentPrimary}`,
     borderRadius: '50%',
-    width: '40px',
-    height: '40px',
     animation: `${KEYFRAMES.SPIN} 1s linear infinite`,
-    marginBottom: '20px',
   },
   loadingText: {
+    marginTop: '15px',
     color: THEME.textSecondary,
+    fontSize: '14px',
   },
-  // Add pagination controls styles
+  // Pagination controls (matching ViewAssets)
   paginationControls: {
     display: 'flex',
     justifyContent: 'center',
@@ -251,269 +215,36 @@ const styles = {
     marginBottom: '10px',
     gap: '15px',
   },
-  pageButton: {
-    backgroundColor: 'transparent',
-    color: THEME.textPrimary,
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: THEME.accentPrimary,
-    borderRadius: '4px',
-    padding: '5px 10px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    fontSize: '14px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: '30px',
-  },
-  pageButtonDisabled: {
-    backgroundColor: 'transparent',
-    color: THEME.textSecondary,
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: THEME.textSecondary,
-    cursor: 'not-allowed',
-    opacity: 0.5,
-  },
-  pageButtonActive: {
-    backgroundColor: THEME.accentPrimary,
-    color: 'white',
-  },
   pageIndicator: {
     color: THEME.textPrimary,
     fontSize: '14px',
   },
-  uploadButton: {
-    backgroundColor: THEME.bgActive,
-    color: THEME.textPrimary,
-    borderRadius: '4px',
-    padding: '12px 24px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.3)',
-    width: '100%',
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: THEME.textSecondary,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  uploadButtonHover: {
-    backgroundColor: THEME.bgActive,
-    borderColor: THEME.textPrimary,
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.4)',
-  },
-  // Upload form styles
-  uploadForm: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '15px',
-    padding: '20px',
-    backgroundColor: THEME.bgSecondary,
-    borderRadius: '8px',
-    border: `1px solid ${THEME.accentPrimary}`,
-    marginBottom: '15px',
-  },
-  uploadFormTitle: {
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: THEME.accentPrimary,
-    marginBottom: '10px',
-  },
-  formGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '5px',
-  },
-  formLabel: {
-    fontSize: '14px',
-    color: THEME.textPrimary,
-    fontWeight: '500',
-  },
-  formInput: {
-    backgroundColor: THEME.bgActive,
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: THEME.textSecondary,
-    borderRadius: '4px',
-    padding: '8px 12px',
-    color: THEME.textPrimary,
-    fontSize: '14px',
-  },
-  formInputFocus: {
-    borderColor: THEME.accentPrimary,
-    outline: 'none',
-  },
-  dimensionsContainer: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr 1fr',
-    gap: '10px',
-  },
-  processingContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '20px',
-    backgroundColor: THEME.bgSecondary,
-    borderRadius: '8px',
-    border: `1px solid ${THEME.accentPrimary}`,
-    marginBottom: '15px',
-  },
-  processingSpinner: {
-    width: '40px',
-    height: '40px',
-    border: `3px solid ${THEME.bgActive}`,
-    borderTopColor: THEME.accentPrimary,
-    borderRadius: '50%',
-    animation: `${KEYFRAMES.SPIN} 1s linear infinite`,
-    marginBottom: '15px',
-  },
-  processingText: {
-    color: THEME.textPrimary,
-    fontSize: '14px',
-    textAlign: 'center',
-  },
-  // Styles for Asset Placement UI
-  assetControlsContainer: {
-    flex: '0.7',
-    padding: '15px',
-    backgroundColor: THEME.bgPrimary,
-    borderLeft: THEME.border,
-    borderRadius: '8px',
-    boxShadow: THEME.boxShadow,
-    height: '100%',
-    overflowY: 'auto',
-    maxWidth: '280px',
-    minWidth: '220px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '15px',
-  },
-  transformControlsContainer: {
-    padding: '12px',
-    backgroundColor: 'rgba(50, 55, 65, 0.9)',
-    borderRadius: '6px',
-    border: `1px solid ${THEME.bgLight}`,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-  },
-  assetControlsTitle: {
-    fontSize: '16px',
-    color: THEME.accentPrimary,
-    marginBottom: '10px',
-    fontWeight: 'bold',
-  },
-  assetSelection: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '8px',
-    marginBottom: '15px',
-  },
-  assetButton: {
-    padding: '8px 12px',
-    fontSize: '13px',
-    backgroundColor: THEME.bgSecondary,
-    color: THEME.textPrimary,
-    border: `1px solid ${THEME.border}`,
-    borderRadius: '4px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-  },
-  assetButtonSelected: {
-    backgroundColor: THEME.accentPrimary,
-    color: THEME.bgPrimary,
-    borderColor: THEME.accentPrimary,
-    boxShadow: `0 0 5px ${THEME.accentPrimary}`,
-  },
-  assetActionButtons: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-    marginBottom: '10px',
-    alignItems: 'stretch',
-  },
-  actionButton: {
-    padding: '8px 15px',
-    fontSize: '13px',
-  },
-  clearButton: {
-    backgroundColor: THEME.dangerBg,
-    color: THEME.textLight,
-  },
-  infoText: {
-    fontSize: '12px',
-    color: THEME.textSecondary,
-    marginTop: '5px',
-    minHeight: '18px',
-  },
 };
 
-// Responsive styles for mobile/small screens
+// Mobile styles (matching ViewAssets)
 export const getMobileStyles = (windowWidth) => {
-  const mobileStyles = {};
-  
   if (windowWidth <= MOBILE_BREAKPOINT) {
-    mobileStyles.container = {
-      flexDirection: 'column',
-      height: 'auto',
-      overflow: 'auto',
-      position: 'relative',
-      maxHeight: 'none',
-    };
-    mobileStyles.visualizationPanel = {
-      flex: 'none',
-      height: 'auto',
-      minHeight: '50vh',
-    };
-    mobileStyles.terrainListPanel = {
-      flex: 'none',
-      minHeight: '40vh',
-      borderLeft: 'none',
-      borderTop: THEME.border,
-      maxWidth: '100%',
-      maxHeight: '50vh',
-      overflow: 'hidden',
-    };
-    mobileStyles.terrainListContainer = {
-      maxHeight: 'calc(50vh - 160px)', // Adjusted for pagination controls
-      overflowY: 'auto',
-      overflowX: 'hidden',
-    };
-    mobileStyles.paginationControls = {
-      marginBottom: '5px',
-    };
-    mobileStyles.terrainGrid = {
-      gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-      gap: '8px',
-    };
-    mobileStyles.terrainItem = {
-      padding: '8px',
-      height: '80px',
-    };
-    mobileStyles.dimensionsContainer = {
-      gridTemplateColumns: '1fr',
-      gap: '8px',
+    return {
+      container: {
+        flexDirection: 'column',
+      },
+      visualizationPanel: {
+        flex: '1',
+        minHeight: '50vh',
+      },
+      terrainListPanel: {
+        flex: 'none',
+        maxWidth: '100%',
+        height: '50vh',
+        borderLeft: 'none',
+        borderTop: THEME.border,
+      },
+      terrainGrid: {
+        gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+      },
     };
   }
-  
-  if (windowWidth <= SINGLE_COLUMN_BREAKPOINT) {
-    mobileStyles.terrainGrid = {
-      gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
-      gap: '6px',
-    };
-    mobileStyles.terrainItem = {
-      padding: '6px',
-      height: '70px',
-    };
-  }
-  
-  return mobileStyles;
+  return {};
 };
 
 export default styles; 

@@ -18,16 +18,15 @@ body, html {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Hide overflow to prevent scrollbars */
+  overflow: visible;
 }
 
 .app-container {
   width: 100%;
   min-height: 100vh;
-  max-height: 100vh; /* Limit height to prevent scrolling */
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Hide overflow to prevent scrollbars */
+  overflow: visible;
 }
 
 .content {
@@ -37,7 +36,7 @@ body, html {
   padding-top: calc(60px + 2rem); /* Account for navbar height plus padding */
   background-color: #1a1a1a;
   margin: 0 auto;
-  overflow: hidden; /* Hide overflow by default */
+  overflow: visible;
   position: relative; /* Allow positioning of child elements */
 }
 

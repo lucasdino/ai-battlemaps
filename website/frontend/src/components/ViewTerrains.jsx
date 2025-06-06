@@ -1,23 +1,20 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import * as THREE from 'three'; // Only if THREE is directly used in this component, otherwise remove.
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'; // For type hints or direct use
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'; // For type hints or direct use
 
 import TerrainViewer from './TerrainViewer';
 import TerrainUploadPopup from './TerrainUploadPopup';
-import { Button } from './common'; // Assuming Button is a custom component
+import GenerateDungeonPopup from './GenerateDungeonPopup';
+import { Button } from './common';
 import styles, { getMobileStyles, KEYFRAMES } from '../styles/ViewTerrains';
 import CONFIG from '../config';
 import THEME from '../theme'; // <-- ADDED IMPORT
 
-// Define a list of available assets for placement
-// TODO: Fetch this from an API or a more dynamic config
-// const DEFAULT_AVAILABLE_ASSETS = [
-//   { name: 'Wizard Dragon', url: '/assets/3d_models/wizard_dragon_1747769405175_a8ea3534.glb', scale: { x: 0.5, y: 0.5, z: 0.5 }, rotation: { x: 0, y: 0, z: 0 } },
-//   { name: 'Funko Pop Swanson', url: '/assets/3d_models/funkopop_swanson_1747771324935_d59c54e0.glb', scale: { x: 0.3, y: 0.3, z: 0.3 }, rotation: { x: 0, y: 0, z: 0 } },
-//   { name: 'Edited Asset', url: '/assets/3d_models/edited-1747771432094-386786_1747771466019_fe396e4e.glb', scale: { x: 1, y: 1, z: 1 }, rotation: { x: 0, y: 0, z: 0 } },
-//   // Add more assets here as needed
-// ];
+// Constants for grid item dimensions (4x ViewAssets size, single column)
+const GRID_ITEM_HEIGHT = 220; // 4x the size of ViewAssets cards
+const GRID_ITEM_WIDTH = 120;  // Full width (not used since single column)
+const GRID_GAP = 12; // Gap between items
 
 // Helper function to generate a display-friendly name from a model ID (filename)
 const cleanModelIdForDisplay = (originalName, modelId) => {
@@ -29,55 +26,82 @@ const cleanModelIdForDisplay = (originalName, modelId) => {
   let name = modelId.replace(/\.glb$/i, ''); // Remove .glb extension
   let prefix = '';
 
-  if (name.toLowerCase().startsWith('generated-')) {
-    prefix = 'Generated';
-    name = name.substring(10);
-  } else if (name.toLowerCase().startsWith('edited-')) {
-    prefix = 'Edited';
-    name = name.substring(7);
+  // Check for common prefixes and extract them
+  const prefixPatterns = [
+    { pattern: /^edited-\d+-\d+_/, replacement: 'Edited' },
+    { pattern: /^funkopop_/, replacement: 'Funko Pop' },
+    { pattern: /^wizard_/, replacement: 'Wizard' },
+    { pattern: /^dragon_/, replacement: 'Dragon' },
+    { pattern: /^character_/, replacement: 'Character' },
+    { pattern: /^weapon_/, replacement: 'Weapon' },
+    { pattern: /^armor_/, replacement: 'Armor' },
+    { pattern: /^building_/, replacement: 'Building' },
+    { pattern: /^vehicle_/, replacement: 'Vehicle' },
+    { pattern: /^creature_/, replacement: 'Creature' },
+    { pattern: /^monster_/, replacement: 'Monster' },
+    { pattern: /^npc_/, replacement: 'NPC' },
+    { pattern: /^prop_/, replacement: 'Prop' },
+    { pattern: /^environment_/, replacement: 'Environment' },
+    { pattern: /^terrain_/, replacement: 'Terrain' },
+    { pattern: /^dungeon_/, replacement: 'Dungeon' },
+    { pattern: /^castle_/, replacement: 'Castle' },
+    { pattern: /^forest_/, replacement: 'Forest' },
+    { pattern: /^mountain_/, replacement: 'Mountain' },
+    { pattern: /^cave_/, replacement: 'Cave' },
+    { pattern: /^temple_/, replacement: 'Temple' },
+    { pattern: /^tower_/, replacement: 'Tower' },
+    { pattern: /^bridge_/, replacement: 'Bridge' },
+    { pattern: /^gate_/, replacement: 'Gate' },
+    { pattern: /^wall_/, replacement: 'Wall' },
+    { pattern: /^door_/, replacement: 'Door' },
+    { pattern: /^chest_/, replacement: 'Chest' },
+    { pattern: /^table_/, replacement: 'Table' },
+    { pattern: /^chair_/, replacement: 'Chair' },
+    { pattern: /^bed_/, replacement: 'Bed' },
+    { pattern: /^torch_/, replacement: 'Torch' },
+    { pattern: /^candle_/, replacement: 'Candle' },
+    { pattern: /^book_/, replacement: 'Book' },
+    { pattern: /^scroll_/, replacement: 'Scroll' },
+    { pattern: /^potion_/, replacement: 'Potion' },
+    { pattern: /^gem_/, replacement: 'Gem' },
+    { pattern: /^coin_/, replacement: 'Coin' },
+    { pattern: /^key_/, replacement: 'Key' },
+    { pattern: /^ring_/, replacement: 'Ring' },
+    { pattern: /^amulet_/, replacement: 'Amulet' },
+    { pattern: /^staff_/, replacement: 'Staff' },
+    { pattern: /^wand_/, replacement: 'Wand' },
+    { pattern: /^sword_/, replacement: 'Sword' },
+    { pattern: /^axe_/, replacement: 'Axe' },
+    { pattern: /^bow_/, replacement: 'Bow' },
+    { pattern: /^arrow_/, replacement: 'Arrow' },
+    { pattern: /^shield_/, replacement: 'Shield' },
+    { pattern: /^helmet_/, replacement: 'Helmet' },
+    { pattern: /^boots_/, replacement: 'Boots' },
+    { pattern: /^gloves_/, replacement: 'Gloves' },
+    { pattern: /^cloak_/, replacement: 'Cloak' },
+    { pattern: /^robe_/, replacement: 'Robe' },
+  ];
+
+  // Apply prefix patterns
+  for (const { pattern, replacement } of prefixPatterns) {
+    if (pattern.test(name)) {
+      name = name.replace(pattern, '');
+      prefix = replacement;
+      break;
+    }
   }
 
-  const parts = name.split(/[-_]/);
-  const keptParts = [];
+  // Clean up the remaining name
+  let cleanedName = name
+    .replace(/_\d{13}_[a-f0-9]{8}$/, '') // Remove timestamp and hash suffix
+    .replace(/_+/g, ' ') // Replace underscores with spaces
+    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .trim();
 
-  for (const part of parts) {
-    if (!part) continue; // Skip empty parts that can result from multiple separators
-
-    // Rule 1: Discard 13-digit timestamps
-    if (/^\d{13}$/.test(part)) {
-      continue;
-    }
-
-    // Rule 2: Discard common hex hash patterns (typically 6, 8, or 10 chars long)
-    // To qualify as a hash, it must contain at least one a-f/A-F character.
-    if ((/^[a-fA-F0-9]{6}$/.test(part) || /^[a-fA-F0-9]{8}$/.test(part) || /^[a-fA-F0-9]{10}$/.test(part)) && /[a-fA-F]/i.test(part)) {
-      // Exception for a few common short words that might be all hex characters
-      const commonHexWords = ['cafe', 'face', 'dead', 'beef', 'feed', 'babe']; 
-      if (!commonHexWords.includes(part.toLowerCase())) {
-        continue;
-      }
-    }
-    
-    // Rule 3: Discard other long purely numeric sequences (likely generic IDs)
-    // (e.g., "386786" from an example, or other multipart IDs that aren't timestamps)
-    if (/^\d{6,}$/.test(part) && part.length !== 13) { // ensure not a 13-digit timestamp (already handled)
-        continue;
-    }
-
-    // If the part survived all checks, keep it
-    keptParts.push(part);
-  }
-
-  let cleanedName = keptParts.join(' ').trim(); // Join and trim any leading/trailing spaces from preserved parts
-
-  if (cleanedName && cleanedName.length > 0) {
-    cleanedName = cleanedName.toLowerCase().split(' ')
-        .filter(Boolean) // Filter out empty strings from multiple spaces after join
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-  } else {
-    cleanedName = ''; // Ensure name is empty string if nothing is left
-  }
+  // Capitalize each word
+  cleanedName = cleanedName.split(' ').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+  ).join(' ');
 
   if (prefix) {
     cleanedName = cleanedName === '' ? `${prefix} Model` : `${prefix} ${cleanedName}`;
@@ -102,19 +126,20 @@ const ViewTerrains = () => {
   const [selectedTerrain, setSelectedTerrain] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [message, setMessage] = useState(null);
-  const [messageType, setMessageType] = useState('success');
+  const [notification, setNotification] = useState(null);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  const [hoveredTerrain, setHoveredTerrain] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showUploadForm, setShowUploadForm] = useState(false);
+  const [showGeneratePopup, setShowGeneratePopup] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [layoutSaveStatus, setLayoutSaveStatus] = useState(null); // 'saving', 'success', 'error', null
+  const [layoutSaveStatus, setLayoutSaveStatus] = useState(null);
   
-  // Pagination state
+  // Pagination state (matching ViewAssets)
   const [currentPage, setCurrentPage] = useState(1);
-  const terrainsPerPage = 12;
+  const [totalPages, setTotalPages] = useState(1);
+  const [terrainsPerPage, setTerrainsPerPage] = useState(9);
+  const gridContainerRef = useRef(null);
   
   // Upload form state
   const [uploadFile, setUploadFile] = useState(null);
@@ -124,1042 +149,780 @@ const ViewTerrains = () => {
     depth: 0.1
   });
   
-  // Asset placement state
-  const [availableAssets, setAvailableAssets] = useState([]);
-  const [loadingModelsError, setLoadingModelsError] = useState(null);
-  const [currentSelectedAssetForPlacement, setCurrentSelectedAssetForPlacement] = useState(null);
-  const [placedAssetsOnTerrain, setPlacedAssetsOnTerrain] = useState([]);
-  const [currentAssetPlacementRotationY, setCurrentAssetPlacementRotationY] = useState(0); // Degrees
-  const [agentPlacementConfig, setAgentPlacementConfig] = useState([]);
-  const [terrainViewerMetrics, setTerrainViewerMetrics] = useState(null);
+  // NEW ARCHITECTURE: Terrain-keyed asset management
+  const [terrainAssets, setTerrainAssets] = useState(new Map()); // Map<terrainId, Asset[]>
   const [globallySelectedPlacedAssetId, setGloballySelectedPlacedAssetId] = useState(null);
-  const [transformMode, setTransformMode] = useState('translate'); // New state for transform mode
+  const [transformMode, setTransformMode] = useState('translate');
+  const [terrainViewerMetrics, setTerrainViewerMetrics] = useState(null);
+  
+  // Refs for throttled saves on resize/rotation
+  const throttleTimeoutRef = useRef(null);
+  const pendingMoveUpdatesRef = useRef(new Map());
   
   // Refs
   const fileInputRef = useRef(null);
   const dropzoneRef = useRef(null);
   const layoutFileInputRef = useRef(null);
 
-  // Get responsive styles
-  const mobileStyles = getMobileStyles(windowWidth);
-  const combinedStyles = { ...styles, ...mobileStyles };
+  // Constants for grid item dimensions (4x ViewAssets size, single column)
+  const GRID_ITEM_HEIGHT = 220;
+  const GRID_ITEM_WIDTH = 120;
+  const GRID_GAP = 12;
 
-  // Handle window resize
+  // Get current terrain assets
+  const currentTerrainAssets = useMemo(() => {
+    if (!selectedTerrain?.id) return [];
+    return terrainAssets.get(selectedTerrain.id) || [];
+  }, [selectedTerrain?.id, terrainAssets]);
+
+  // Calculate terrains per page based on container size (single column layout)
+  const calculateTerrainsPerPage = useCallback(() => {
+    if (!gridContainerRef.current) return;
+
+    const container = gridContainerRef.current;
+    const containerHeight = container.clientHeight - (GRID_GAP * 2);
+
+    // Single column layout - only calculate how many rows can fit
+    const rowsPerPage = Math.max(1, Math.floor((containerHeight + GRID_GAP) / (GRID_ITEM_HEIGHT + GRID_GAP)));
+
+    // Items per page is just the number of rows since we have 1 column
+    const itemsPerPage = rowsPerPage;
+    
+    // Update terrains per page if it's different
+    if (itemsPerPage !== terrainsPerPage) {
+      setTerrainsPerPage(itemsPerPage);
+      // Adjust current page if necessary to keep items in view
+      const newTotalPages = Math.max(1, Math.ceil(terrains.length / itemsPerPage));
+      if (currentPage > newTotalPages) {
+        setCurrentPage(newTotalPages);
+      }
+    }
+  }, [terrainsPerPage, terrains.length, currentPage]);
+
+  // Recalculate on window resize or container size change (matching ViewAssets)
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+      calculateTerrainsPerPage();
+    };
+
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    
+    // Initial calculation
+    calculateTerrainsPerPage();
+    
+    // Set up resize observer for container
+    const resizeObserver = new ResizeObserver(calculateTerrainsPerPage);
+    if (gridContainerRef.current) {
+      resizeObserver.observe(gridContainerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
+    };
+  }, [calculateTerrainsPerPage]);
+
+  // Get responsive styles
+  const mobileStyles = useMemo(() => getMobileStyles(windowWidth), [windowWidth]);
+
+  // Clear notifications after timeout (matching ViewAssets)
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
+  // Show message helper
+  const showMessage = useCallback((message, type = 'success') => {
+    setNotification({ message, type });
   }, []);
 
-  // Show message with auto-hide
-  const showMessage = useCallback((text, type = 'success') => {
-    setMessage(text);
-    setMessageType(type);
-    setTimeout(() => setMessage(null), 5000);
-  }, []);
+  // Save specific assets to backend
+  const saveTerrainAssetsToBackend = useCallback(async (terrainId, assets) => {
+    try {
+      console.log('💾 Saving assets to backend:', assets.length, 'assets for terrain:', terrainId);
+      
+      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.BASE}/${terrainId}/layout`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          placedAssets: assets.map(asset => ({
+            id: asset.id,
+            modelUrl: asset.modelUrl,
+            name: asset.name,
+            position: asset.position,
+            rotation: asset.rotation,
+            scale: asset.scale
+          }))
+        }),
+      });
 
-  // Memoized onError handler for TerrainViewer
-  const handleTerrainViewerError = useCallback((errorText) => {
-    showMessage(errorText, 'error');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save assets');
+      }
+      
+      console.log('✅ Successfully saved assets to backend');
+    } catch (error) {
+      console.error('❌ Failed to save assets to backend:', error);
+      showMessage(`Failed to save assets: ${error.message}`, 'error');
+    }
   }, [showMessage]);
 
-  // Callback from TerrainViewer to update local state with terrain's actual dimensions and center
-  const handleTerrainMetricsUpdate = useCallback((metrics) => {
-    setTerrainViewerMetrics(metrics);
-  }, []); // No dependencies, setTerrainViewerMetrics is stable
+  // Immediate save function for events like placement and deletion (uses current state)
+  const saveTerrainAssetsImmediately = useCallback(async (terrainId) => {
+    const assets = terrainAssets.get(terrainId) || [];
+    await saveTerrainAssetsToBackend(terrainId, assets);
+  }, [terrainAssets, saveTerrainAssetsToBackend]);
 
-  // Fetch terrains from API
+  // Throttled save function for resize/rotation operations
+  const saveTerrainAssetsThrottled = useCallback((terrainId) => {
+    // Store the pending update
+    pendingMoveUpdatesRef.current.set(terrainId, true);
+    
+    // Clear existing timeout
+    if (throttleTimeoutRef.current) {
+      clearTimeout(throttleTimeoutRef.current);
+    }
+    
+    // Set new timeout for 800ms (longer than debounced to allow for multiple adjustments)
+    throttleTimeoutRef.current = setTimeout(async () => {
+      const terrainsToUpdate = Array.from(pendingMoveUpdatesRef.current.keys());
+      pendingMoveUpdatesRef.current.clear();
+      
+      // Save all pending terrain updates
+      for (const tId of terrainsToUpdate) {
+        await saveTerrainAssetsImmediately(tId);
+      }
+    }, 800);
+  }, [saveTerrainAssetsImmediately]);
+
+  // Load terrain assets from backend
+  const loadTerrainAssets = useCallback(async (terrainId) => {
+    if (!terrainId) return;
+    
+    console.log(`🔄 Loading assets for terrain: ${terrainId}`);
+    
+    try {
+      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.BASE}/${terrainId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch terrain metadata: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data && data.placedAssets && Array.isArray(data.placedAssets)) {
+        console.log(`✅ Loaded ${data.placedAssets.length} assets for terrain ${terrainId}`);
+        setTerrainAssets(prev => new Map(prev.set(terrainId, data.placedAssets)));
+      } else {
+        console.log(`✅ No assets found for terrain ${terrainId}`);
+        setTerrainAssets(prev => new Map(prev.set(terrainId, [])));
+      }
+    } catch (error) {
+      console.error(`❌ Error loading assets for terrain ${terrainId}:`, error);
+      setTerrainAssets(prev => new Map(prev.set(terrainId, [])));
+    }
+  }, []);
+
+  // Fetch terrains with pagination
   const fetchTerrains = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.BASE}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch terrains: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      const fetchedTerrains = data.terrains || [];
-      
-      // Add "None" terrain option at the beginning
-      const noneTerrainOption = {
-        id: 'none',
-        name: 'Generated Dungeon',
-        type: 'none',
-        url: null,
-        created: Date.now(),
-        icon: null,
-        sourceImage: null,
-        dimensions: null,
-        scale: 1.0,
-        placedAssets: [],
-        isNone: true
-      };
-      
-      const terrainsWithNone = [noneTerrainOption, ...fetchedTerrains];
-      setTerrains(terrainsWithNone);
-      
-      // Auto-select "None" if no terrain selected, otherwise first regular terrain
-      if (!selectedTerrain) {
-        setSelectedTerrain(noneTerrainOption);
-      }
-    } catch (err) {
-      console.error('Error fetching terrains:', err);
-      setError(err.message);
-      showMessage('Failed to load terrains', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedTerrain]);
-
-  // Fetch available 3D models for asset placement
-  const fetchAvailableModels = useCallback(async () => {
-    try {
-      // Consider adding a loading state for models if needed
-      setLoadingModelsError(null);
-      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.MODELS.BASE}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch models: ${response.status}`);
-      }
-      const data = await response.json();
-      if (data.models && Array.isArray(data.models)) {
-        const processedModels = data.models.map(model => {
-          const modelName = cleanModelIdForDisplay(model.name, model.id);
-          return {
-            id: model.id, // Original filename, used as unique ID
-            name: modelName, // Cleaned name for display
-            url: `/assets/3d_models/${model.id}`,
-            iconUrl: model.icon,
-            scale: model.metadata?.scale || { x: 1.0, y: 1.0, z: 1.0 },
-            rotation: model.metadata?.rotation || { x: 0, y: 0, z: 0 },
-          };
-        });
-        setAvailableAssets(processedModels);
-        // Initialize agentPlacementConfig based on available assets
-        setAgentPlacementConfig(processedModels.map(asset => ({ ...asset, count: 0 })));
-      } else {
-        setAvailableAssets([]);
-        setAgentPlacementConfig([]);
-      }
-    } catch (err) {
-      console.error('Error fetching available models:', err);
-      setLoadingModelsError(err.message);
-      showMessage('Failed to load available 3D models for placement', 'error');
-      setAvailableAssets([]); // Clear or set to default on error
-      setAgentPlacementConfig([]);
-    }
-  }, [showMessage]);
-
-  // Initial load
-  useEffect(() => {
-    fetchTerrains();
-    fetchAvailableModels();
-  }, [fetchTerrains, fetchAvailableModels]);
-
-  // Handle terrain selection
-  const handleTerrainSelect = useCallback((terrain) => {
-    setSelectedTerrain(terrain);
-    setCurrentSelectedAssetForPlacement(null);
-    setCurrentAssetPlacementRotationY(0); 
-    setTerrainViewerMetrics(null); 
-    setGloballySelectedPlacedAssetId(null);
-    setTransformMode('translate'); // Reset transform mode on new terrain
-    // Logic for setPlacedAssetsOnTerrain is now moved to a dedicated useEffect below
-  }, []);
-
-  // Effect to initialize/reset placedAssetsOnTerrain when the selectedTerrain genuinely changes
-  useEffect(() => {
-    if (selectedTerrain) {
-      if (selectedTerrain.placedAssets && Array.isArray(selectedTerrain.placedAssets)) {
-        setPlacedAssetsOnTerrain(selectedTerrain.placedAssets);
-      } else {
-        setPlacedAssetsOnTerrain([]);
-      }
-    } else {
-      // No terrain selected, clear assets
-      setPlacedAssetsOnTerrain([]);
-    }
-  }, [selectedTerrain]); // React to changes in the selectedTerrain object reference
-
-  // Handle terrain name change
-  const handleTerrainNameChange = useCallback(async (terrainId, newName) => {
-    if (!selectedTerrain || !newName.trim() || selectedTerrain.isNone) return;
+    setIsLoading(true);
+    setError(null);
 
     try {
       const response = await fetch(
-        `${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.BASE}/${terrainId}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: newName.trim() })
-        }
+        `${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.LIST}?page=${currentPage}&per_page=${terrainsPerPage}`
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to update terrain name: ${response.status}`);
+        throw new Error(`Failed to fetch terrains: ${response.status}`);
       }
 
-      // Update local state
-      const updatedTerrain = { ...selectedTerrain, name: newName.trim() };
-      setSelectedTerrain(updatedTerrain);
-      setTerrains(prev => prev.map(t => t.id === terrainId ? updatedTerrain : t));
+      const data = await response.json();
       
-      showMessage('Terrain name updated successfully');
+      // Process the terrains array - directly from terrain_metadata.json
+      const terrainsArray = Array.isArray(data.terrains) ? data.terrains : [];
+      
+      // Map terrains with proper icon handling
+      const terrainsData = terrainsArray.map(terrain => {
+        let thumbnailUrl = null;
+        let iconEmoji = null;
+        
+        if (terrain.icon) {
+          // Debug logging for throneroom
+          if (terrain.name && terrain.name.includes('throneroom')) {
+            console.log('Throneroom terrain icon:', terrain.icon, 'type:', typeof terrain.icon);
+          }
+          
+          // If icon starts with '/' it's a path to an image
+          if (terrain.icon.startsWith('/')) {
+            thumbnailUrl = terrain.icon;
+          } 
+          // If icon is a single character or emoji, treat as emoji
+          else if (terrain.icon.length <= 4) {
+            iconEmoji = terrain.icon;
+          }
+          // Otherwise it might be a filename or other string, default to emoji fallback
+          else {
+            iconEmoji = '🗺️';
+          }
+        } else {
+          // Default fallback when no icon is provided
+          iconEmoji = '🗺️';
+        }
+        
+        return {
+          ...terrain,
+          displayName: terrain.name || 'Unnamed Dungeon',
+          thumbnailUrl,
+          iconEmoji
+        };
+      });
+
+      setTerrains(terrainsData);
+      setTotalPages(data.total_pages || Math.max(1, Math.ceil(terrainsData.length / terrainsPerPage)));
+
     } catch (err) {
-      console.error('Error updating terrain name:', err);
-      showMessage('Failed to update terrain name', 'error');
+      console.error('Error fetching terrains:', err);
+      setError('Failed to load dungeons. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentPage, terrainsPerPage]);
+
+  // Load terrain assets when terrain is selected
+  useEffect(() => {
+    if (selectedTerrain?.id) {
+      loadTerrainAssets(selectedTerrain.id);
+    }
+  }, [selectedTerrain?.id, loadTerrainAssets]);
+
+  // Handle page change (matching ViewAssets)
+  const handlePageChange = useCallback((newPage) => {
+    if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
+      setCurrentPage(newPage);
+    }
+  }, [currentPage, totalPages]);
+
+  // Get paginated terrains
+  const getPaginatedTerrains = useMemo(() => {
+    const startIndex = (currentPage - 1) * terrainsPerPage;
+    const endIndex = startIndex + terrainsPerPage;
+    return terrains.slice(startIndex, endIndex);
+  }, [terrains, currentPage, terrainsPerPage]);
+
+  // Render terrain thumbnail
+  const renderTerrainThumbnail = (terrain) => {
+    const thumbnailStyle = {
+      width: '100%',
+      height: '120px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: '8px',
+      backgroundColor: '#2a2a2a',
+      marginBottom: '8px',
+      overflow: 'hidden',
+    };
+
+    if (terrain.thumbnailUrl) {
+      return (
+        <div style={thumbnailStyle}>
+          <img
+            src={`${CONFIG.API.BASE_URL}${terrain.thumbnailUrl}`}
+            alt={terrain.displayName}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              objectFit: 'cover',
+              borderRadius: '8px',
+            }}
+            onError={(e) => {
+              console.error('Failed to load thumbnail:', terrain.thumbnailUrl);
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'flex';
+            }}
+          />
+          <div style={{ ...thumbnailStyle, display: 'none', fontSize: '48px' }}>
+            {terrain.iconEmoji}
+          </div>
+        </div>
+      );
+    } else {
+      return (
+        <div style={{ ...thumbnailStyle, fontSize: '48px' }}>
+          {terrain.iconEmoji}
+        </div>
+      );
+    }
+  };
+
+  // Fetch terrains on mount and pagination changes
+  useEffect(() => {
+    fetchTerrains();
+  }, [fetchTerrains]);
+
+  // Handle file upload
+  const handleFileUpload = useCallback((file) => {
+    if (file) {
+      setUploadFile(file);
+      setShowUploadForm(true);
+    }
+  }, []);
+
+  // Terrain viewer error handler
+  const handleTerrainViewerError = useCallback((error) => {
+    showMessage(error, 'error');
+  }, [showMessage]);
+
+  // Handle terrain name change
+  const handleTerrainNameChange = useCallback(async (terrainId, newName) => {
+    try {
+      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.BASE}/${terrainId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: newName }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update terrain name');
+      }
+
+      // Update the terrain in our state
+      setTerrains(prev => prev.map(terrain => 
+        terrain.id === terrainId 
+          ? { ...terrain, name: newName, displayName: newName }
+          : terrain
+      ));
+
+      // Update selected terrain if it's the one being renamed
+      if (selectedTerrain && selectedTerrain.id === terrainId) {
+        setSelectedTerrain(prev => ({ ...prev, name: newName, displayName: newName }));
+      }
+
+      showMessage('Terrain name updated successfully!');
+    } catch (error) {
+      console.error('Error updating terrain name:', error);
+      throw error; // Re-throw so TerrainViewer can handle it
     }
   }, [selectedTerrain, showMessage]);
 
   // Handle terrain deletion
-  const handleTerrainDeleted = useCallback(async (terrainId, message) => {
-    // Prevent deletion of "None" terrain
-    if (terrainId === 'none') return;
+  const handleTerrainDeleted = useCallback(async (terrainId) => {
+    try {
+      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.BASE}/${terrainId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete terrain');
+      }
+
+      // Remove from terrains list
+      setTerrains(prev => prev.filter(terrain => terrain.id !== terrainId));
+      
+      // Clear terrain assets
+      setTerrainAssets(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(terrainId);
+        return newMap;
+      });
+
+      // Clear selection if this terrain was selected
+      if (selectedTerrain && selectedTerrain.id === terrainId) {
+        setSelectedTerrain(null);
+        setGloballySelectedPlacedAssetId(null);
+      }
+
+      showMessage('Terrain deleted successfully!');
+      
+      // Refresh the terrain list to update pagination
+      await fetchTerrains();
+
+    } catch (error) {
+      console.error('Error deleting terrain:', error);
+      throw error; // Re-throw so TerrainViewer can handle it
+    }
+  }, [selectedTerrain, showMessage, fetchTerrains]);
+
+  // Handle terrain metrics update
+  const handleTerrainMetricsUpdate = useCallback((metrics) => {
+    setTerrainViewerMetrics(metrics);
+  }, []);
+
+  // Handle asset placement
+  const handleAssetPlaced = useCallback((newAssetData, terrainId) => {
+    console.log('🏠 ViewTerrains.handleAssetPlaced called:', newAssetData.name, 'for terrain:', terrainId);
     
-    // Remove from local state
-    setTerrains(prev => prev.filter(t => t.id !== terrainId));
-    
-    // Select "None" terrain or another terrain if the deleted one was selected
-    if (selectedTerrain && selectedTerrain.id === terrainId) {
-      const remainingTerrains = terrains.filter(t => t.id !== terrainId);
-      const noneOption = remainingTerrains.find(t => t.isNone);
-      setSelectedTerrain(noneOption || (remainingTerrains.length > 0 ? remainingTerrains[0] : null));
+    if (!terrainId) {
+      console.warn('🏠 No terrainId provided to handleAssetPlaced');
+      return;
     }
     
-    showMessage(message || 'Terrain deleted successfully');
-  }, [selectedTerrain, terrains, showMessage]);
+    setTerrainAssets(prev => {
+      const newMap = new Map(prev);
+      const currentAssets = newMap.get(terrainId) || [];
+      const updatedAssets = [...currentAssets, newAssetData];
+      newMap.set(terrainId, updatedAssets);
+      console.log('🏠 Updated terrain assets, new count:', updatedAssets.length);
+      
+      // Save immediately using the updated assets directly
+      console.log('🏠 Saving updated assets to backend immediately');
+      setTimeout(() => {
+        saveTerrainAssetsToBackend(terrainId, updatedAssets);
+      }, 50);
+      
+      return newMap;
+    });
+  }, []);
 
-  // Handle file upload
-  const handleFileUpload = useCallback(async (file) => {
-    if (!file) return;
+  // Handle asset moved (includes rotation and scaling)
+  const handleAssetMoved = useCallback((assetId, position, rotation, scale, terrainId) => {
+    if (!terrainId) return;
+    
+    setTerrainAssets(prev => {
+      const newMap = new Map(prev);
+      const currentAssets = newMap.get(terrainId) || [];
+      const updatedAssets = currentAssets.map(asset => 
+        asset.id === assetId 
+          ? { ...asset, position, rotation, scale }
+          : asset
+      );
+      newMap.set(terrainId, updatedAssets);
+      return newMap;
+    });
+    
+    // Use throttled save for move/resize/rotation events
+    saveTerrainAssetsThrottled(terrainId);
+  }, [saveTerrainAssetsThrottled]);
 
-    // Validate file type
-    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      showMessage('Please select a valid image file (PNG, JPG, JPEG, WEBP)', 'error');
+  // Handle asset deletion
+  const handleAssetDeleted = useCallback((assetId, terrainId) => {
+    if (!terrainId) return;
+    
+    setTerrainAssets(prev => {
+      const newMap = new Map(prev);
+      const currentAssets = newMap.get(terrainId) || [];
+      const updatedAssets = currentAssets.filter(asset => asset.id !== assetId);
+      newMap.set(terrainId, updatedAssets);
+      return newMap;
+    });
+    
+    // Clear selection if this asset was selected
+    if (globallySelectedPlacedAssetId === assetId) {
+      setGloballySelectedPlacedAssetId(null);
+    }
+    
+    // Save immediately for deletion events
+    setTimeout(() => saveTerrainAssetsImmediately(terrainId), 100);
+    
+    showMessage('Asset deleted successfully');
+  }, [globallySelectedPlacedAssetId, saveTerrainAssetsImmediately, showMessage]);
+
+  // Handle asset selection
+  const handleAssetSelected = useCallback((assetId) => {
+    setGloballySelectedPlacedAssetId(assetId);
+  }, []);
+
+  // Upload processing function
+  const processTerrainUpload = useCallback(async (terrainName, gridScale) => {
+    if (!uploadFile) {
+      showMessage('No file selected for upload', 'error');
       return;
     }
 
-    // Validate file size (10MB limit)
-    if (file.size > 10 * 1024 * 1024) {
-      showMessage('File size must be less than 10MB', 'error');
-      return;
-    }
-
-    setUploadFile(file);
-    setShowUploadForm(true);
-  }, [showMessage]);
-
-  // Process terrain upload
-  const processTerrainUpload = useCallback(async () => {
-    if (!uploadFile) return;
+    setIsProcessing(true);
 
     try {
-      setIsProcessing(true);
-      
       const formData = new FormData();
       formData.append('terrain', uploadFile);
       formData.append('width', terrainDimensions.width.toString());
       formData.append('height', terrainDimensions.height.toString());
       formData.append('depth', terrainDimensions.depth.toString());
-
-      const response = await fetch(
-        `${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.UPLOAD}`,
-        {
-          method: 'POST',
-          body: formData
-        }
-      );
+      
+      // Add terrain name if provided
+      if (terrainName && terrainName.trim()) {
+        formData.append('name', terrainName.trim());
+      }
+      
+      // Add grid scale if provided
+      if (gridScale !== undefined) {
+        formData.append('gridScale', gridScale.toString());
+      }
+      
+      // Upload the terrain
+      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.UPLOAD}`, {
+        method: 'POST',
+        body: formData,
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `Upload failed: ${response.status}`);
+        throw new Error(errorData.error || 'Failed to upload terrain');
       }
 
       const result = await response.json();
       
-      // Refresh terrains list
+      // Success - refresh the terrain list and close popup
       await fetchTerrains();
-      
-      // Find and select the newly uploaded terrain
-      const updatedTerrains = await fetchTerrainsForSelection();
-      const newTerrain = updatedTerrains.find(t => t.id === result.id);
-      
-      if (newTerrain) {
-        setSelectedTerrain(newTerrain);
-      }
-      
-      showMessage(result.message || 'Terrain uploaded and processed successfully');
-      
-      // Reset upload state
-      setUploadFile(null);
       setShowUploadForm(false);
-      setTerrainDimensions({ width: 10, height: 10, depth: 0.1 });
+      setUploadFile(null);
+      // Reset the file input value to allow re-uploading the same file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      showMessage('Terrain uploaded successfully!');
       
-    } catch (err) {
-      console.error('Error uploading terrain:', err);
-      showMessage(err.message, 'error');
+    } catch (error) {
+      console.error('Error uploading terrain:', error);
+      showMessage(error.message || 'Failed to upload terrain', 'error');
+      // Reset the file input value on error too
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } finally {
       setIsProcessing(false);
     }
-  }, [uploadFile, terrainDimensions, fetchTerrains, showMessage]);
-
-  // Helper function to fetch terrains and return them
-  const fetchTerrainsForSelection = useCallback(async () => {
-    try {
-      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.BASE}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch terrains: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      return data.terrains || [];
-    } catch (err) {
-      console.error('Error fetching terrains for selection:', err);
-      return [];
-    }
-  }, []);
+  }, [uploadFile, terrainDimensions, showMessage, fetchTerrains]);
 
   // Handle upload popup cancel
   const handleUploadCancel = useCallback(() => {
     if (!isProcessing) {
-      setUploadFile(null);
       setShowUploadForm(false);
-      setTerrainDimensions({ width: 10, height: 10, depth: 0.1 });
-    }
-  }, [isProcessing]);
-
-  // Handle drag and drop
-  const handleDragOver = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDragEnter = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDragLeave = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDrop = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      handleFileUpload(files[0]);
-    }
-  }, [handleFileUpload]);
-
-  // Pagination calculations
-  const totalPages = Math.ceil(terrains.length / terrainsPerPage);
-  const startIndex = (currentPage - 1) * terrainsPerPage;
-  const endIndex = startIndex + terrainsPerPage;
-  const currentTerrains = terrains.slice(startIndex, endIndex);
-
-  const handlePageChange = useCallback((page) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-  }, [totalPages]);
-
-  // Render terrain thumbnail
-  const renderTerrainThumbnail = useCallback((terrain) => {
-    // Handle "None" terrain option
-    if (terrain.isNone) {
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{
-            ...combinedStyles.terrainThumbnail,
-            backgroundColor: 'transparent',
-            border: `2px dashed ${THEME.textSecondary}`,
-            color: THEME.textSecondary
-          }}>
-            ✕
-          </div>
-          <div style={{ fontSize: '12px', color: '#fff', marginTop: '4px', textAlign: 'center', wordBreak: 'break-word', maxWidth: '100%' }}>
-            {terrain.name}
-          </div>
-        </div>
-      );
-    }
-    
-    if (terrain.icon) {
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div
-            style={{
-              ...combinedStyles.terrainThumbnail,
-              backgroundImage: `url(${CONFIG.API.BASE_URL}${terrain.icon})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center'
-            }}
-          />
-          <div style={{ fontSize: '12px', color: '#fff', marginTop: '4px', textAlign: 'center', wordBreak: 'break-word', maxWidth: '100%' }}>
-            {terrain.name}
-          </div>
-        </div>
-      );
-    }
-    
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <div style={combinedStyles.terrainThumbnail}>
-          🗺️
-        </div>
-        <div style={{ fontSize: '12px', color: '#fff', marginTop: '4px', textAlign: 'center', wordBreak: 'break-word', maxWidth: '100%' }}>
-          {terrain.name}
-        </div>
-      </div>
-    );
-  }, [combinedStyles.terrainThumbnail]);
-
-  // Add CSS keyframes to document head
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes ${KEYFRAMES.FADE_IN} {
-        from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-        to { opacity: 1; transform: translateX(-50%) translateY(0); }
+      setUploadFile(null);
+      // Reset the file input value
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
-      @keyframes ${KEYFRAMES.SPIN} {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-      }
-      @keyframes ${KEYFRAMES.THUMBNAIL_SPIN} {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-      }
-    `;
-    document.head.appendChild(style);
-    return () => document.head.removeChild(style);
-  }, []);
-
-  // Handle manual asset placement callback from TerrainViewer
-  const handleManualAssetPlaced = useCallback((newAssetData) => {
-    setPlacedAssetsOnTerrain(prev => [...prev, { ...newAssetData, id: newAssetData.id || `manual-${Date.now()}` }]);
-    // setCurrentSelectedAssetForPlacement(null); // Do not automatically exit placement mode
-    setGloballySelectedPlacedAssetId(null); // Deselect any placed asset when placing a new one
-  }, []);
-
-  // Handle agent-based asset placement
-  const handleAgentPlaceAssets = useCallback(() => {
-    if (!selectedTerrain) {
-      showMessage('Please select a terrain first.', 'error');
-      return;
-    }
-    // Use terrainViewerMetrics if available, otherwise fallback to metadata or defaults
-    const currentTerrainWidth = terrainViewerMetrics?.width || selectedTerrain.metadata?.dimensions?.width || 20;
-    const currentTerrainDepth = terrainViewerMetrics?.depth || selectedTerrain.metadata?.dimensions?.depth || 20;
-    const terrainCenterX = terrainViewerMetrics?.centerX || 0;
-    const terrainCenterZ = terrainViewerMetrics?.centerZ || 0; // Y center is not needed for XZ plane placement
-
-    if (agentPlacementConfig.every(assetConfig => assetConfig.count === 0)) {
-      showMessage('Please specify counts for assets to be placed by the agent.', 'info');
-      return;
-    }
-
-    const newAgentAssets = [];
-    
-    const maxAttemptsPerAsset = 20; // Increased attempts slightly
-
-    agentPlacementConfig.forEach(assetConfig => {
-      if (assetConfig.count > 0) {
-        const candidateAssetRadius = getAssetRadius(assetConfig); // Get radius for the asset type we are trying to place
-
-        for (let i = 0; i < assetConfig.count; i++) {
-          let position = null;
-          let attempts = 0;
-
-          while (attempts < maxAttemptsPerAsset) {
-            const candidateX = terrainCenterX + (Math.random() - 0.5) * currentTerrainWidth;
-            const candidateZ = terrainCenterZ + (Math.random() - 0.5) * currentTerrainDepth;
-            let tooClose = false;
-
-            // Check against other assets already placed in this NEW batch
-            for (const placed of newAgentAssets) {
-              const placedAssetRadius = getAssetRadius(placed);
-              const requiredSeparation = candidateAssetRadius + placedAssetRadius;
-              const minDistanceSqDynamic = requiredSeparation * requiredSeparation;
-              
-              const dx = candidateX - placed.position.x;
-              const dz = candidateZ - placed.position.z;
-              if ((dx * dx + dz * dz) < minDistanceSqDynamic) {
-                tooClose = true;
-                break;
-              }
-            }
-
-            if (tooClose) {
-              attempts++;
-              continue; // Try a new random spot
-            }
-
-            // Check against assets already on terrain (from previous placements)
-            for (const existing of placedAssetsOnTerrain) {
-              const existingAssetRadius = getAssetRadius(existing);
-              const requiredSeparation = candidateAssetRadius + existingAssetRadius;
-              const minDistanceSqDynamic = requiredSeparation * requiredSeparation;
-
-              const dx = candidateX - existing.position.x;
-              const dz = candidateZ - existing.position.z;
-              if ((dx * dx + dz * dz) < minDistanceSqDynamic) {
-                tooClose = true;
-                break;
-              }
-            }
-
-            if (!tooClose) {
-              position = { x: candidateX, y: 0, z: candidateZ };
-              break;
-            }
-            attempts++;
-          }
-
-          if (position) {
-            newAgentAssets.push({
-              // Spread assetConfig properties and then override/add specific instance data
-              ...assetConfig, // Includes name, scale, rotation (defaults)
-              id: `agent-${assetConfig.id}-${Date.now()}-${i}`, // Unique instance ID
-              modelUrl: assetConfig.url, // Ensure modelUrl is populated from assetConfig.url
-              position,
-              // Allow specific agent-placed rotation to be random if not set, or use default
-              rotation: assetConfig.rotation || { x: 0, y: Math.random() * Math.PI * 2, z: 0 },
-              instance: null, // GLTF instance is null until loaded by TerrainViewer
-            });
-          } else {
-            console.warn(`Agent could not find a suitable spot for ${assetConfig.name} (instance ${i + 1}) after ${maxAttemptsPerAsset} attempts.`);
-          }
-        }
-      }
-    });
-
-    if (newAgentAssets.length > 0) {
-      setPlacedAssetsOnTerrain(prev => {
-        const updatedAssets = [...prev, ...newAgentAssets];
-        return updatedAssets;
+      // Reset dimensions to default
+      setTerrainDimensions({
+        width: 10,
+        height: 10,
+        depth: 0.1
       });
-      showMessage(`${newAgentAssets.length} assets placed by agent.`, 'success');
-      setGloballySelectedPlacedAssetId(null); // Deselect any placed asset after agent places new ones
-    } else if (agentPlacementConfig.some(ac => ac.count > 0)) {
-      showMessage('Agent could not place the requested assets due to spacing constraints or lack of valid spots.', 'warning');
     }
-  }, [selectedTerrain, agentPlacementConfig, showMessage, placedAssetsOnTerrain, terrainViewerMetrics]); // <-- ADDED terrainViewerMetrics to dependencies
+  }, [isProcessing, setTerrainDimensions]);
 
-  // Handle saving the current asset layout for the selected terrain
-  const handleSaveLayout = useCallback(async () => {
-    if (!selectedTerrain || !selectedTerrain.id) {
-      showMessage('Please select a terrain first.', 'error');
-      return;
-    }
-    setLayoutSaveStatus('saving');
-    try {
-      // We need to strip the 'instance' field before saving if it exists
-      const assetsToSave = placedAssetsOnTerrain.map(({ instance, ...rest }) => rest);
-
-      const response = await fetch(
-        `${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.BASE}/${selectedTerrain.id}/layout`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ placedAssets: assetsToSave })
-        }
-      );
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to save layout' }));
-        throw new Error(errorData.error || 'Failed to save layout');
-      }
-      setLayoutSaveStatus('success');
-      showMessage('Terrain layout saved successfully!', 'success');
-      // Optionally, re-fetch terrain data to ensure UI consistency if backend modifies data upon save
-      // fetchTerrains(); 
-    } catch (err) {
-      setLayoutSaveStatus('error');
-      showMessage(err.message || 'Error saving terrain layout.', 'error');
-      console.error('Error saving layout:', err);
-    }
-    setTimeout(() => setLayoutSaveStatus(null), 3000); // Clear status after 3s
-  }, [selectedTerrain, placedAssetsOnTerrain, showMessage]);
-
-  // Button to clear all placed assets for the current terrain
-  const handleClearAllPlacedAssets = useCallback(() => {
-    setPlacedAssetsOnTerrain([]);
-    setGloballySelectedPlacedAssetId(null); // <-- RESET on clear all
-    showMessage('All placed assets cleared for this terrain.', 'info');
-  }, [showMessage]);
-
-  // Handle downloading the current asset layout
-  const handleDownloadLayout = useCallback(() => {
-    if (!selectedTerrain) {
-      showMessage('Please select a terrain first.', 'error');
-      return;
-    }
-    if (placedAssetsOnTerrain.length === 0) {
-      showMessage('No assets to download.', 'info');
-      return;
-    }
-
-    try {
-      const assetsToDownload = placedAssetsOnTerrain.map(({ instance, ...rest }) => rest);
-      const jsonString = JSON.stringify(assetsToDownload, null, 2);
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const href = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = href;
-      const terrainName = selectedTerrain.name.replace(/[^a-z0-9_\-\.]/gi, '_') || 'terrain';
-      link.download = `${terrainName}_layout.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(href);
-      showMessage('Layout downloaded successfully!', 'success');
-    } catch (error) {
-      console.error('Error downloading layout:', error);
-      showMessage('Failed to download layout.', 'error');
-    }
-  }, [selectedTerrain, placedAssetsOnTerrain, showMessage]);
-
-  // Handle selecting a layout file to upload
-  const handleLayoutFileSelect = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    if (!file.name.endsWith('.json')) {
-      showMessage('Please select a valid JSON layout file.', 'error');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const jsonContent = e.target.result;
-        const loadedAssets = JSON.parse(jsonContent);
-
-        if (!Array.isArray(loadedAssets)) {
-          throw new Error('Layout file is not a valid array of assets.');
-        }
-
-        // Basic validation of asset structure (can be more comprehensive)
-        for (const asset of loadedAssets) {
-          if (
-            typeof asset.id !== 'string' ||
-            typeof asset.modelUrl !== 'string' ||
-            typeof asset.name !== 'string' || // Added name check
-            typeof asset.position !== 'object' ||
-            typeof asset.rotation !== 'object' ||
-            typeof asset.scale !== 'object'
-          ) {
-            throw new Error('Invalid asset structure in layout file.');
-          }
-        }
-        // Ensure instances are null as they are live objects
-        const assetsToSet = loadedAssets.map(asset => ({ ...asset, instance: null }));
-        setPlacedAssetsOnTerrain(assetsToSet);
-        showMessage('Layout loaded successfully! Click \'Save Layout\' to persist changes.', 'success');
-      } catch (error) {
-        console.error('Error loading layout file:', error);
-        showMessage(`Failed to load layout: ${error.message}`, 'error');
-      }
-    };
-    reader.onerror = () => {
-      showMessage('Error reading layout file.', 'error');
-    };
-    reader.readAsText(file);
-
-    // Reset file input to allow uploading the same file again if needed
-    event.target.value = null;
-  };
-
-  // Callback from TerrainViewer when a placed asset is selected or deselected
-  const handlePlacedAssetSelectionChange = useCallback((assetId) => {
-    setGloballySelectedPlacedAssetId(assetId);
-  }, []);
-
-  // Callback from TerrainViewer when a placed asset has been moved
-  const handlePlacedAssetMoved = useCallback((assetId, newPosition, newRotation, newScale) => {
-    setPlacedAssetsOnTerrain(prevAssets =>
-      prevAssets.map(asset => {
-        if (asset.id === assetId) {
-          // newPosition is a THREE.Vector3
-          // newRotation is a THREE.Euler
-          // newScale is a THREE.Vector3
-          return {
-            ...asset,
-            position: { x: newPosition.x, y: newPosition.y, z: newPosition.z },
-            // Storing Euler angles; ensure your loading logic expects this or convert as needed
-            rotation: { x: newRotation.x, y: newRotation.y, z: newRotation.z },
-            scale: { x: newScale.x, y: newScale.y, z: newScale.z },
-          };
-        }
-        return asset;
-      })
-    );
-    // No immediate save, user should click "Save Layout"
-  }, []);
-
-  // Handle deleting the currently selected placed asset
-  const handleDeleteSelectedAsset = useCallback(() => {
-    if (!globallySelectedPlacedAssetId) {
-      showMessage('No asset selected to delete.', 'warning');
-      return;
-    }
-    setPlacedAssetsOnTerrain(prev => prev.filter(asset => asset.id !== globallySelectedPlacedAssetId));
-    setGloballySelectedPlacedAssetId(null); // Deselect after deletion
-    showMessage('Selected asset deleted.', 'success');
-  }, [globallySelectedPlacedAssetId, showMessage]);
-
-  // Handle Escape key for deselecting placement asset AND selected placed asset, and T,R,S for transform modes
+  // Cleanup throttled save timeouts on unmount
   useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        let escapeHandled = false;
-        if (currentSelectedAssetForPlacement) {
-          setCurrentSelectedAssetForPlacement(null);
-          escapeHandled = true;
-        }
-        if (globallySelectedPlacedAssetId) {
-          setGloballySelectedPlacedAssetId(null); // Deselect asset
-          escapeHandled = true;
-        }
-        if (escapeHandled) {
-          event.preventDefault(); // Prevent other escape actions if we handled it.
-        }
-      } else if (globallySelectedPlacedAssetId) { 
-        let newMode = null;
-        if (event.key.toLowerCase() === 't') {
-          newMode = 'translate';
-        } else if (event.key.toLowerCase() === 'r') {
-          newMode = 'rotate';
-        } else if (event.key.toLowerCase() === 's') {
-          newMode = 'scale';
-        }
-        
-        if (newMode && newMode !== transformMode) {
-          setTransformMode(newMode);
-          event.preventDefault(); // Prevent typing 't', 'r', 's' into other inputs
-        }
+    return () => {
+      if (throttleTimeoutRef.current) {
+        clearTimeout(throttleTimeoutRef.current);
       }
     };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [currentSelectedAssetForPlacement, globallySelectedPlacedAssetId, transformMode]);
+  }, []);
 
   return (
-    <div style={combinedStyles.container}>
-      {/* Message Display */}
-      {message && (
+    <div style={styles.container}>
+      {/* Left panel - Visualization */}
+      <div style={styles.visualizationPanel}>
+        {/* Notification message */}
+        {notification && (
         <div style={{
-          ...combinedStyles.message,
-          ...(messageType === 'error' ? combinedStyles.error : combinedStyles.success)
-        }}>
-          {message}
+            ...styles.message, 
+            ...(notification.type === 'error' ? styles.error : styles.success),
+            position: 'absolute',
+            top: '15px',
+            right: '15px',
+            left: 'auto',
+            transform: 'none',
+            zIndex: 1000,
+            boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+            maxWidth: '300px'
+          }}>
+            {notification.message}
         </div>
       )}
 
-      {/* Left Panel - Terrain Visualization */}
-      <div style={combinedStyles.visualizationPanel}>
-        {selectedTerrain ? (
-          <div style={combinedStyles.terrainViewer}>
+        {isLoading ? (
+          <div style={styles.loadingContainer}>
+            <div style={styles.spinner}></div>
+            <p style={styles.loadingText}>Loading dungeons...</p>
+          </div>
+        ) : selectedTerrain ? (
             <TerrainViewer
-              key={selectedTerrain ? selectedTerrain.id : 'no-terrain'}
-              terrainUrl={selectedTerrain && !selectedTerrain.isNone ? `${CONFIG.API.BASE_URL}${selectedTerrain.url}` : null}
-              terrainName={selectedTerrain ? selectedTerrain.name : null}
-              terrainId={selectedTerrain && !selectedTerrain.isNone ? selectedTerrain.id : null}
+            key={selectedTerrain.id}
+            terrainUrl={selectedTerrain.url}
+            terrainName={selectedTerrain.name}
+            terrainId={selectedTerrain.id}
               onError={handleTerrainViewerError}
-              onTerrainNameChange={!selectedTerrain?.isNone ? (newName) => handleTerrainNameChange(selectedTerrain.id, newName) : undefined}
-              onTerrainDeleted={!selectedTerrain?.isNone ? handleTerrainDeleted : undefined}
+            onTerrainNameChange={handleTerrainNameChange}
+            onTerrainDeleted={handleTerrainDeleted}
               onTerrainMetricsUpdate={handleTerrainMetricsUpdate}
-              scale={selectedTerrain?.metadata?.scale}
-              selectedAsset={currentSelectedAssetForPlacement ? { ...currentSelectedAssetForPlacement, rotation: { x: 0, y: THREE.MathUtils.degToRad(currentAssetPlacementRotationY), z: 0 } } : null}
-              onAssetPlaced={handleManualAssetPlaced}
-              rawPlacedAssets={placedAssetsOnTerrain}
-              onPlacedAssetSelected={handlePlacedAssetSelectionChange}
-              onPlacedAssetMoved={handlePlacedAssetMoved}
+            hideTerrainControls={selectedTerrain.isNone}
+            showGrid={true}
+              // NEW: Pass assets as props instead of managing them internally
+              placedAssets={currentTerrainAssets}
+              onAssetPlaced={handleAssetPlaced}
+              onAssetMoved={handleAssetMoved}
+              onAssetDeleted={handleAssetDeleted}
+              onAssetSelected={handleAssetSelected}
+              selectedAssetId={globallySelectedPlacedAssetId}
               transformMode={transformMode}
               onTransformModeChange={setTransformMode}
-              onPlacedAssetDeleted={handleDeleteSelectedAsset}
-              floorPlanUrl="/assets/dungeon/floor_plan/plan1.json"
-            />
-          </div>
+            floorPlan={selectedTerrain.layoutData}
+            isDungeonLayout={selectedTerrain.type === 'dungeon_layout'}
+            layoutLoadError={selectedTerrain.layoutLoadError}
+            placedDungeons={currentTerrainAssets.length > 0}
+          />
         ) : (
-          <div style={combinedStyles.loadingContainer}>
-            {isLoading ? (
-              <>
-                <div style={combinedStyles.spinner} />
-                <div style={combinedStyles.loadingText}>Loading terrains...</div>
-              </>
-            ) : (
-              <div
-                ref={dropzoneRef}
-                style={combinedStyles.dropzone}
-                onDragOver={handleDragOver}
-                onDragEnter={handleDragEnter}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <div style={combinedStyles.uploadIcon}>🗺️</div>
-                <div style={combinedStyles.dropzoneText}>
-                  Upload Terrain Image
-                </div>
-                <div style={combinedStyles.dropzoneSubText}>
-                  Drag & drop an image here, or click to select
-                </div>
-                <div style={combinedStyles.dropzoneSubText}>
-                  Supports PNG, JPG, JPEG, WEBP (max 10MB)
-                </div>
-              </div>
-            )}
+          <div 
+            style={styles.dropzone}
+            ref={dropzoneRef}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const files = Array.from(e.dataTransfer.files);
+              const imageFile = files.find(file => file.type.startsWith('image/'));
+              if (imageFile) {
+                handleFileUpload(imageFile);
+              } else {
+                showMessage('Please drop a valid image file', 'error');
+              }
+            }}
+          >
+            <div style={styles.uploadIcon}>📤</div>
+            <p style={styles.dropzoneText}>
+              {terrains.length > 0 ? "Click a dungeon or upload here" : "Upload some dungeons here!"}
+            </p>
+            <p style={styles.dropzoneSubText}>
+              Drag & drop an image file or click to browse
+            </p>
           </div>
         )}
       </div>
 
-      {/* Right Panel - Terrain List */}
-      <div style={combinedStyles.terrainListPanel}>
-        <h2 style={combinedStyles.terrainListHeader}>Terrains</h2>
+      {/* Right panel - Dungeon list */}
+      <div style={styles.terrainListPanel}>
+        <h3 style={styles.terrainListHeader}>Dungeons</h3>
         
-        {/* Processing Indicator - only show if processing and no popup */}
-        {isProcessing && !showUploadForm && (
-          <div style={combinedStyles.processingContainer}>
-            <div style={combinedStyles.processingSpinner} />
-            <div style={combinedStyles.processingText}>
-              Processing terrain image...
-              <br />
-              This may take a few moments.
-            </div>
-          </div>
-        )}
-        
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div style={combinedStyles.paginationControls}>
-            <button
-              style={{
-                ...combinedStyles.pageButton,
-                ...(currentPage === 1 ? combinedStyles.pageButtonDisabled : {})
-              }}
+        {/* Pagination controls */}
+        {terrains.length > 0 && !error && (
+          <div style={styles.paginationControls}>
+            <Button 
+              variant="icon"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
             >
-              ‹
-            </button>
-            
-            <span style={combinedStyles.pageIndicator}>
-              {currentPage} of {totalPages}
+              &lt;
+            </Button>
+            <span style={styles.pageIndicator}>
+              {currentPage} / {totalPages}
             </span>
-            
-            <button
-              style={{
-                ...combinedStyles.pageButton,
-                ...(currentPage === totalPages ? combinedStyles.pageButtonDisabled : {})
-              }}
+            <Button 
+              variant="icon"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
             >
-              ›
-            </button>
+              &gt;
+            </Button>
           </div>
         )}
 
-        {/* Terrain Grid */}
-        <div style={combinedStyles.terrainListContainer}>
-          <div style={combinedStyles.terrainGrid}>
-            {currentTerrains.map((terrain) => (
+        {/* Scrollable dungeon grid */}
+        <div style={styles.terrainListContainer} ref={gridContainerRef}>
+          {error ? (
+            <div style={{...styles.message, ...styles.error}}>
+              {error}
+            </div>
+          ) : terrains.length > 0 ? (
+            <div style={{...styles.terrainGrid, ...mobileStyles.terrainGrid}}>
+              {getPaginatedTerrains.map((terrain) => (
               <div
                 key={terrain.id}
                 style={{
-                  ...combinedStyles.terrainItem,
-                  ...(selectedTerrain?.id === terrain.id ? combinedStyles.terrainItemSelected : {}),
-                  ...(hoveredTerrain === terrain.id ? combinedStyles.terrainItemHover : {})
+                    ...styles.terrainItem,
+                    ...(selectedTerrain && selectedTerrain.id === terrain.id ? styles.terrainItemSelected : {})
                 }}
-                onClick={() => handleTerrainSelect(terrain)}
-                onMouseEnter={() => setHoveredTerrain(terrain.id)}
-                onMouseLeave={() => setHoveredTerrain(null)}
+                  onClick={() => setSelectedTerrain(terrain)}
               >
                 {renderTerrainThumbnail(terrain)}
+                  <div style={styles.terrainName}>
+                    {terrain.displayName || terrain.name || '(no name)'}
+                  </div>
               </div>
             ))}
           </div>
+          ) : (
+            <p style={{ color: THEME.textSecondary }}>No dungeons available</p>
+          )}
         </div>
 
-        {/* Upload Button */}
-        <div style={combinedStyles.buttonContainer}>
-          <button
-            style={combinedStyles.uploadButton}
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading || isProcessing}
+        {/* Button Container with Upload and Generate buttons */}
+        <div style={styles.buttonContainer}>
+          <Button
+            variant="secondary"
+            onClick={() => fileInputRef.current.click()}
+            style={{ 
+              width: '100%', 
+              padding: '12px 24px',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '8px'
+            }}
           >
-            {isUploading ? 'Uploading...' : '+ Upload Terrain'}
-          </button>
+            <span>Upload Image</span>
+            <span>+</span>
+          </Button>
+          
+          <Button
+            variant="primary"
+            onClick={() => setShowGeneratePopup(true)}
+            style={{ width: '100%', padding: '12px 24px' }}
+          >
+            🏰 Generate Dungeon
+          </Button>
         </div>
 
-        {/* Hidden File Input for Terrain Image*/}
         <input
+          type="file"
           ref={fileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/jpg,image/webp"
           style={{ display: 'none' }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              handleFileUpload(file);
-            }
-            e.target.value = ''; // Reset input
-          }}
+          accept="image/*"
+          onChange={(e) => handleFileUpload(e.target.files[0])}
         />
-
-        {/* Hidden File Input for Layout JSON*/}
-        <input
-          ref={layoutFileInputRef}
-          type="file"
-          accept=".json,application/json"
-          style={{ display: 'none' }}
-          onChange={handleLayoutFileSelect}
-        />
-      </div>
-
-      {/* Upload Popup */}
+        
+        {/* Upload Form Popup */}
       <TerrainUploadPopup
         isOpen={showUploadForm}
+          onCancel={handleUploadCancel}
+          onUpload={processTerrainUpload}
+          isProcessing={isProcessing}
         uploadFile={uploadFile}
         terrainDimensions={terrainDimensions}
         setTerrainDimensions={setTerrainDimensions}
-        onUpload={processTerrainUpload}
-        onCancel={handleUploadCancel}
-        isProcessing={isProcessing}
-      />
-
-      {/* Asset Placement Controls - Moved here for better layout with viewer */}
-      {selectedTerrain && (
-        <div style={combinedStyles.assetControlsContainer}>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-            <h3 style={combinedStyles.assetControlsTitle}>Place Assets</h3>
-            {currentSelectedAssetForPlacement && (
-              <Button 
-                onClick={() => {
-                  setCurrentSelectedAssetForPlacement(null);
-                  showMessage('Asset placement cancelled', 'info');
-                }}
-                style={{...combinedStyles.actionButton, ...combinedStyles.cancelButton, padding: '5px 10px', fontSize: '12px'}}
-              >
-                Cancel Placement (Esc)
-              </Button>
-            )}
-          </div>
-          <div style={combinedStyles.assetSelection}>
-            {availableAssets.map(asset => (
-              <Button
-                key={asset.url}
-                onClick={() => {
-                  // Ensure the selected asset object for placement has modelUrl
-                  const assetToPlace = {
-                    ...asset,
-                    modelUrl: asset.url // Copy relative url to modelUrl
-                  };
-                  setCurrentSelectedAssetForPlacement(assetToPlace);
-                  
-                  // Set initial rotation from asset's default, or 0 if none
-                  // Convert radians to degrees for the slider if stored in radians, or ensure consistency
-                  let initialYRotationDegrees = 0;
-                  if (asset.rotation?.y) {
-                    // Assuming asset.rotation.y is in radians, convert to degrees
-                    initialYRotationDegrees = THREE.MathUtils.radToDeg(asset.rotation.y);
-                  }
-                  setCurrentAssetPlacementRotationY(initialYRotationDegrees);
-                }}
-                style={{
-                  ...combinedStyles.assetButton,
-                  ...(currentSelectedAssetForPlacement && currentSelectedAssetForPlacement.url === asset.url ? combinedStyles.assetButtonSelected : {})
-                }}
-                title={`Select ${asset.name} to place manually`}
-              >
-                {asset.name}
-              </Button>
-            ))}
-          </div>
-          <div style={combinedStyles.assetActionButtons}>
-            {/* New UI for per-asset agent placement counts */}
-            <div style={{ maxHeight: '150px', overflowY: 'auto', marginBottom: '10px', border: combinedStyles.border, padding: '5px', borderRadius: '4px' }}>
-              {agentPlacementConfig.map((assetConfig, index) => (
-                <div key={assetConfig.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
-                  <label htmlFor={`agentCount-${assetConfig.id}`} title={assetConfig.name} style={{ color: combinedStyles.infoText.color, fontSize: '12px', marginRight: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1 }}>
-                    {assetConfig.name}:
-                  </label>
-                  <input
-                    type="number"
-                    id={`agentCount-${assetConfig.id}`}
-                    value={assetConfig.count}
-                    onChange={(e) => {
-                      const newCount = Math.max(0, parseInt(e.target.value, 10) || 0);
-                      setAgentPlacementConfig(prevConfig =>
-                        prevConfig.map(item =>
-                          item.id === assetConfig.id ? { ...item, count: newCount } : item
-                        )
-                      );
-                    }}
-                    min="0"
-                    max="20" // Reasonable max per asset type
-                    style={{ width: '50px', padding: '3px', fontSize: '12px', textAlign: 'center', ...combinedStyles.inputFieldSmall }}
+        />
+        
+        {/* Generate Dungeon Popup */}
+        <GenerateDungeonPopup
+          isOpen={showGeneratePopup}
+          onClose={() => setShowGeneratePopup(false)}
+          onDungeonGenerated={fetchTerrains}
                   />
                 </div>
-              ))}
-            </div>
-            <Button onClick={handleAgentPlaceAssets} style={{...combinedStyles.actionButton }} disabled={!selectedTerrain}>
-              Place by Agent
-            </Button>
-            <Button 
-              onClick={handleSaveLayout} 
-              style={combinedStyles.actionButton} 
-              disabled={!selectedTerrain || layoutSaveStatus === 'saving'}
-            >
-              {layoutSaveStatus === 'saving' ? 'Saving...' : (layoutSaveStatus === 'success' ? 'Saved!' : 'Save Layout')}
-            </Button>
-            <Button onClick={handleDownloadLayout} style={combinedStyles.actionButton} disabled={!selectedTerrain || placedAssetsOnTerrain.length === 0}>
-              Download Layout
-            </Button>
-            <Button onClick={() => layoutFileInputRef.current?.click()} style={combinedStyles.actionButton} disabled={!selectedTerrain}>
-              Load Layout
-            </Button>
-            <Button onClick={handleClearAllPlacedAssets} style={{...combinedStyles.actionButton, ...combinedStyles.clearButton}} disabled={placedAssetsOnTerrain.length === 0}>
-              Clear Placed Assets
-            </Button>
-            <Button 
-                onClick={handleDeleteSelectedAsset} 
-                style={{...combinedStyles.actionButton, backgroundColor: THEME.dangerButton, color: 'white'}} 
-                disabled={!globallySelectedPlacedAssetId}
-            >
-                Delete Selected Asset
-            </Button>
-          </div>
-           {currentSelectedAssetForPlacement && (
-            <div style={{ marginTop: '15px' }}> {/* Container for selected info and slider */}
-              <p style={combinedStyles.infoText}>Selected: {currentSelectedAssetForPlacement.name}. Click on terrain to place.</p>
-              <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <label htmlFor="rotationSlider" style={{ color: combinedStyles.infoText.color, fontSize: '14px' }}>Rot Y:</label>
-                <input 
-                  type="range" 
-                  id="rotationSlider"
-                  min="0" 
-                  max="360" 
-                  step="1" 
-                  value={currentAssetPlacementRotationY}
-                  onChange={(e) => setCurrentAssetPlacementRotationY(parseFloat(e.target.value))}
-                  style={{ flexGrow: 1 }}
-                />
-                <span style={{ color: combinedStyles.infoText.color, fontSize: '14px', minWidth: '40px', textAlign: 'right' }}>{currentAssetPlacementRotationY}°</span>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 };

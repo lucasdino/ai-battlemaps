@@ -353,15 +353,7 @@ def generate_layout():
             }
         }
         
-        # Save layout
-        filename = f"layout_{int(time.time() * 1000)}_{os.urandom(3).hex()}.json"
-        filepath = os.path.join(LAYOUT_DIR, filename)
-        
-        with open(filepath, 'w') as f:
-            json.dump(response_data, f, indent=2)
-        
-        response_data['filename'] = filename
-        response_data['filepath'] = filepath
+        # Note: Removed automatic saving - users can save via frontend when desired
         
         return jsonify(response_data)
         

@@ -47,31 +47,52 @@ const terrainImageUpload = multer({
  */
 router.get('/terrains', (req, res) => {
   try {
+    // Get pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const perPage = parseInt(req.query.per_page) || 12;
+
     // Get terrain metadata
     const allMetadata = TerrainMetadataUtil.getMetadata();
     
     // Convert metadata to terrains array
-    const terrains = Object.entries(allMetadata).map(([filename, metadata]) => {
+    const allTerrains = Object.entries(allMetadata).map(([filename, metadata]) => {
       return {
         id: filename,
         name: metadata.name || path.basename(filename, path.extname(filename)),
-        type: 'terrain',
-        url: `/assets/terrains/${filename}`,
+        type: metadata.type || 'terrain',
+        url: metadata.isDungeonLayout ? null : `/assets/terrains/${filename}`,
         created: metadata.created,
-        icon: metadata.icon ? metadata.icon.path : null,
+        icon: metadata.icon ? (typeof metadata.icon === 'string' ? metadata.icon : metadata.icon.path) : null,
         sourceImage: metadata.sourceImage ? metadata.sourceImage.path : null,
         dimensions: metadata.dimensions || { width: 10, height: 10, depth: 0.1 },
         scale: typeof metadata.scale === 'number' ? metadata.scale : 1.0,
-        placedAssets: metadata.placedAssets || []
+        placedAssets: metadata.placedAssets || [],
+        layoutPath: metadata.layoutPath || null,
+        isDungeonLayout: metadata.isDungeonLayout || false,
+        placed_dungeons: metadata.placed_dungeons || false
       };
     });
     
     // Sort terrains by created date (newest first)
-    terrains.sort((a, b) => (b.created || 0) - (a.created || 0));
+    allTerrains.sort((a, b) => (b.created || 0) - (a.created || 0));
+
+    // Calculate pagination
+    const total = allTerrains.length;
+    const totalPages = Math.ceil(total / perPage);
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
     
-    res.json({ terrains });
+    // Get paginated terrains
+    const terrains = allTerrains.slice(startIndex, endIndex);
+    
+    res.json({ 
+      terrains,
+      total,
+      page,
+      per_page: perPage,
+      total_pages: totalPages
+    });
   } catch (error) {
-    console.error("Error listing terrains:", error);
     res.status(500).json({ error: "Server error listing terrains" });
   }
 });
@@ -89,15 +110,16 @@ router.get('/terrains/:terrainId', (req, res) => {
       return res.status(404).json({ error: 'Terrain not found' });
     }
     
-    res.json({
+    const responseData = {
       id: terrainId,
       ...metadata,
       scale: typeof metadata.scale === 'number' ? metadata.scale : 1.0,
       path: `/assets/terrains/${terrainId}`,
       placedAssets: metadata.placedAssets || []
-    });
+    };
+    
+    res.json(responseData);
   } catch (error) {
-    console.error('Error retrieving terrain metadata:', error);
     res.status(500).json({ error: 'Server error retrieving terrain' });
   }
 });
@@ -118,7 +140,7 @@ router.post('/terrains/upload', terrainImageUpload.single('terrain'), async (req
     const uploadedImageName = req.file.filename;
     
     // Get terrain options from request body
-    const { width = 10, height = 10, depth = 0.1, scale = 1.0 } = req.body;
+    const { width = 10, height = 10, depth = 0.1, scale = 1.0, name, gridScale } = req.body;
     
     // Generate unique GLB filename
     const baseName = path.basename(uploadedImageName, path.extname(uploadedImageName));
@@ -148,12 +170,12 @@ router.post('/terrains/upload', terrainImageUpload.single('terrain'), async (req
       await TerrainProcessor.generateThumbnail(uploadedImagePath, iconPath, {
         size: CONFIG.THUMBNAILS.SIZE
       });
-    } catch (iconError) {
-      console.warn(`Warning: Failed to generate icon for terrain ${glbFilename}:`, iconError);
-    }
+            } catch (iconError) {
+          // Failed to generate icon - continue without it
+        }
     
     // Create metadata for the terrain
-    const displayName = path.basename(originalFilename, path.extname(originalFilename));
+    const displayName = name && name.trim() ? name.trim() : path.basename(originalFilename, path.extname(originalFilename));
     const metadata = {
       name: displayName,
       type: 'terrain',
@@ -164,6 +186,7 @@ router.post('/terrains/upload', terrainImageUpload.single('terrain'), async (req
         depth: parseFloat(depth)
       },
       scale: typeof scale === 'number' ? scale : parseFloat(scale) || 1.0,
+      gridScale: gridScale ? parseFloat(gridScale) : undefined,
       sourceImage: {
         file: uploadedImageName,
         path: `/assets/terrain_images/${uploadedImageName}`
@@ -192,8 +215,6 @@ router.post('/terrains/upload', terrainImageUpload.single('terrain'), async (req
       dimensions: metadata.dimensions
     });
   } catch (error) {
-    console.error('Error processing terrain upload:', error);
-    
     // Cleanup on error
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
@@ -238,7 +259,6 @@ router.put('/terrains/:terrainId', async (req, res) => {
       return res.status(500).json({ error: 'Failed to update terrain' });
     }
   } catch (error) {
-    console.error('Error updating terrain:', error);
     return res.status(500).json({ error: 'Server error updating terrain' });
   }
 });
@@ -252,44 +272,36 @@ router.put('/terrains/:terrainId/layout', async (req, res) => {
     const { terrainId } = req.params;
     const { placedAssets } = req.body;
 
-    console.log(`Received request to save layout for terrain ID: ${terrainId}`);
-    console.log(`Body (placedAssets type): ${typeof placedAssets}, isArray: ${Array.isArray(placedAssets)}`);
-    if (Array.isArray(placedAssets)) {
-      console.log(`Number of assets to save: ${placedAssets.length}`);
-      if (placedAssets.length > 0) {
-        console.log('First asset structure:', JSON.stringify(placedAssets[0]));
-      }
-    }
-
     if (!Array.isArray(placedAssets)) {
       return res.status(400).json({ error: 'Invalid placedAssets data: Must be an array.' });
     }
 
-    // Basic validation for each asset object (can be more detailed)
-    for (const asset of placedAssets) {
-      if (!asset.id || !asset.modelUrl || !asset.position || !asset.rotation || !asset.scale) {
-        console.log('Invalid asset structure detected:', JSON.stringify(asset));
-        return res.status(400).json({ error: 'Invalid asset object structure in placedAssets.' });
+    // Validate each asset object only if the array is not empty
+    if (placedAssets.length > 0) {
+      for (const asset of placedAssets) {
+        if (!asset.id || !asset.modelUrl || !asset.position || !asset.rotation || !asset.scale) {
+          return res.status(400).json({ error: 'Invalid asset object structure in placedAssets.' });
+        }
       }
     }
 
     const terrainExists = TerrainMetadataUtil.terrainExists(terrainId);
-    console.log(`Terrain exists check for ID (${terrainId}): ${terrainExists}`);
 
     if (!terrainExists) {
       return res.status(404).json({ error: 'Terrain not found' });
     }
 
     const success = await TerrainMetadataUtil.updateTerrainMetadata(terrainId, { placedAssets });
-    console.log(`Update success status for ID (${terrainId}): ${success}`);
 
     if (success) {
-      return res.json({ message: 'Terrain layout saved successfully' });
+      return res.json({ 
+        message: placedAssets.length === 0 ? 'All assets cleared successfully' : 'Terrain layout saved successfully',
+        assetsCount: placedAssets.length
+      });
     } else {
       return res.status(500).json({ error: 'Failed to save terrain layout' });
     }
   } catch (error) {
-    console.error('Error saving terrain layout:', error);
     return res.status(500).json({ error: 'Server error saving terrain layout' });
   }
 });
@@ -312,6 +324,7 @@ router.delete('/terrains/:terrainId', async (req, res) => {
     const terrainPath = path.join(CONFIG.DIRECTORIES.TERRAINS, terrainId);
     let iconPath = null;
     let sourceImagePath = null;
+    let layoutPath = null;
     
     // Check if the terrain has an icon and get its path
     if (metadata.icon && metadata.icon.file) {
@@ -323,7 +336,12 @@ router.delete('/terrains/:terrainId', async (req, res) => {
       sourceImagePath = path.join(CONFIG.DIRECTORIES.TERRAIN_IMAGES, metadata.sourceImage.file);
     }
     
-    // Delete the terrain GLB file
+    // Check if this is a dungeon layout and get the layout file path
+    if (metadata.isDungeonLayout && metadata.layoutFile) {
+      layoutPath = path.join(CONFIG.DIRECTORIES.DUNGEON_LAYOUTS, metadata.layoutFile);
+    }
+    
+    // Delete the terrain GLB file (only exists for regular terrains, not dungeon layouts)
     if (fs.existsSync(terrainPath)) {
       fs.unlinkSync(terrainPath);
     }
@@ -338,6 +356,11 @@ router.delete('/terrains/:terrainId', async (req, res) => {
       fs.unlinkSync(sourceImagePath);
     }
     
+    // Delete the dungeon layout file if it exists
+    if (layoutPath && fs.existsSync(layoutPath)) {
+      fs.unlinkSync(layoutPath);
+    }
+    
     // Delete the terrain metadata
     const success = await TerrainMetadataUtil.removeTerrain(terrainId);
     
@@ -347,7 +370,6 @@ router.delete('/terrains/:terrainId', async (req, res) => {
       return res.status(500).json({ error: 'Failed to delete terrain metadata' });
     }
   } catch (error) {
-    console.error('Error deleting terrain:', error);
     return res.status(500).json({ error: 'Server error deleting terrain' });
   }
 });
@@ -410,15 +432,153 @@ router.get('/terrains/:terrainId/icon', async (req, res) => {
             });
           }
         } catch (thumbnailError) {
-          console.error('Failed to generate terrain icon:', thumbnailError);
+          // Failed to generate terrain icon
         }
       }
     }
     
     return res.status(404).json({ error: 'No icon available for terrain' });
   } catch (error) {
-    console.error('Error retrieving terrain icon:', error);
     return res.status(500).json({ error: 'Server error retrieving terrain icon' });
+  }
+});
+
+/**
+ * Save a dungeon layout and create a new terrain for it
+ * POST /api/terrains/save-layout
+ */
+router.post('/terrains/save-layout', async (req, res) => {
+  try {
+    const { layoutData, layoutName } = req.body;
+    
+    if (!layoutData || !layoutName) {
+      return res.status(400).json({ error: 'Layout data and name are required' });
+    }
+
+    // Generate unique filename for the layout
+    const timestamp = Date.now();
+    const sanitizedName = layoutName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    const layoutFilename = `${sanitizedName}_${timestamp}.json`;
+    const layoutPath = path.join(CONFIG.DIRECTORIES.DUNGEON_LAYOUTS, layoutFilename);
+
+    // Save the layout data to file
+    fs.writeFileSync(layoutPath, JSON.stringify(layoutData, null, 2));
+
+    // Create terrain metadata for the dungeon layout
+    const terrainId = `dungeon_${sanitizedName}_${timestamp}.glb`; // Even though it's not a real GLB
+    const metadata = {
+      name: layoutName,
+      type: 'dungeon_layout',
+      originalFilename: layoutFilename,
+      layoutFile: layoutFilename,
+      layoutPath: `/assets/dungeon_layouts/${layoutFilename}`,
+      dimensions: {
+        width: layoutData.params?.width || 50,
+        height: layoutData.params?.height || 50,
+        depth: 0.1
+      },
+      scale: 1.0,
+      icon: '🏰', // Default dungeon emoji
+      created: timestamp,
+      isDungeonLayout: true,
+      placed_dungeons: false // This is a saved layout, not a placed dungeon with 3D assets
+    };
+
+    // Update the terrain metadata
+    const success = await TerrainMetadataUtil.updateTerrainMetadata(terrainId, metadata);
+    
+    if (success) {
+      res.json({ 
+        message: 'Layout saved and terrain created successfully',
+        terrainId: terrainId,
+        layoutPath: `/assets/dungeon_layouts/${layoutFilename}`,
+        metadata: metadata
+      });
+    } else {
+      return res.status(500).json({ error: 'Failed to create terrain metadata' });
+    }
+  } catch (error) {
+    return res.status(500).json({ error: 'Server error saving layout' });
+  }
+});
+
+/**
+ * Save asset layout for a terrain
+ * POST /api/terrains/:terrainId/assets
+ */
+router.post('/terrains/:terrainId/assets', async (req, res) => {
+  try {
+    const { terrainId } = req.params;
+    const { assets } = req.body;
+    
+    if (!assets || !Array.isArray(assets)) {
+      return res.status(400).json({ error: 'Assets array is required' });
+    }
+    
+    // Check if terrain exists
+    const metadata = TerrainMetadataUtil.getTerrainMetadata(terrainId);
+    if (!metadata) {
+      return res.status(404).json({ error: 'Terrain not found' });
+    }
+    
+    // Validate asset data
+    const validAssets = assets.filter(asset => {
+      return asset.id && asset.modelUrl && asset.name && 
+             asset.position && asset.rotation && asset.scale;
+    });
+    
+    if (validAssets.length !== assets.length) {
+      // Some assets were invalid and filtered out
+    }
+    
+    // Update terrain metadata with placed assets
+    const updateData = {
+      placedAssets: validAssets,
+      placed_dungeons: validAssets.length > 0, // Mark as having placed assets
+      updated: Date.now()
+    };
+    
+    const success = await TerrainMetadataUtil.updateTerrainMetadata(terrainId, updateData);
+    
+    if (success) {
+      res.json({ 
+        message: 'Asset layout saved successfully',
+        assetsCount: validAssets.length,
+        terrainId: terrainId
+      });
+    } else {
+      return res.status(500).json({ error: 'Failed to save asset layout' });
+    }
+  } catch (error) {
+    return res.status(500).json({ error: 'Server error saving asset layout' });
+  }
+});
+
+/**
+ * Get all saved dungeon layouts
+ * GET /api/terrains/layouts
+ */
+router.get('/terrains/layouts', (req, res) => {
+  try {
+    const allMetadata = TerrainMetadataUtil.getMetadata();
+    
+    // Filter only dungeon layout terrains
+    const dungeonLayouts = Object.entries(allMetadata)
+      .filter(([_, metadata]) => metadata.isDungeonLayout === true)
+      .map(([terrainId, metadata]) => ({
+        id: terrainId,
+        name: metadata.name,
+        created: metadata.created,
+        layoutPath: metadata.layoutPath,
+        icon: metadata.icon || '🏰'
+      }));
+    
+    // Sort by created date (newest first)
+    dungeonLayouts.sort((a, b) => (b.created || 0) - (a.created || 0));
+    
+    res.json({ layouts: dungeonLayouts });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error listing layouts' });
   }
 });
 

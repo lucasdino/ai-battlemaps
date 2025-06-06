@@ -906,7 +906,7 @@ const ViewAssets = () => {
 
       {/* Right panel - Asset list */}
       <div style={{...styles.assetListPanel, ...mobileStyles.assetListPanel}}>
-        <h3 style={styles.assetListHeader}>Your 3D Models</h3>
+        <h3 style={styles.assetListHeader}>3D Models</h3>
         
         {/* Pagination controls */}
         {assets.length > 0 && !error && (

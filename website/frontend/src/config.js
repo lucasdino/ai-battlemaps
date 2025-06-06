@@ -13,8 +13,11 @@ const CONFIG = {
       },
       TERRAINS: {
         BASE: '/api/terrains',
+        LIST: '/api/terrains',
         UPLOAD: '/api/terrains/upload',
-        ICON: '/api/terrains/:id/icon'
+        ICON: '/api/terrains/:id/icon',
+        SAVE_LAYOUT: '/api/terrains/save-layout',
+        LAYOUTS: '/api/terrains/layouts'
       },
       DUNGEON: {
         FLOOR_PLAN: '/api/dungeon/floor_plan',

@@ -29,7 +29,8 @@ const CONFIG = {
     TERRAINS: path.join(BACKEND_ROOT, 'assets', 'terrains'),
     TERRAIN_IMAGES: path.join(BACKEND_ROOT, 'assets', 'terrain_images'),
     TERRAIN_ICONS: path.join(BACKEND_ROOT, 'assets', 'terrain_icons'),
-    DUNGEON: path.join(BACKEND_ROOT, 'assets', 'dungeon')
+    DUNGEON: path.join(BACKEND_ROOT, 'assets', 'dungeon'),
+    DUNGEON_LAYOUTS: path.join(BACKEND_ROOT, 'assets', 'dungeon_layouts')
   },
   
   ENDPOINTS: {

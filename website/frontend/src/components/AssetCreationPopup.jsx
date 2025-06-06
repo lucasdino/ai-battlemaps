@@ -906,7 +906,7 @@ const AssetCreationPopup = ({ isOpen, onClose, onAssetCreated, generationStatus 
                 icon="➕"
                 style={{ flex: 1 }}
               >
-                Add/Select Images
+                Upload Image
               </Button>
               <Button
                 variant="secondary"
@@ -914,7 +914,7 @@ const AssetCreationPopup = ({ isOpen, onClose, onAssetCreated, generationStatus 
                 icon="📦"
                 style={{ flex: 1 }}
               >
-                Add 3D Model
+                Use Existing Model
               </Button>
             </div>
             
