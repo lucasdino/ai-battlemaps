@@ -45,6 +45,10 @@ const setupStaticServing = (app) => {
   console.log(`[DEBUG] Serving dungeon assets from physical path: ${CONFIG.DIRECTORIES.DUNGEON}`);
   app.use('/assets/dungeon', express.static(CONFIG.DIRECTORIES.DUNGEON));
   
+  // Dungeon layouts directory (for serving layout JSON files)
+  console.log(`[DEBUG] Serving dungeon layouts from physical path: ${CONFIG.DIRECTORIES.DUNGEON_LAYOUTS}`);
+  app.use('/assets/dungeon_layouts', express.static(CONFIG.DIRECTORIES.DUNGEON_LAYOUTS));
+  
   // Log the static serving paths for debugging
   console.log('Serving static files from:');
   console.log(`- ${CONFIG.DIRECTORIES.MODELS} at /assets/3d_models`);
@@ -55,6 +59,7 @@ const setupStaticServing = (app) => {
   console.log(`- ${CONFIG.DIRECTORIES.TERRAIN_IMAGES} at /assets/terrain_images`);
   console.log(`- ${CONFIG.DIRECTORIES.TERRAIN_ICONS} at /assets/terrain_icons`);
   console.log(`- ${CONFIG.DIRECTORIES.DUNGEON} at /assets/dungeon`);
+  console.log(`- ${CONFIG.DIRECTORIES.DUNGEON_LAYOUTS} at /assets/dungeon_layouts`);
 };
 
 /**

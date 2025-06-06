@@ -31,20 +31,6 @@ const Navbar = () => {
       </Link>
       <div style={styles.navbarLinks}>
         <Link 
-          to="/" 
-          style={styles.navbarLink}
-          onMouseEnter={() => setHoveredLink('home')}
-          onMouseLeave={() => setHoveredLink(null)}
-        >
-          Home
-          <span 
-            style={{
-              ...styles.linkFlameEffect,
-              ...(hoveredLink === 'home' ? styles.linkFlameEffectHover : {})
-            }}
-          />
-        </Link>
-        <Link 
           to="/view-assets" 
           style={styles.navbarLink}
           onMouseEnter={() => setHoveredLink('assets')}

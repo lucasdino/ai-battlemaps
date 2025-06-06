@@ -155,6 +155,18 @@ const ViewTerrains = () => {
   const [transformMode, setTransformMode] = useState('translate');
   const [terrainViewerMetrics, setTerrainViewerMetrics] = useState(null);
   
+  // Create a stable selected terrain object to prevent unnecessary re-renders
+  const stableSelectedTerrain = useMemo(() => {
+    if (!selectedTerrain) return null;
+    
+    // Find the terrain in the current terrains list to get any updates
+    const updatedTerrain = terrains.find(terrain => terrain.id === selectedTerrain.id);
+    
+    // If we found an updated version, use it, otherwise keep the current selection
+    // This prevents re-renders when pagination changes but the selected terrain hasn't actually changed
+    return updatedTerrain || selectedTerrain;
+  }, [selectedTerrain?.id, selectedTerrain?.name, selectedTerrain?.displayName, terrains]);
+  
   // Refs for throttled saves on resize/rotation
   const throttleTimeoutRef = useRef(null);
   const pendingMoveUpdatesRef = useRef(new Map());
@@ -171,9 +183,9 @@ const ViewTerrains = () => {
 
   // Get current terrain assets
   const currentTerrainAssets = useMemo(() => {
-    if (!selectedTerrain?.id) return [];
-    return terrainAssets.get(selectedTerrain.id) || [];
-  }, [selectedTerrain?.id, terrainAssets]);
+    if (!stableSelectedTerrain?.id) return [];
+    return terrainAssets.get(stableSelectedTerrain.id) || [];
+  }, [stableSelectedTerrain?.id, terrainAssets]);
 
   // Calculate terrains per page based on container size (single column layout)
   const calculateTerrainsPerPage = useCallback(() => {
@@ -329,6 +341,25 @@ const ViewTerrains = () => {
     }
   }, []);
 
+  // NEW: Load layout data for dungeon layouts
+  const loadLayoutData = useCallback(async (layoutPath) => {
+    if (!layoutPath) return null;
+    
+    try {
+      const response = await fetch(`${CONFIG.API.BASE_URL}${layoutPath}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch layout data: ${response.status}`);
+      }
+
+      const layoutData = await response.json();
+      return layoutData;
+    } catch (error) {
+      console.error(`❌ Error loading layout data:`, error);
+      return null;
+    }
+  }, []);
+
   // Fetch terrains with pagination
   const fetchTerrains = useCallback(async () => {
     setIsLoading(true);
@@ -348,17 +379,13 @@ const ViewTerrains = () => {
       // Process the terrains array - directly from terrain_metadata.json
       const terrainsArray = Array.isArray(data.terrains) ? data.terrains : [];
       
-      // Map terrains with proper icon handling
-      const terrainsData = terrainsArray.map(terrain => {
+      // Map terrains with proper icon handling and layout data loading
+      const terrainsData = await Promise.all(terrainsArray.map(async (terrain) => {
         let thumbnailUrl = null;
         let iconEmoji = null;
+        let layoutData = null;
         
         if (terrain.icon) {
-          // Debug logging for throneroom
-          if (terrain.name && terrain.name.includes('throneroom')) {
-            console.log('Throneroom terrain icon:', terrain.icon, 'type:', typeof terrain.icon);
-          }
-          
           // If icon starts with '/' it's a path to an image
           if (terrain.icon.startsWith('/')) {
             thumbnailUrl = terrain.icon;
@@ -375,14 +402,22 @@ const ViewTerrains = () => {
           // Default fallback when no icon is provided
           iconEmoji = '🗺️';
         }
+
+        // Load layout data if this is a dungeon layout
+        if (terrain.isDungeonLayout && terrain.layoutPath) {
+          layoutData = await loadLayoutData(terrain.layoutPath);
+        }
         
         return {
           ...terrain,
           displayName: terrain.name || 'Unnamed Dungeon',
           thumbnailUrl,
-          iconEmoji
+          iconEmoji,
+          layoutData,
+          type: terrain.isDungeonLayout ? 'dungeon_layout' : 'terrain',
+          layoutLoadError: terrain.isDungeonLayout && terrain.layoutPath && !layoutData
         };
-      });
+      }));
 
       setTerrains(terrainsData);
       setTotalPages(data.total_pages || Math.max(1, Math.ceil(terrainsData.length / terrainsPerPage)));
@@ -393,14 +428,14 @@ const ViewTerrains = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, terrainsPerPage]);
+  }, [currentPage, terrainsPerPage, loadLayoutData]);
 
   // Load terrain assets when terrain is selected
   useEffect(() => {
-    if (selectedTerrain?.id) {
-      loadTerrainAssets(selectedTerrain.id);
+    if (stableSelectedTerrain?.id) {
+      loadTerrainAssets(stableSelectedTerrain.id);
     }
-  }, [selectedTerrain?.id, loadTerrainAssets]);
+  }, [stableSelectedTerrain?.id, loadTerrainAssets]);
 
   // Handle page change (matching ViewAssets)
   const handlePageChange = useCallback((newPage) => {
@@ -409,12 +444,10 @@ const ViewTerrains = () => {
     }
   }, [currentPage, totalPages]);
 
-  // Get paginated terrains
+  // Since the backend already returns paginated data, we don't need to paginate again on the frontend
   const getPaginatedTerrains = useMemo(() => {
-    const startIndex = (currentPage - 1) * terrainsPerPage;
-    const endIndex = startIndex + terrainsPerPage;
-    return terrains.slice(startIndex, endIndex);
-  }, [terrains, currentPage, terrainsPerPage]);
+    return terrains; // terrains is already paginated by the backend
+  }, [terrains]);
 
   // Render terrain thumbnail
   const renderTerrainThumbnail = (terrain) => {
@@ -743,35 +776,29 @@ const ViewTerrains = () => {
         </div>
       )}
 
-        {isLoading ? (
-          <div style={styles.loadingContainer}>
-            <div style={styles.spinner}></div>
-            <p style={styles.loadingText}>Loading dungeons...</p>
-          </div>
-        ) : selectedTerrain ? (
-            <TerrainViewer
-            key={selectedTerrain.id}
-            terrainUrl={selectedTerrain.url}
-            terrainName={selectedTerrain.name}
-            terrainId={selectedTerrain.id}
-              onError={handleTerrainViewerError}
+        {stableSelectedTerrain ? (
+          <TerrainViewer
+            key={`terrain-${stableSelectedTerrain.id}`}
+            terrainUrl={stableSelectedTerrain.url}
+            terrainName={stableSelectedTerrain.name}
+            terrainId={stableSelectedTerrain.id}
+            onError={handleTerrainViewerError}
             onTerrainNameChange={handleTerrainNameChange}
             onTerrainDeleted={handleTerrainDeleted}
-              onTerrainMetricsUpdate={handleTerrainMetricsUpdate}
+            onTerrainMetricsUpdate={handleTerrainMetricsUpdate}
             hideTerrainControls={selectedTerrain.isNone}
             showGrid={true}
-              // NEW: Pass assets as props instead of managing them internally
-              placedAssets={currentTerrainAssets}
-              onAssetPlaced={handleAssetPlaced}
-              onAssetMoved={handleAssetMoved}
-              onAssetDeleted={handleAssetDeleted}
-              onAssetSelected={handleAssetSelected}
-              selectedAssetId={globallySelectedPlacedAssetId}
-              transformMode={transformMode}
-              onTransformModeChange={setTransformMode}
-            floorPlan={selectedTerrain.layoutData}
-            isDungeonLayout={selectedTerrain.type === 'dungeon_layout'}
-            layoutLoadError={selectedTerrain.layoutLoadError}
+            placedAssets={currentTerrainAssets}
+            onAssetPlaced={handleAssetPlaced}
+            onAssetMoved={handleAssetMoved}
+            onAssetDeleted={handleAssetDeleted}
+            onAssetSelected={handleAssetSelected}
+            selectedAssetId={globallySelectedPlacedAssetId}
+            transformMode={transformMode}
+            onTransformModeChange={setTransformMode}
+            floorPlan={stableSelectedTerrain.layoutData}
+            isDungeonLayout={stableSelectedTerrain.type === 'dungeon_layout'}
+            layoutLoadError={stableSelectedTerrain.layoutLoadError}
             placedDungeons={currentTerrainAssets.length > 0}
           />
         ) : (
@@ -810,6 +837,23 @@ const ViewTerrains = () => {
             <p style={styles.dropzoneSubText}>
               Drag & drop an image file or click to browse
             </p>
+          </div>
+        )}
+        {/* Only show loading spinner if there is no selected terrain and we are loading */}
+        {isLoading && !stableSelectedTerrain && (
+          <div style={{
+            ...styles.loadingContainer,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 50,
+            pointerEvents: 'none',
+          }}>
+            <div style={styles.spinner}></div>
+            <p style={styles.loadingText}>Loading dungeons...</p>
           </div>
         )}
       </div>
@@ -891,9 +935,9 @@ const ViewTerrains = () => {
           <Button
             variant="primary"
             onClick={() => setShowGeneratePopup(true)}
-            style={{ width: '100%', padding: '12px 24px' }}
+            style={{ width: '100%', padding: '12px 24px', fontWeight: 'bold', fontSize: '1rem' }}
           >
-            🏰 Generate Dungeon
+            Generate Dungeon
           </Button>
         </div>
 

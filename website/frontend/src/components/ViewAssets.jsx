@@ -12,9 +12,10 @@ import { Button } from './common';
 const ASSETS_PER_PAGE = 9; // Number of assets to display per page
 
 // Constants for grid item dimensions (including gap)
-const GRID_ITEM_HEIGHT = 96; // Base height of each grid item (matching styles)
+const GRID_ITEM_HEIGHT = 110; // Base height of each grid item (matching styles.assetItem.height)
 const GRID_ITEM_WIDTH = 120;  // Base width of each grid item (matching styles)
 const GRID_GAP = 12; // Gap between items (matching styles)
+const RESERVED_HEIGHT = 160; // Space reserved for header, pagination, and buttons (matching styles.assetListContainer.maxHeight)
 
 // Define the steps we'll use in this component
 const GENERATION_STEPS = [
@@ -53,6 +54,7 @@ const ViewAssets = () => {
   const fileInputRef = useRef(null);
   const gridContainerRef = useRef(null);
   const [assetsPerPage, setAssetsPerPage] = useState(9);
+  const [gridMaxHeight, setGridMaxHeight] = useState(null);
   const [generationStatus, setGenerationStatus] = useState({
     inProgress: false,
     error: false,
@@ -82,21 +84,29 @@ const ViewAssets = () => {
     if (!gridContainerRef.current) return;
 
     const container = gridContainerRef.current;
-    const containerWidth = container.clientWidth - (GRID_GAP * 2); // Account for container padding
-    const containerHeight = container.clientHeight - (GRID_GAP * 2); // Account for container padding
+    const containerPadding = 10; // 5px padding on each side
+    const containerWidth = container.clientWidth - containerPadding; 
+    const containerHeight = container.clientHeight - containerPadding;
 
     // Calculate how many items can fit in a row, accounting for gaps
     const columnsPerRow = Math.max(1, Math.floor((containerWidth + GRID_GAP) / (GRID_ITEM_WIDTH + GRID_GAP)));
     
     // Calculate how many rows can fit, accounting for gaps
-    const rowsPerPage = Math.max(1, Math.floor((containerHeight + GRID_GAP) / (GRID_ITEM_HEIGHT + GRID_GAP)));
+    // Be conservative to prevent overflow - leave some buffer space
+    const bufferSpace = 20; // Extra buffer to prevent scrollbars
+    const availableHeight = Math.max(GRID_ITEM_HEIGHT, containerHeight - bufferSpace);
+    const rowsPerPage = Math.max(1, Math.floor(availableHeight / (GRID_ITEM_HEIGHT + GRID_GAP)));
 
     // Calculate total items that can fit
     const itemsPerPage = columnsPerRow * rowsPerPage;
     
+    // Calculate the exact height the grid should have to prevent overflow
+    const exactGridHeight = rowsPerPage * (GRID_ITEM_HEIGHT + GRID_GAP) - GRID_GAP;
+    
     // Update assets per page if it's different
     if (itemsPerPage !== assetsPerPage) {
       setAssetsPerPage(itemsPerPage);
+      setGridMaxHeight(exactGridHeight);
       // Adjust current page if necessary to keep items in view
       const newTotalPages = Math.max(1, Math.ceil(assets.length / itemsPerPage));
       if (currentPage > newTotalPages) {
@@ -905,7 +915,7 @@ const ViewAssets = () => {
       </div>
 
       {/* Right panel - Asset list */}
-      <div style={{...styles.assetListPanel, ...mobileStyles.assetListPanel}}>
+      <div style={{...styles.assetListPanel, ...mobileStyles.assetListPanel}} data-panel="asset-list">
         <h3 style={styles.assetListHeader}>3D Models</h3>
         
         {/* Pagination controls */}
@@ -938,7 +948,11 @@ const ViewAssets = () => {
               {error}
             </div>
           ) : assets.length > 0 ? (
-            <div style={{...styles.assetGrid, ...mobileStyles.assetGrid}}>
+            <div style={{
+              ...styles.assetGrid, 
+              ...mobileStyles.assetGrid,
+              ...(gridMaxHeight && { maxHeight: `${gridMaxHeight}px`, overflow: 'hidden' })
+            }}>
               {getPaginatedAssets.map((asset, index) => (
                 <div 
                   key={asset.id || index} 
@@ -986,7 +1000,7 @@ const ViewAssets = () => {
           <Button
             variant="primary"
             onClick={() => setIsCreationPopupOpen(true)}
-            style={{ width: '100%', padding: '12px 24px' }}
+            style={{ width: '100%', padding: '12px 24px', fontWeight: 'bold', fontSize: '1rem' }}
           >
             Create 3D Asset
           </Button>

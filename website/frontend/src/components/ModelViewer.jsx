@@ -509,8 +509,8 @@ const ModelViewer = ({
   
   // Add this new useEffect to check and set the video URL when model is ready
   useEffect(() => {
-    // When model is ready and we have a videoUrl but formattedVideoUrl isn't set yet
-    if (isModelReady && !formattedVideoUrl && modelId) {
+    // Only fetch video if model doesn't already have videoUrl prop and model is ready
+    if (isModelReady && !formattedVideoUrl && !videoUrl && modelId) {
       fetch(`${CONFIG.API.BASE_URL}/api/models/${modelId}/video`)
         .then(res => res.ok ? res.json() : null)
         .then(data => {
@@ -526,7 +526,7 @@ const ModelViewer = ({
         })
         .catch(() => {});
     }
-  }, [isModelReady, formattedVideoUrl, modelId]);
+  }, [isModelReady, formattedVideoUrl, videoUrl, modelId]);
   
   // Function to handle PNG download
   const handleDownloadPNG = () => {

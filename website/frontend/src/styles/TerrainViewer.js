@@ -95,7 +95,10 @@ export const terrainViewerStyles = {
     border: '2px solid #404040',
     borderRadius: '4px',
     maxWidth: '100%',
-    maxHeight: '400px'
+    maxHeight: '500px',
+    minWidth: '300px',
+    minHeight: '300px',
+    imageRendering: 'pixelated'
   },
 
   canvasPlaceholder: {

@@ -106,12 +106,12 @@ const TerrainViewer = ({
 
   // Layout visualization data effect
   useEffect(() => {
-    if (isDungeonLayout && !placedDungeons && floorPlan) {
+    if (isDungeonLayout && floorPlan) {
       setLayoutVisualizationData(floorPlan);
     } else {
       setLayoutVisualizationData(null);
     }
-  }, [isDungeonLayout, placedDungeons, floorPlan]);
+  }, [isDungeonLayout, floorPlan]);
 
   // Clear assets when terrain changes
   useEffect(() => {
@@ -187,7 +187,7 @@ const TerrainViewer = ({
       )}
       
       {/* Terrain Name Header */}
-      {!isLoading && !error && terrainUrl && !hideTerrainControls && (
+      {!isLoading && !error && !hideTerrainControls && (
         <div style={terrainViewerStyles.terrainNameHeader}>
           {isEditingName ? (
             <div style={terrainViewerStyles.terrainNameContainer}>
@@ -230,7 +230,7 @@ const TerrainViewer = ({
         isOpen={showLayoutVisualization}
         onClose={() => setShowLayoutVisualization(false)}
         layoutVisualizationData={layoutVisualizationData}
-        onPlaceAssets={() => setShowPlaceAssetsPopup(true)}
+        onPlaceAssets={() => setShowAssetPlacementPanel(true)}
       />
       
       {/* Main render container */}
@@ -293,11 +293,12 @@ const TerrainViewer = ({
                 size="small" 
                 style={terrainViewerStyles.viewLayoutButton}
               >
-                View Layout 📊
+                View Layout
               </Button>
             )}
               
-            {terrainUrl && (
+            {/* Show delete button for all terrains that have onTerrainDeleted handler */}
+            {onTerrainDeleted && (
               <Button onClick={handleDeleteTerrain} variant="danger" size="small">
                 Delete Dungeon
               </Button>

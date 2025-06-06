@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import CONFIG from '../config';
+import { Button } from './common';
 
 const AssetPlacementPanel = ({ 
   isOpen, 
@@ -12,6 +13,30 @@ const AssetPlacementPanel = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const draggedAssetRef = useRef(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [assetsPerPage] = useState(6); // Show 6 assets per page (2 columns x 3 rows)
+
+  // Calculate pagination
+  const totalPages = Math.max(1, Math.ceil(availableAssets.length / assetsPerPage));
+  
+  // Get paginated assets
+  const getPaginatedAssets = useMemo(() => {
+    if (Array.isArray(availableAssets)) {
+      const startIndex = (currentPage - 1) * assetsPerPage;
+      const endIndex = startIndex + assetsPerPage;
+      return availableAssets.slice(startIndex, endIndex);
+    }
+    return [];
+  }, [availableAssets, currentPage, assetsPerPage]);
+
+  // Handle page change
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
+      setCurrentPage(newPage);
+    }
+  };
 
   // Clean model ID for display
   const cleanModelIdForDisplay = (originalName, modelId) => {
@@ -54,6 +79,7 @@ const AssetPlacementPanel = ({
             };
           });
           setAvailableAssets(processedModels);
+          setCurrentPage(1); // Reset to first page when data loads
         } else {
           setAvailableAssets([]);
         }
@@ -68,6 +94,11 @@ const AssetPlacementPanel = ({
 
     fetchAvailableModels();
   }, [isOpen]);
+
+  // Reset to first page when assets change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [availableAssets.length]);
 
   // Handle drag start
   const handleDragStart = (e, asset) => {
@@ -121,7 +152,33 @@ const AssetPlacementPanel = ({
         </div>
 
         <div style={styles.assetSection}>
-          <h4 style={styles.assetSectionTitle}>Available Assets</h4>
+          <div style={styles.assetSectionHeader}>
+            <h4 style={styles.assetSectionTitle}>Available Assets</h4>
+            {/* Pagination controls */}
+            {availableAssets.length > assetsPerPage && !error && !isLoading && (
+              <div style={styles.paginationControls}>
+                <Button 
+                  variant="icon"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  size="small"
+                >
+                  &lt;
+                </Button>
+                <span style={styles.pageIndicator}>
+                  {currentPage} / {totalPages}
+                </span>
+                <Button 
+                  variant="icon"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  size="small"
+                >
+                  &gt;
+                </Button>
+              </div>
+            )}
+          </div>
           
           {isLoading ? (
             <div style={styles.loadingContainer}>
@@ -138,7 +195,7 @@ const AssetPlacementPanel = ({
             </div>
           ) : (
             <div style={styles.assetGrid}>
-              {availableAssets.map((asset) => (
+              {getPaginatedAssets.map((asset) => (
                 <div
                   key={asset.id}
                   draggable={true}
@@ -259,11 +316,28 @@ const styles = {
   assetSection: {
     flex: 1,
   },
+  assetSectionHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '12px',
+  },
   assetSectionTitle: {
     color: '#fff',
     fontSize: '14px',
-    marginBottom: '12px',
+    margin: 0,
     fontWeight: 'bold',
+  },
+  paginationControls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  pageIndicator: {
+    color: '#ccc',
+    fontSize: '12px',
+    minWidth: '40px',
+    textAlign: 'center',
   },
   assetGrid: {
     display: 'grid',

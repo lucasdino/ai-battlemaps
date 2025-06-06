@@ -152,26 +152,26 @@
       "file": "forest_battlemap_1749181490779_qxm8er_icon.png",
       "path": "/assets/terrain_icons/forest_battlemap_1749181490779_qxm8er_icon.png"
     },
-    "updated": 1749191610585,
+    "updated": 1749229261465,
     "placedAssets": [
       {
         "id": "dragdrop-wizard_dragon_1747769405175_a8ea3534.glb-1749190187249",
         "modelUrl": "/assets/3d_models/wizard_dragon_1747769405175_a8ea3534.glb",
         "name": "Wizard Dragon 1747769405175 A8ea3534",
         "position": {
-          "x": -2,
-          "y": 0.7667314715683461,
-          "z": 4.095433977786919
+          "x": -3,
+          "y": 0.4400364525616169,
+          "z": 3.0715754833401894
         },
         "rotation": {
           "x": 0,
-          "y": 0,
+          "y": 2.9,
           "z": 0
         },
         "scale": {
-          "x": 1.6,
-          "y": 1.6,
-          "z": 1.6
+          "x": 0.9,
+          "y": 0.9,
+          "z": 0.9
         }
       },
       {
@@ -179,19 +179,19 @@
         "modelUrl": "/assets/3d_models/edited-1747771432094-386786_1747771466019_fe396e4e.glb",
         "name": "Edited 1747771432094 386786 1747771466019 Fe396e4e",
         "position": {
-          "x": -6,
-          "y": 0.46982015743851663,
+          "x": -2,
+          "y": 0.869660297781229,
           "z": 4.095433977786919
         },
         "rotation": {
           "x": 0,
-          "y": 0,
+          "y": 2.5,
           "z": 0
         },
         "scale": {
-          "x": 0.9,
-          "y": 0.9,
-          "z": 0.9214726450020567
+          "x": 1.7,
+          "y": 1.7,
+          "z": 1.7
         }
       },
       {
@@ -216,5 +216,41 @@
       }
     ],
     "placed_dungeons": false
+  },
+  "dungeon_test_dungeon_1749194493341.glb": {
+    "created": 1749194493341,
+    "name": "Test Dungeon",
+    "type": "dungeon_layout",
+    "originalFilename": "test_dungeon_1749194493341.json",
+    "layoutFile": "test_dungeon_1749194493341.json",
+    "layoutPath": "/assets/dungeon_layouts/test_dungeon_1749194493341.json",
+    "dimensions": {
+      "width": 50,
+      "height": 50,
+      "depth": 0.1
+    },
+    "scale": 1,
+    "icon": "🏰",
+    "isDungeonLayout": true,
+    "placed_dungeons": false,
+    "updated": 1749194493343
+  },
+  "dungeon_dungeon_2_1749195697305.glb": {
+    "created": 1749195697305,
+    "name": "Dungeon 2",
+    "type": "dungeon_layout",
+    "originalFilename": "dungeon_2_1749195697305.json",
+    "layoutFile": "dungeon_2_1749195697305.json",
+    "layoutPath": "/assets/dungeon_layouts/dungeon_2_1749195697305.json",
+    "dimensions": {
+      "width": 50,
+      "height": 50,
+      "depth": 0.1
+    },
+    "scale": 1,
+    "icon": "🏰",
+    "isDungeonLayout": true,
+    "placed_dungeons": false,
+    "updated": 1749195697307
   }
 }
