@@ -179,7 +179,7 @@ const Home = () => {
           onMouseUp={() => setButtonActive(prev => ({ ...prev, forge: false }))}
           onClick={() => handleButtonClick('Forge New Assets')}
         >
-          Forge Heros
+          Create 3D Models
         </button>
         
         <button
@@ -194,7 +194,7 @@ const Home = () => {
           onMouseUp={() => setButtonActive(prev => ({ ...prev, explore: false }))}
           onClick={() => handleButtonClick('Explore New Dungeons')}
         >
-          Explore Dungeons
+          Generate Dungeons
         </button>
       </div>
     </div>
