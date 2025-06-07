@@ -48,4 +48,22 @@ export const updateModel = async (modelId, updateData) => {
   }
   
   return await response.json();
+};
+
+// Update default asset configuration helper
+export const updateDefaultAssetConfig = async (assetId, configData) => {
+  const response = await fetch(`${CONFIG.API.BASE_URL}/api/dungeon-assets/defaults/${assetId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(configData),
+  });
+  
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || `Configuration update failed: ${response.status}`);
+  }
+  
+  return await response.json();
 }; 

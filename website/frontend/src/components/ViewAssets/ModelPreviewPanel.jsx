@@ -23,6 +23,7 @@ const ModelPreviewPanel = ({
   onModelNameChange,
   onModelDeleted,
   onGenerationClose,
+  onOpenAssetConfig, // NEW: Handler for opening asset configuration
   
   // Dropzone
   isDragActive,
@@ -54,16 +55,45 @@ const ModelPreviewPanel = ({
 
   if (selectedModel) {
     return (
-      <ModelViewer 
-        modelUrl={selectedModel.isDefault ? selectedModel.modelUrl : getModelUrl(selectedModel)} 
-        modelName={selectedModel.displayName || selectedModel.name}
-        modelId={selectedModel.id}
-        videoUrl={selectedModel.videoUrl}
-        onError={onModelError}
-        onModelNameChange={selectedModel.isDefault ? undefined : onModelNameChange}
-        onModelDeleted={selectedModel.isDefault ? undefined : onModelDeleted}
-        hideControls={selectedModel.isDefault ? true : false}
-      />
+      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <ModelViewer 
+          modelUrl={selectedModel.isDefault ? selectedModel.modelUrl : getModelUrl(selectedModel)} 
+          modelName={selectedModel.displayName || selectedModel.name}
+          modelId={selectedModel.id}
+          videoUrl={selectedModel.videoUrl}
+          onError={onModelError}
+          onModelNameChange={selectedModel.isDefault ? undefined : onModelNameChange}
+          onModelDeleted={selectedModel.isDefault ? undefined : onModelDeleted}
+          hideControls={selectedModel.isDefault ? true : false}
+        />
+        
+        {/* Configure button for default assets */}
+        {selectedModel.isDefault && onOpenAssetConfig && (
+          <button
+            onClick={() => onOpenAssetConfig(selectedModel)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              backgroundColor: '#e67e22',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '12px 20px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              zIndex: 100,
+              transition: 'background-color 0.2s ease'
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = '#f39c12'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = '#e67e22'}
+          >
+            ⚙️ Configure Size
+          </button>
+        )}
+      </div>
     );
   }
 

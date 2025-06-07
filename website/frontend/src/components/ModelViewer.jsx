@@ -6,20 +6,98 @@ import THEME from '../theme';
 import styles, { getButtonStyle, getLoadingOverlayStyle, KEYFRAMES } from '../styles/ModelViewer';
 import CONFIG from '../config';
 
-// Add a style tag for the spinner animation
+// Utility functions
 const addSpinnerAnimation = () => {
-  // Check if the animation already exists
   if (!document.getElementById('spinner-animation')) {
     const style = document.createElement('style');
     style.id = 'spinner-animation';
-    style.innerHTML = `
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-    `;
+    style.innerHTML = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
     document.head.appendChild(style);
   }
+};
+
+const formatVideoUrl = (videoUrl) => {
+  if (!videoUrl) return null;
+  if (videoUrl.startsWith('http') || videoUrl.startsWith('blob:')) return videoUrl;
+  return videoUrl.startsWith('/') 
+    ? `${CONFIG.API.BASE_URL}${videoUrl}` 
+    : `${CONFIG.API.BASE_URL}/${videoUrl}`;
+};
+
+const disposeObject = (object) => {
+  if (object.geometry) object.geometry.dispose();
+  if (object.material) {
+    if (Array.isArray(object.material)) {
+      object.material.forEach(material => material.dispose());
+    } else {
+      object.material.dispose();
+    }
+  }
+};
+
+const createLights = (scene) => {
+  const lights = [
+    { type: 'ambient', color: 0xffffff, intensity: 8.0 },
+    { type: 'directional', color: 0xffffff, intensity: 2.0, position: [3, 6, 3] },
+    { type: 'directional', color: 0xffffff, intensity: 5.0, position: [-4, -8, -4] },
+    { type: 'directional', color: 0xffffff, intensity: 3, position: [0, -8, 4] },
+    { type: 'directional', color: 0xffffff, intensity: 3, position: [0, 2, -8] },
+    { type: 'directional', color: 0xffffff, intensity: 3, position: [8, 0, 2] }
+  ];
+
+  lights.forEach(lightConfig => {
+    const light = lightConfig.type === 'ambient' 
+      ? new THREE.AmbientLight(lightConfig.color, lightConfig.intensity)
+      : new THREE.DirectionalLight(lightConfig.color, lightConfig.intensity);
+    
+    if (lightConfig.position) {
+      light.position.set(...lightConfig.position);
+      light.castShadow = false;
+    }
+    scene.add(light);
+  });
+};
+
+const setupModelMaterial = (node) => {
+  if (!node.isMesh || !node.material) return;
+  
+  node.castShadow = true;
+  node.receiveShadow = true;
+  
+  const material = node.material;
+  if (material.metalness !== undefined) material.metalness = Math.min(material.metalness + 0.15, 1.0);
+  if (material.roughness !== undefined) material.roughness = Math.max(0.15, Math.min(material.roughness, 0.75));
+  if (material.shadowSide === undefined) material.shadowSide = THREE.FrontSide;
+  if (material.normalMap) material.normalScale.set(1.2, 1.2);
+  if (material.emissive && material.emissiveIntensity !== undefined) material.emissiveIntensity *= 1.2;
+  material.needsUpdate = true;
+};
+
+const calculateCameraPosition = (model, camera) => {
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const scale = 2 / maxDim;
+  
+  model.scale.set(scale, scale, scale);
+  
+  const scaledBox = new THREE.Box3().setFromObject(model);
+  const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
+  const scaledSize = scaledBox.getSize(new THREE.Vector3());
+  
+  model.position.set(-scaledCenter.x, -scaledCenter.y, -scaledCenter.z);
+  
+  const vfov = camera.fov * (Math.PI / 180);
+  const hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
+  
+  const distanceForHeight = scaledSize.y / (1.6 * Math.tan(vfov / 2));
+  const distanceForWidth = scaledSize.x / (1.6 * Math.tan(hfov / 2));
+  const distanceForDepth = scaledSize.z / (1.6 * Math.tan(hfov / 2));
+  
+  let cameraZ = Math.max(distanceForHeight, distanceForWidth, distanceForDepth);
+  cameraZ = Math.max(cameraZ + Math.max(scaledSize.z * 0.1, 0.5), 2);
+  
+  return { x: cameraZ * 0.8, y: cameraZ * 0.5, z: cameraZ * 1 };
 };
 
 const ModelViewer = ({ 
@@ -32,6 +110,7 @@ const ModelViewer = ({
   onModelDeleted,
   hideControls = false
 }) => {
+  // Refs
   const containerRef = useRef(null);
   const canvasContainerRef = useRef(null);
   const sceneRef = useRef(null);
@@ -41,11 +120,12 @@ const ModelViewer = ({
   const animationIdRef = useRef(null);
   const modelRef = useRef(null);
   const controlsHelpRef = useRef(null);
+
+  // State
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isModelReady, setIsModelReady] = useState(false);
   const [error, setError] = useState(null);
-  const [instanceId] = useState(() => Math.random().toString(36).substring(2, 9)); // Unique instance ID for debugging
   const [hoveredButton, setHoveredButton] = useState(null);
   const [activeButton, setActiveButton] = useState(null);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -55,142 +135,73 @@ const ModelViewer = ({
   const [showVideo, setShowVideo] = useState(false);
   const [formattedVideoUrl, setFormattedVideoUrl] = useState(null);
 
-  // Add spinner animation when component mounts
+  // Initialize spinner animation
   useEffect(() => {
     addSpinnerAnimation();
   }, []);
 
-  // Process video URL on component mount or URL change
+  // Process video URL
   useEffect(() => {
-    if (videoUrl) {
-      // Ensure the video URL is properly formatted
-      let processedUrl = videoUrl;
-      
-      // Make URL absolute if it's relative
-      if (videoUrl && !videoUrl.startsWith('http') && !videoUrl.startsWith('blob:')) {
-        processedUrl = videoUrl.startsWith('/') 
-          ? `${CONFIG.API.BASE_URL}${videoUrl}` 
-          : `${CONFIG.API.BASE_URL}/${videoUrl}`;
-      }
-      
-      setFormattedVideoUrl(processedUrl);
-    } else {
-      setFormattedVideoUrl(null);
-    }
+    setFormattedVideoUrl(formatVideoUrl(videoUrl));
   }, [videoUrl]);
 
   // Update editable name when model changes
   useEffect(() => {
     setEditableName(modelName || '');
-    // Reset model ready state when model changes
     setIsModelReady(false);
-    // Reset video state when model changes
     setShowVideo(false);
   }, [modelName]);
 
-  // Clear all THREE.js resources and DOM elements
+  // Clear scene function
   const clearScene = () => {
-    // Stop animation loop
     if (animationIdRef.current) {
       cancelAnimationFrame(animationIdRef.current);
       animationIdRef.current = null;
     }
 
-    // Clear existing model
     if (modelRef.current && sceneRef.current) {
       sceneRef.current.remove(modelRef.current);
-      
-      // Dispose geometries and materials
-      modelRef.current.traverse((child) => {
-        if (child.isMesh) {
-          if (child.geometry) {
-            child.geometry.dispose();
-          }
-          
-          if (child.material) {
-            if (Array.isArray(child.material)) {
-              child.material.forEach(material => material.dispose());
-            } else {
-              child.material.dispose();
-            }
-          }
-        }
-      });
-      
+      modelRef.current.traverse(disposeObject);
       modelRef.current = null;
     }
     
-    // Dispose of controls
     if (controlsRef.current) {
       controlsRef.current.dispose();
       controlsRef.current = null;
     }
     
-    // Dispose of renderer
     if (rendererRef.current) {
       rendererRef.current.dispose();
       rendererRef.current = null;
     }
     
-    // Clear container's DOM elements
     if (canvasContainerRef.current) {
       while (canvasContainerRef.current.firstChild) {
         canvasContainerRef.current.removeChild(canvasContainerRef.current.firstChild);
       }
     }
     
-    // Remove controls help if it exists
     if (controlsHelpRef.current && containerRef.current) {
       try {
         containerRef.current.removeChild(controlsHelpRef.current);
       } catch (err) {
-        // Ignore if it was already removed
+        // Ignore if already removed
       }
       controlsHelpRef.current = null;
     }
     
-    // Clear scene
     if (sceneRef.current) {
-      // Dispose of all textures, materials, and geometries in the scene
-      sceneRef.current.traverse((object) => {
-        if (object.geometry) {
-          object.geometry.dispose();
-        }
-        
-        if (object.material) {
-          if (Array.isArray(object.material)) {
-            object.material.forEach(material => {
-              Object.keys(material).forEach(prop => {
-                if (material[prop] && material[prop].isTexture) {
-                  material[prop].dispose();
-                }
-              });
-              material.dispose();
-            });
-          } else {
-            Object.keys(object.material).forEach(prop => {
-              if (object.material[prop] && object.material[prop].isTexture) {
-                object.material[prop].dispose();
-              }
-            });
-            object.material.dispose();
-          }
-        }
-      });
-      
-      // Clear all objects from scene
+      sceneRef.current.traverse(disposeObject);
       while (sceneRef.current.children.length > 0) {
         sceneRef.current.remove(sceneRef.current.children[0]);
       }
-      
       sceneRef.current = null;
     }
     
-    // Clear camera reference
     cameraRef.current = null;
   };
 
-  // Handle errors by notifying parent component if needed
+  // Handle errors
   useEffect(() => {
     if (error && onError) {
       onError(error);
@@ -204,22 +215,18 @@ const ModelViewer = ({
     };
   }, []);
 
-  // Initialize scene when component mounts or modelUrl changes
+  // Setup scene and load model
   useEffect(() => {
     if (!canvasContainerRef.current || !modelUrl) return;
     
-    // Reset state
     setIsLoading(true);
     setError(null);
     setLoadingProgress(0);
-    
-    // Clean up previous resources
     clearScene();
     
-    // Function to initialize scene
     const setupScene = () => {
       try {
-        // Create new scene
+        // Create scene
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a1a1a);
         sceneRef.current = scene;
@@ -227,133 +234,73 @@ const ModelViewer = ({
         // Create camera
         const aspect = canvasContainerRef.current.clientWidth / canvasContainerRef.current.clientHeight;
         const camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
-        camera.position.z = 5;
-        camera.position.y = 2;
-        camera.position.x = 2;
+        camera.position.set(2, 2, 5);
         cameraRef.current = camera;
         
-        // Try to create WebGL renderer with fallback options
-        let renderer;
-        
-        try {
-          // First try with best quality settings
-          renderer = new THREE.WebGLRenderer({ 
-            antialias: true,
-            alpha: true,
-            preserveDrawingBuffer: true,
-            powerPreference: 'default'
-          });
-        } catch (err) {
-          try {
-            // Fallback to basic settings
-            renderer = new THREE.WebGLRenderer({ 
-              antialias: false,
-              alpha: true,
-              preserveDrawingBuffer: true
-            });
-          } catch (fallbackErr) {
-            throw new Error('WebGL is not supported in your browser');
-          }
-        }
+        // Create renderer
+        const renderer = new THREE.WebGLRenderer({ 
+          antialias: true,
+          alpha: true,
+          preserveDrawingBuffer: true,
+          powerPreference: 'default'
+        });
         
         renderer.setSize(canvasContainerRef.current.clientWidth, canvasContainerRef.current.clientHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limit pixel ratio for performance
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.6;
         
-        // Append canvas to container
         canvasContainerRef.current.appendChild(renderer.domElement);
         rendererRef.current = renderer;
         
-        // Explicitly remove focus/outline styles
         renderer.domElement.style.outline = 'none';
-        renderer.domElement.tabIndex = -1; // Make it unfocusable
-        
-        // Add event listener to prevent focus outline
-        renderer.domElement.addEventListener('mousedown', (e) => {
-          e.preventDefault();
-          renderer.domElement.style.outline = 'none';
-        });
+        renderer.domElement.tabIndex = -1;
         
         // Setup controls
         const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.1;
-        controls.enableZoom = true;
-        controls.zoomSpeed = 1.2;
-        controls.rotateSpeed = 1.0;
-        controls.panSpeed = 1.0;
-        controls.screenSpacePanning = true;
-        controls.minDistance = 1;
-        controls.maxDistance = 20;
-        controls.maxPolarAngle = Math.PI / 1.5;
+        Object.assign(controls, {
+          enableDamping: true,
+          dampingFactor: 0.1,
+          enableZoom: true,
+          zoomSpeed: 1.2,
+          rotateSpeed: 1.0,
+          panSpeed: 1.0,
+          screenSpacePanning: true,
+          minDistance: 1,
+          maxDistance: 20,
+          maxPolarAngle: Math.PI / 1.5
+        });
         controlsRef.current = controls;
         
-        // Add lights (SIMPLIFIED)
-        // Extremely even, bright lighting from all angles
-        const ambientLight = new THREE.AmbientLight(0xffffff, 8.0);
-        scene.add(ambientLight);
-
-        // Key directional light (main)
-        const keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
-        keyLight.position.set(3, 6, 3);
-        keyLight.castShadow = false;
-        scene.add(keyLight);
-
-        // Fill directional light (opposite side, higher intensity)
-        const fillLight = new THREE.DirectionalLight(0xffffff, 5.0);
-        fillLight.position.set(-4, -8, -4);
-        fillLight.castShadow = false;
-        scene.add(fillLight);
+        // Add lights
+        createLights(scene);
         
-        // Extra fill light from the side/below
-        const sideLight = new THREE.DirectionalLight(0xffffff, 3);
-        sideLight.position.set(0, -8, 4);
-        sideLight.castShadow = false;
-        scene.add(sideLight);
-        
-        // Fourth light from the back
-        const backLight = new THREE.DirectionalLight(0xffffff, 3);
-        backLight.position.set(0, 2, -8);
-        backLight.castShadow = false;
-        scene.add(backLight);
-        
-        // Add another fill directional light from the right
-        const rightFillLight = new THREE.DirectionalLight(0xffffff, 3);
-        rightFillLight.position.set(8, 0, 2);
-        rightFillLight.castShadow = false;
-        scene.add(rightFillLight);
-        
-        // Add a subtle grid to help with spatial orientation
+        // Add grid
         const gridHelper = new THREE.GridHelper(20, 20, 0x555555, 0x333333);
-        gridHelper.position.y = -0.01; // Slight offset to prevent z-fighting
+        gridHelper.position.y = -0.01;
         gridHelper.material.opacity = 0.2;
         gridHelper.material.transparent = true;
         scene.add(gridHelper);
         
-        // Setup animation loop
+        // Animation loop
         const animate = () => {
           if (!controlsRef.current || !rendererRef.current || !sceneRef.current || !cameraRef.current) {
             return;
           }
-          
           animationIdRef.current = requestAnimationFrame(animate);
           controlsRef.current.update();
           rendererRef.current.render(sceneRef.current, cameraRef.current);
         };
-        
         animate();
         
-        // Handle window resize
+        // Handle resize
         const handleResize = () => {
           if (!canvasContainerRef.current || !cameraRef.current || !rendererRef.current) return;
-          
           const width = canvasContainerRef.current.clientWidth;
           const height = canvasContainerRef.current.clientHeight;
-          
           cameraRef.current.aspect = width / height;
           cameraRef.current.updateProjectionMatrix();
           rendererRef.current.setSize(width, height);
@@ -369,7 +316,6 @@ const ModelViewer = ({
       }
     };
     
-    // Load the 3D model
     const loadModel = () => {
       if (!sceneRef.current) {
         setError('Cannot load model: scene not initialized');
@@ -378,167 +324,75 @@ const ModelViewer = ({
       
       const loader = new GLTFLoader();
       
-      try {
-        loader.load(
-          modelUrl,
-          (gltf) => {
-            try {
-              const model = gltf.scene;
-              modelRef.current = model;
-              
-              // Configure model materials and shadows
-              model.traverse((node) => {
-                if (node.isMesh) {
-                  node.castShadow = true;
-                  node.receiveShadow = true;
-                  
-                  if (node.material) {
-                    if (node.material.metalness !== undefined) {
-                      node.material.metalness = Math.min(node.material.metalness + 0.15, 1.0);
-                    }
-                    
-                    if (node.material.roughness !== undefined) {
-                      node.material.roughness = Math.max(0.15, Math.min(node.material.roughness, 0.75));
-                    }
-                    
-                    if (node.material.shadowSide === undefined) {
-                      node.material.shadowSide = THREE.FrontSide;
-                    }
-                    
-                    if (node.material.normalMap) {
-                      node.material.normalScale.set(1.2, 1.2);
-                    }
-                    
-                    if (node.material.emissive && node.material.emissiveIntensity !== undefined) {
-                      node.material.emissiveIntensity *= 1.2;
-                    }
-                    
-                    node.material.needsUpdate = true;
-                  }
-                }
-              });
-              
-              // Add model to scene
-              sceneRef.current.add(model);
-              
-              // Center and scale the model
-              const box = new THREE.Box3().setFromObject(model);
-              const center = box.getCenter(new THREE.Vector3());
-              const size = box.getSize(new THREE.Vector3());
-
-              // Scale the model so its largest dimension is always 2 units
-              const maxDim = Math.max(size.x, size.y, size.z);
-              const scale = 2 / maxDim;
-              model.scale.set(scale, scale, scale);
-
-              // Recompute box and center after scaling
-              const scaledBox = new THREE.Box3().setFromObject(model);
-              const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
-              model.position.x = -scaledCenter.x;
-              model.position.y = -scaledCenter.y;
-              model.position.z = -scaledCenter.z;
-
-              // Calculate camera position to frame the model to fill 80% of the view
-              const camera = cameraRef.current;
-              const aspect = camera.aspect;
-              const vfov = camera.fov * (Math.PI / 180);
-              const scaledSize = scaledBox.getSize(new THREE.Vector3());
-              const height = scaledSize.y;
-              const width = scaledSize.x;
-              const depth = scaledSize.z;
-
-              // Calculate distances needed for height and width
-              let distanceForHeight = height / (1.6 * Math.tan(vfov / 2));
-              const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect);
-              let distanceForWidth = width / (1.6 * Math.tan(hfov / 2));
-              let distanceForDepth = depth / (1.6 * Math.tan(hfov / 2));
-
-              // Use the maximum distance to ensure the entire model is visible
-              let cameraZ = Math.max(distanceForHeight, distanceForWidth, distanceForDepth);
-              cameraZ = cameraZ + Math.max(depth * 0.1, 0.5); // Add a small buffer
-              cameraZ = Math.max(cameraZ, 2); // Ensure minimum reasonable distance
-
-              // Place camera at an angle from above and to the side
-              camera.position.set(cameraZ * 0.8, cameraZ * 0.5, cameraZ * 1);
-              camera.lookAt(0, 0, 0);
-              
-              // Adjust controls
-              if (controlsRef.current) {
-                controlsRef.current.target.set(0, 0, 0);
-                controlsRef.current.update();
-              }
-              
-              // Update state
-              setIsLoading(false);
-              setLoadingProgress(100);
-              
-              // Add a slight delay before showing UI elements to ensure smooth transition
-              setTimeout(() => {
-                setIsModelReady(true);
-                // Add controls help overlay once model is ready and controls are visible
-                addControlsHelp();
-              }, 300);
-            } catch (err) {
-              console.error("Model display error:", err);
-              setError('Error displaying the model. The file may be corrupted.');
-              setIsLoading(false);
+      loader.load(
+        modelUrl,
+        (gltf) => {
+          try {
+            const model = gltf.scene;
+            modelRef.current = model;
+            
+            model.traverse(setupModelMaterial);
+            sceneRef.current.add(model);
+            
+            const cameraPos = calculateCameraPosition(model, cameraRef.current);
+            cameraRef.current.position.set(cameraPos.x, cameraPos.y, cameraPos.z);
+            cameraRef.current.lookAt(0, 0, 0);
+            
+            if (controlsRef.current) {
+              controlsRef.current.target.set(0, 0, 0);
+              controlsRef.current.update();
             }
-          },
-          (xhr) => {
-            const progress = (xhr.loaded / xhr.total) * 100;
-            setLoadingProgress(progress);
-          },
-          (errorEvent) => {
-            console.error("Model load error:", errorEvent);
-            setError('Failed to load 3D model. The file might be inaccessible or corrupted.');
+            
+            setIsLoading(false);
+            setLoadingProgress(100);
+            
+            setTimeout(() => {
+              setIsModelReady(true);
+              addControlsHelp();
+            }, 300);
+          } catch (err) {
+            console.error("Model display error:", err);
+            setError('Error displaying the model. The file may be corrupted.');
             setIsLoading(false);
           }
-        );
-      } catch (err) {
-        console.error("GLTFLoader error:", err);
-        setError('Could not load the 3D model. Please try again later.');
-        setIsLoading(false);
-      }
+        },
+        (xhr) => {
+          const progress = (xhr.loaded / xhr.total) * 100;
+          setLoadingProgress(progress);
+        },
+        (errorEvent) => {
+          console.error("Model load error:", errorEvent);
+          setError('Failed to load 3D model. The file might be inaccessible or corrupted.');
+          setIsLoading(false);
+        }
+      );
     };
     
-    // Setup scene and load model
     setupScene();
     loadModel();
     
   }, [modelUrl]);
   
-  // Add this new useEffect to check and set the video URL when model is ready
+  // Fetch video URL if not provided (skip for default assets)
   useEffect(() => {
-    // Only fetch video if model doesn't already have videoUrl prop and model is ready
-    if (isModelReady && !formattedVideoUrl && !videoUrl && modelId) {
+    if (isModelReady && !formattedVideoUrl && !videoUrl && modelId && !hideControls) {
       fetch(`${CONFIG.API.BASE_URL}/api/models/${modelId}/video`)
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data && data.videoPath) {
-            let processedUrl = data.videoPath;
-            if (!processedUrl.startsWith('http') && !processedUrl.startsWith('blob:')) {
-              processedUrl = processedUrl.startsWith('/') 
-                ? `${CONFIG.API.BASE_URL}${processedUrl}` 
-                : `${CONFIG.API.BASE_URL}/${processedUrl}`;
-            }
-            setFormattedVideoUrl(processedUrl);
+            setFormattedVideoUrl(formatVideoUrl(data.videoPath));
           }
         })
         .catch(() => {});
     }
-  }, [isModelReady, formattedVideoUrl, videoUrl, modelId]);
+  }, [isModelReady, formattedVideoUrl, videoUrl, modelId, hideControls]);
   
-  // Function to handle PNG download
+  // Action handlers
   const handleDownloadPNG = () => {
-    if (!rendererRef.current || !sceneRef.current || !cameraRef.current) {
-      return;
-    }
+    if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return;
     
     try {
-      // Render the current view to ensure it's up to date
       rendererRef.current.render(sceneRef.current, cameraRef.current);
-      
-      // Get data URL and trigger download
       const canvas = rendererRef.current.domElement;
       const dataURL = canvas.toDataURL('image/png');
       const link = document.createElement('a');
@@ -552,21 +406,13 @@ const ModelViewer = ({
     }
   };
   
-  // Function to handle GLB download
   const handleDownloadGLB = () => {
-    if (!modelUrl) {
-      return;
-    }
+    if (!modelUrl) return;
     
     try {
-      // Create a link to download the original GLB file
       const link = document.createElement('a');
       link.href = modelUrl;
-      
-      // Extract filename from URL or use a default name
-      const fileName = modelUrl.split('/').pop() || 'model.glb';
-      link.download = fileName;
-      
+      link.download = modelUrl.split('/').pop() || 'model.glb';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -575,29 +421,18 @@ const ModelViewer = ({
     }
   };
 
-  // Function to handle STL download
   const handleDownloadSTL = async () => {
-    if (!modelId) {
-      return;
-    }
+    if (!modelId) return;
     
     try {
-      // Request STL conversion from the backend
       const response = await fetch(`${CONFIG.API.BASE_URL}/api/models/${modelId}/download/stl`);
+      if (!response.ok) throw new Error(`STL conversion failed: ${response.status}`);
       
-      if (!response.ok) {
-        throw new Error(`STL conversion failed: ${response.status}`);
-      }
-      
-      // Get the STL data as a blob
       const blob = await response.blob();
-      
-      // Create a download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       
-      // Extract model name and create STL filename
       const modelFileName = modelUrl?.split('/').pop() || 'model.glb';
       const baseName = modelFileName.replace(/\.glb$/i, '');
       link.download = `${baseName}.stl`;
@@ -605,8 +440,6 @@ const ModelViewer = ({
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
-      // Clean up the blob URL
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('STL download error:', err);
@@ -614,48 +447,25 @@ const ModelViewer = ({
     }
   };
   
-  // Function to reset the camera view
   const resetView = () => {
     if (!cameraRef.current || !controlsRef.current || !modelRef.current) return;
     
     try {
-      // Ensure the model's world matrix is up to date
-      modelRef.current.updateWorldMatrix(true, true);
-      // Get model dimensions
-      const box = new THREE.Box3().setFromObject(modelRef.current);
-      const size = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const scale = 2 / maxDim;
-      modelRef.current.scale.set(scale, scale, scale);
-      const scaledBox = new THREE.Box3().setFromObject(modelRef.current);
-      const scaledSize = scaledBox.getSize(new THREE.Vector3());
-      const height = scaledSize.y;
-      const width = scaledSize.x;
-      const depth = scaledSize.z;
-      const hfov = 2 * Math.atan(Math.tan(cameraRef.current.fov * (Math.PI / 180) / 2) * cameraRef.current.aspect);
-      const distanceForHeight = height / (1.6 * Math.tan(cameraRef.current.fov * (Math.PI / 180) / 2));
-      const distanceForWidth = width / (1.6 * Math.tan(hfov / 2));
-      const distanceForDepth = depth / (1.6 * Math.tan(hfov / 2));
-      let cameraZ = Math.max(distanceForHeight, distanceForWidth, distanceForDepth);
-      cameraZ = cameraZ + Math.max(depth * 0.1, 0.5);
-      cameraZ = Math.max(cameraZ, 2);
-      cameraRef.current.position.set(cameraZ * 0.8, cameraZ * 0.5, cameraZ * 1);
+      const cameraPos = calculateCameraPosition(modelRef.current, cameraRef.current);
+      cameraRef.current.position.set(cameraPos.x, cameraPos.y, cameraPos.z);
       cameraRef.current.lookAt(0, 0, 0);
       controlsRef.current.target.set(0, 0, 0);
       controlsRef.current.update();
-      modelRef.current.rotation.y = 0; // No initial rotation
+      modelRef.current.rotation.y = 0;
     } catch (err) {
       // Silently fail - not critical
     }
   };
   
-  // Toggle video display
   const toggleVideo = () => {
-    console.log("Toggle video called, current state:", showVideo, "URL:", formattedVideoUrl);
     setShowVideo(!showVideo);
   };
   
-  // Save name change and exit edit mode
   const saveModelName = () => {
     if (onModelNameChange && editableName !== modelName) {
       onModelNameChange(editableName);
@@ -663,21 +473,18 @@ const ModelViewer = ({
     setIsEditingName(false);
   };
 
-  // Handle key press in the input
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
       saveModelName();
     }
   };
   
-  // Function to handle model deletion
   const handleDeleteModel = async () => {
     if (!modelId) return;
     
     setIsDeleting(true);
     
     try {
-      // Call the API to delete the model
       const response = await fetch(`${CONFIG.API.BASE_URL}/api/models/${modelId}`, {
         method: 'DELETE',
       });
@@ -687,7 +494,6 @@ const ModelViewer = ({
         throw new Error(errorData.error || `Delete failed: ${response.status}`);
       }
       
-      // Notify parent component about successful deletion
       if (onModelDeleted) {
         onModelDeleted(modelId, 'Model deleted successfully');
       }
@@ -699,7 +505,6 @@ const ModelViewer = ({
     }
   };
   
-  // Function to get button style with hover state
   const getActionButtonStyle = (isHovered, isActive, isPrimary = false, isDanger = false) => {
     return {
       background: isDanger 
@@ -720,12 +525,11 @@ const ModelViewer = ({
     };
   };
   
-  // Style for the video toggle button
   const videoToggleButtonStyle = {
     position: 'absolute',
     top: '15px',
     left: '15px',
-    zIndex: 100, // Increase z-index significantly
+    zIndex: 100,
     background: showVideo ? '#e67e22' : '#333',
     color: 'white',
     border: 'none',
@@ -736,16 +540,14 @@ const ModelViewer = ({
     cursor: 'pointer',
     boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
     transition: 'background-color 0.2s ease',
-    pointerEvents: 'auto' // Ensure clicks are registered
+    pointerEvents: 'auto'
   };
   
-  // Update loading progress bar style
   const loadingProgressBarStyle = {
     ...styles.loadingProgressBar,
     width: `${loadingProgress}%`
   };
 
-  // We'll define a memoized callback that ensures only one instance is added and only when controls are visible
   const addControlsHelp = () => {
     if (!containerRef.current || controlsHelpRef.current || hideControls) return;
     const helpText = document.createElement('div');
@@ -764,7 +566,7 @@ const ModelViewer = ({
 
   return (
     <div style={styles.container} ref={containerRef}>
-      {/* Video Toggle Button - Only show if video is available */}
+      {/* Video Toggle Button */}
       {!isLoading && !error && isModelReady && formattedVideoUrl && !hideControls && (
         <button 
           style={videoToggleButtonStyle}
@@ -957,7 +759,7 @@ const ModelViewer = ({
         </div>
       </div>
 
-      {/* Video Player - In top left corner */}
+      {/* Video Player */}
       {formattedVideoUrl && showVideo && (
         <div style={{
           position: 'absolute',

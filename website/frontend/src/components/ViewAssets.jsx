@@ -3,6 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import THEME from '../theme';
 import ModelViewer from './ModelViewer';
 import AssetCreationPopup from './AssetCreationPopup';
+import DefaultAssetConfigViewer from './DefaultAssetConfigViewer';
 import CONFIG from '../config';
 import styles, { getMobileStyles, MOBILE_BREAKPOINT, SINGLE_COLUMN_BREAKPOINT } from '../styles/ViewAssets';
 import addGlobalAnimations from '../styles/animations';
@@ -15,7 +16,7 @@ import GenerationProgress from './ViewAssets/GenerationProgress';
 import ModelPreviewPanel from './ViewAssets/ModelPreviewPanel';
 import useResponsiveGrid from '../hooks/useResponsiveGrid';
 import { formatFileName, getModelUrl, processAssetData, isValidAsset, formatVideoMapping } from '../utils/assetHelpers';
-import { fetchFromApi, uploadFile, updateModel } from '../utils/api';
+import { fetchFromApi, uploadFile, updateModel, updateDefaultAssetConfig } from '../utils/api';
 import { ASSETS_PER_PAGE, GENERATION_STEPS, PROGRESS_STEPS, MAJOR_STEPS } from '../utils/constants';
 
 // Note: Constants moved to utils/constants.js
@@ -68,6 +69,10 @@ const ViewAssets = () => {
   // Track video preview and temp model for action steps
   const [actionVideoUrl, setActionVideoUrl] = useState(null);
   const [actionModel, setActionModel] = useState(null);
+
+  // Default asset configuration state
+  const [isConfigViewerOpen, setIsConfigViewerOpen] = useState(false);
+  const [assetToConfigured, setAssetToConfigured] = useState(null);
 
   // Use responsive grid hook (after all state declarations)
   const { assetsPerPage, gridMaxHeight } = useResponsiveGrid(
@@ -555,6 +560,51 @@ const ViewAssets = () => {
     }
   };
 
+  // Handle opening default asset configuration
+  const handleOpenAssetConfig = useCallback((asset) => {
+    setAssetToConfigured(asset);
+    setIsConfigViewerOpen(true);
+  }, []);
+
+  // Handle closing default asset configuration
+  const handleCloseAssetConfig = useCallback(() => {
+    setIsConfigViewerOpen(false);
+    setAssetToConfigured(null);
+  }, []);
+
+  // Handle saving default asset configuration
+  const handleSaveAssetConfig = useCallback(async (config) => {
+    if (!assetToConfigured) return;
+
+    try {
+      const updates = {
+        defaultScale: config.scale,
+        defaultRotation: config.rotation
+      };
+      
+      await updateDefaultAsset(assetToConfigured.id, updates);
+      
+      // Update the selected model if it's the same asset
+      if (selectedModel && selectedModel.id === assetToConfigured.id) {
+        setSelectedModel(prev => ({
+          ...prev,
+          defaultScale: config.scale,
+          defaultRotation: config.rotation
+        }));
+      }
+      
+      setNotification({ type: 'success', message: 'Asset configuration saved successfully!' });
+      handleCloseAssetConfig();
+    } catch (err) {
+      setNotification({ type: 'error', message: `Failed to save configuration: ${err.message}` });
+    }
+  }, [assetToConfigured, updateDefaultAsset, selectedModel, handleCloseAssetConfig]);
+
+  // Handle default asset configuration error
+  const handleAssetConfigError = useCallback((errorMessage) => {
+    setNotification({ type: 'error', message: errorMessage });
+  }, []);
+
   // Get paginated assets
   const getPaginatedAssets = useMemo(() => {
     if (Array.isArray(assets)) {
@@ -714,6 +764,7 @@ const ViewAssets = () => {
           onActionModelError={handleActionModelError}
           onModelNameChange={handleModelNameChange}
           onModelDeleted={handleModelDeleted}
+          onOpenAssetConfig={handleOpenAssetConfig}
           onGenerationClose={() => {
             setGenerationStatus({ 
               inProgress: false, error: false, errorMessage: '', 
@@ -832,6 +883,16 @@ const ViewAssets = () => {
           generationStatus={generationStatus}
         />
       </div>
+
+      {/* Default Asset Configuration Viewer */}
+      {isConfigViewerOpen && assetToConfigured && (
+        <DefaultAssetConfigViewer
+          asset={assetToConfigured}
+          onSave={handleSaveAssetConfig}
+          onClose={handleCloseAssetConfig}
+          onError={handleAssetConfigError}
+        />
+      )}
     </div>
   );
 };

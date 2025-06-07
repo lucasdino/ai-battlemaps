@@ -187,14 +187,14 @@ router.get('/defaults/:id/icon', async (req, res) => {
   }
 });
 
-// Update default asset metadata (name and description)
+// Update default asset metadata (name, description, scale, rotation)
 router.put('/defaults/:id', (req, res) => {
   const assetId = req.params.id;
-  const { name, description } = req.body;
+  const { name, description, defaultScale, defaultRotation } = req.body;
   const defaultAssetsPath = path.resolve(__dirname, '../data/default_assets_metadata.json');
   
-  if (!name && !description) {
-    return res.status(400).json({ error: 'Name or description is required.' });
+  if (!name && !description && !defaultScale && !defaultRotation) {
+    return res.status(400).json({ error: 'At least one field is required (name, description, defaultScale, or defaultRotation).' });
   }
   
   fs.readFile(defaultAssetsPath, 'utf8', (err, data) => {
@@ -213,6 +213,28 @@ router.put('/defaults/:id', (req, res) => {
       // Update the asset
       if (name) assets[assetIndex].name = name;
       if (description) assets[assetIndex].description = description;
+      if (defaultScale) {
+        // Validate scale object
+        if (typeof defaultScale === 'object' && 
+            typeof defaultScale.x === 'number' && 
+            typeof defaultScale.y === 'number' && 
+            typeof defaultScale.z === 'number') {
+          assets[assetIndex].defaultScale = defaultScale;
+        } else {
+          return res.status(400).json({ error: 'Invalid scale format. Expected {x, y, z} with numeric values.' });
+        }
+      }
+      if (defaultRotation) {
+        // Validate rotation object
+        if (typeof defaultRotation === 'object' && 
+            typeof defaultRotation.x === 'number' && 
+            typeof defaultRotation.y === 'number' && 
+            typeof defaultRotation.z === 'number') {
+          assets[assetIndex].defaultRotation = defaultRotation;
+        } else {
+          return res.status(400).json({ error: 'Invalid rotation format. Expected {x, y, z} with numeric values.' });
+        }
+      }
       
       // Write back to file
       fs.writeFile(defaultAssetsPath, JSON.stringify(assets, null, 2), 'utf8', (writeErr) => {
