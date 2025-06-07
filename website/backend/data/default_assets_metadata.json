@@ -1,0 +1,902 @@
+[
+  {
+    "id": "anvil_1",
+    "name": "Anvil",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Metal anvil for blacksmithing.",
+    "modelPath": "assets/dungeon_defaults/models/anvil.glb",
+    "icon": {
+      "file": "anvil_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/anvil_1.png"
+    }
+  },
+  {
+    "id": "armor_knight_pike_1",
+    "name": "Knight Armor with Pike",
+    "type": "Default Asset",
+    "category": "statue",
+    "description": "Full knight armor display with pike weapon.",
+    "modelPath": "assets/dungeon_defaults/models/armor_knight_pike.glb",
+    "icon": {
+      "file": "armor_knight_pike_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/armor_knight_pike_1.png"
+    }
+  },
+  {
+    "id": "armor_knight_sword_1",
+    "name": "Knight Armor with Sword",
+    "type": "Default Asset",
+    "category": "statue",
+    "description": "Full knight armor display with sword weapon.",
+    "modelPath": "assets/dungeon_defaults/models/armor_knight_sword.glb",
+    "icon": {
+      "file": "armor_knight_sword_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/armor_knight_sword_1.png"
+    }
+  },
+  {
+    "id": "barrel_sideways_1",
+    "name": "Barrel (Sideways)",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Wooden barrel lying on its side.",
+    "modelPath": "assets/dungeon_defaults/models/barrel_sideways.glb",
+    "icon": {
+      "file": "barrel_sideways_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/barrel_sideways_1.png"
+    }
+  },
+  {
+    "id": "barrel_upright_1",
+    "name": "Barrel (Upright)",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Wooden barrel standing upright.",
+    "modelPath": "assets/dungeon_defaults/models/barrel_upright.glb",
+    "icon": {
+      "file": "barrel_upright_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/barrel_upright_1.png"
+    }
+  },
+  {
+    "id": "bed_simple_green_1",
+    "name": "Simple Bed (Green)",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Simple bed with green bedding.",
+    "modelPath": "assets/dungeon_defaults/models/bed_simple_green.glb",
+    "icon": {
+      "file": "bed_simple_green_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/bed_simple_green_1.png"
+    }
+  },
+  {
+    "id": "blacksmith_furnace_1",
+    "name": "Blacksmith Furnace",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Large blacksmith furnace for metalworking.",
+    "modelPath": "assets/dungeon_defaults/models/blacksmith_furnace.glb",
+    "icon": {
+      "file": "blacksmith_furnace_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/blacksmith_furnace_1.png"
+    }
+  },
+  {
+    "id": "blacksmith_table_1",
+    "name": "Blacksmith Table",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Workbench table with blacksmithing tools on it.",
+    "modelPath": "assets/dungeon_defaults/models/blacksmith_table.glb",
+    "icon": {
+      "file": "blacksmith_table_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/blacksmith_table_1.png"
+    }
+  },
+  {
+    "id": "bonepile_1",
+    "name": "Bone Pile",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Pile of bones and skeletal remains.",
+    "modelPath": "assets/dungeon_defaults/models/bonepile.glb",
+    "icon": {
+      "file": "bonepile_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/bonepile_1.png"
+    }
+  },
+  {
+    "id": "bookshelf_empty_1",
+    "name": "Empty Bookshelf",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Wooden bookshelf, empty with no books.",
+    "modelPath": "assets/dungeon_defaults/models/bookshelf_empty.glb",
+    "icon": {
+      "file": "bookshelf_empty_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/bookshelf_empty_1.png"
+    }
+  },
+  {
+    "id": "bookshelf_stone_1",
+    "name": "Stone Bookshelf",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Stone bookshelf filled with books.",
+    "modelPath": "assets/dungeon_defaults/models/bookshelf_stone.glb",
+    "icon": {
+      "file": "bookshelf_stone_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/bookshelf_stone_1.png"
+    }
+  },
+  {
+    "id": "bookshelf_wooden_1",
+    "name": "Wooden Bookshelf",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Wooden bookshelf filled with books.",
+    "modelPath": "assets/dungeon_defaults/models/bookshelf_wooden.glb",
+    "icon": {
+      "file": "bookshelf_wooden_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/bookshelf_wooden_1.png"
+    }
+  },
+  {
+    "id": "bucket_water_1",
+    "name": "Water Bucket",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Dark metal bucket filled with water.",
+    "modelPath": "assets/dungeon_defaults/models/bucket_water.glb",
+    "icon": {
+      "file": "bucket_water_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/bucket_water_1.png"
+    }
+  },
+  {
+    "id": "cabinet_metal_1",
+    "name": "Metal Cabinet",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Metal storage cabinet with drawers.",
+    "modelPath": "assets/dungeon_defaults/models/cabinet_metal.glb",
+    "icon": {
+      "file": "cabinet_metal_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/cabinet_metal_1.png"
+    }
+  },
+  {
+    "id": "cabinet_wooden_1",
+    "name": "Wooden Cabinet",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Wooden storage cabinet with drawers.",
+    "modelPath": "assets/dungeon_defaults/models/cabinet_wooden.glb",
+    "icon": {
+      "file": "cabinet_wooden_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/cabinet_wooden_1.png"
+    }
+  },
+  {
+    "id": "cauldron_greenpotion_1",
+    "name": "Cauldron with Green Potion",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Large brewing cauldron containing green potion.",
+    "modelPath": "assets/dungeon_defaults/models/cauldron_greenpotion.glb",
+    "icon": {
+      "file": "cauldron_greenpotion_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/cauldron_greenpotion_1.png"
+    }
+  },
+  {
+    "id": "chair_carved_wood_1",
+    "name": "Carved Wooden Chair",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Wooden chair with modest woodworking details.",
+    "modelPath": "assets/dungeon_defaults/models/chair_carved_wood.glb",
+    "icon": {
+      "file": "chair_carved_wood_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/chair_carved_wood_1.png"
+    }
+  },
+  {
+    "id": "chair_ornate_red_1",
+    "name": "Ornate Red Chair",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Ornate chair with red upholstery.",
+    "modelPath": "assets/dungeon_defaults/models/chair_ornate_red.glb",
+    "icon": {
+      "file": "chair_ornate_red_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/chair_ornate_red_1.png"
+    }
+  },
+  {
+    "id": "chair_ornate_white_1",
+    "name": "Ornate White Chair",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Ornate chair with white upholstery.",
+    "modelPath": "assets/dungeon_defaults/models/chair_ornate_white.glb",
+    "icon": {
+      "file": "chair_ornate_white_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/chair_ornate_white_1.png"
+    }
+  },
+  {
+    "id": "chair_simple_wood_1",
+    "name": "Simple Wooden Chair",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Simple wooden chair.",
+    "modelPath": "assets/dungeon_defaults/models/chair_simple_wood.glb",
+    "icon": {
+      "file": "chair_simple_wood_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/chair_simple_wood_1.png"
+    }
+  },
+  {
+    "id": "cheese_table_1",
+    "name": "Cheese Table",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Table with cheese and food items.",
+    "modelPath": "assets/dungeon_defaults/models/cheese_table.glb",
+    "icon": {
+      "file": "cheese_table_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/cheese_table_1.png"
+    }
+  },
+  {
+    "id": "chest_semi_valuable_1",
+    "name": "Semi-Valuable Chest",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Medium-tier treasure chest (closed).",
+    "modelPath": "assets/dungeon_defaults/models/chest_semi_valuable.glb",
+    "icon": {
+      "file": "chest_semi_valuable_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/chest_semi_valuable_1.png"
+    }
+  },
+  {
+    "id": "chest_simple_1",
+    "name": "Simple Chest",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Basic wooden chest (closed) for storage.",
+    "modelPath": "assets/dungeon_defaults/models/chest_simple.glb",
+    "icon": {
+      "file": "chest_simple_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/chest_simple_1.png"
+    }
+  },
+  {
+    "id": "chest_super_valuable_1",
+    "name": "Super Valuable Chest",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Ornate treasure chest, open with gold and gems spilling out.",
+    "modelPath": "assets/dungeon_defaults/models/chest_super_valuable.glb",
+    "icon": {
+      "file": "chest_super_valuable_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/chest_super_valuable_1.png"
+    }
+  },
+  {
+    "id": "chest_valuable_1",
+    "name": "Valuable Chest",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Valuable treasure chest (closed) with gold inlay and ornate design.",
+    "modelPath": "assets/dungeon_defaults/models/chest_valuable.glb",
+    "icon": {
+      "file": "chest_valuable_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/chest_valuable_1.png"
+    }
+  },
+  {
+    "id": "coffin_stone_1",
+    "name": "Stone Coffin",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Stone coffin.",
+    "modelPath": "assets/dungeon_defaults/models/coffin_stone.glb",
+    "icon": {
+      "file": "coffin_stone_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/coffin_stone_1.png"
+    }
+  },
+  {
+    "id": "column_gargoyle_1",
+    "name": "Gargoyle Column",
+    "type": "Default Asset",
+    "category": "structure",
+    "description": "Decorative short column with gargoyle statue on top.",
+    "modelPath": "assets/dungeon_defaults/models/column_gargoyle.glb",
+    "icon": {
+      "file": "column_gargoyle_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/column_gargoyle_1.png"
+    }
+  },
+  {
+    "id": "column_short_1",
+    "name": "Short Column",
+    "type": "Default Asset",
+    "category": "structure",
+    "description": "Short decorative column made of marble.",
+    "modelPath": "assets/dungeon_defaults/models/column_short.glb",
+    "icon": {
+      "file": "column_short_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/column_short_1.png"
+    }
+  },
+  {
+    "id": "column_tall_corinthian_1",
+    "name": "Tall Corinthian Column",
+    "type": "Default Asset",
+    "category": "structure",
+    "description": "Tall column with Corinthian capital.",
+    "modelPath": "assets/dungeon_defaults/models/column_tall_corinthian.glb",
+    "icon": {
+      "file": "column_tall_corinthian_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/column_tall_corinthian_1.png"
+    }
+  },
+  {
+    "id": "crate_toolbox_1",
+    "name": "Toolbox Crate",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Open-top wooden crate containing tools.",
+    "modelPath": "assets/dungeon_defaults/models/crate_toolbox.glb",
+    "icon": {
+      "file": "crate_toolbox_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/crate_toolbox_1.png"
+    }
+  },
+  {
+    "id": "crate_wooden_large_1",
+    "name": "Large Wooden Crate",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Large wooden storage crate (closed).",
+    "modelPath": "assets/dungeon_defaults/models/crate_wooden_large.glb",
+    "icon": {
+      "file": "crate_wooden_large_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/crate_wooden_large_1.png"
+    }
+  },
+  {
+    "id": "crate_wooden_stack_1",
+    "name": "Stacked Wooden Crates",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Stack of wooden crates (closed).",
+    "modelPath": "assets/dungeon_defaults/models/crate_wooden_stack.glb",
+    "icon": {
+      "file": "crate_wooden_stack_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/crate_wooden_stack_1.png"
+    }
+  },
+  {
+    "id": "door_dungeon_1",
+    "name": "Dungeon Door",
+    "type": "Default Asset",
+    "category": "structure",
+    "description": "Heavy dungeon door with metal reinforcement.",
+    "modelPath": "assets/dungeon_defaults/models/door_dungeon.glb",
+    "icon": {
+      "file": "door_dungeon_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/door_dungeon_1.png"
+    }
+  },
+  {
+    "id": "door_metal_square_1",
+    "name": "Square Metal Door",
+    "type": "Default Asset",
+    "category": "structure",
+    "description": "Bulky square metal door.",
+    "modelPath": "assets/dungeon_defaults/models/door_metal_square.glb",
+    "icon": {
+      "file": "door_metal_square_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/door_metal_square_1.png"
+    }
+  },
+  {
+    "id": "door_metal_vault_1",
+    "name": "Vault Door",
+    "type": "Default Asset",
+    "category": "structure",
+    "description": "Heavy metal vault door.",
+    "modelPath": "assets/dungeon_defaults/models/door_metal_vault.glb",
+    "icon": {
+      "file": "door_metal_vault_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/door_metal_vault_1.png"
+    }
+  },
+  {
+    "id": "door_wood_arched_1",
+    "name": "Arched Wooden Door",
+    "type": "Default Asset",
+    "category": "structure",
+    "description": "Wooden door with arched top.",
+    "modelPath": "assets/dungeon_defaults/models/door_wood_arched.glb",
+    "icon": {
+      "file": "door_wood_arched_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/door_wood_arched_1.png"
+    }
+  },
+  {
+    "id": "door_wood_square_1",
+    "name": "Square Wooden Door",
+    "type": "Default Asset",
+    "category": "structure",
+    "description": "Wooden door with square frame.",
+    "modelPath": "assets/dungeon_defaults/models/door_wood_square.glb",
+    "icon": {
+      "file": "door_wood_square_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/door_wood_square_1.png"
+    }
+  },
+  {
+    "id": "dresser_wooden_1",
+    "name": "Wooden Dresser",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Wooden dresser with drawers.",
+    "modelPath": "assets/dungeon_defaults/models/dresser_wooden.glb",
+    "icon": {
+      "file": "dresser_wooden_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/dresser_wooden_1.png"
+    }
+  },
+  {
+    "id": "fireplace_largestanding_1",
+    "name": "Large Standing Fireplace",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Large freestanding fireplace.",
+    "modelPath": "assets/dungeon_defaults/models/fireplace_largestanding.glb",
+    "icon": {
+      "file": "fireplace_largestanding_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/fireplace_largestanding_1.png"
+    }
+  },
+  {
+    "id": "fireplace_small_1",
+    "name": "Small Fireplace",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Small floor-mounted metal fireplace with fire burning.",
+    "modelPath": "assets/dungeon_defaults/models/fireplace_small.glb",
+    "icon": {
+      "file": "fireplace_small_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/fireplace_small_1.png"
+    }
+  },
+  {
+    "id": "instrument_cello_1",
+    "name": "Cello",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Musical instrument - cello.",
+    "modelPath": "assets/dungeon_defaults/models/instrument_cello.glb",
+    "icon": {
+      "file": "instrument_cello_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/instrument_cello_1.png"
+    }
+  },
+  {
+    "id": "instrument_harp_1",
+    "name": "Harp",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Musical instrument - harp.",
+    "modelPath": "assets/dungeon_defaults/models/instrument_harp.glb",
+    "icon": {
+      "file": "instrument_harp_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/instrument_harp_1.png"
+    }
+  },
+  {
+    "id": "mirror_standing_1",
+    "name": "Standing Mirror",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Full-length standing mirror.",
+    "modelPath": "assets/dungeon_defaults/models/mirror_standing.glb",
+    "icon": {
+      "file": "mirror_standing_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/mirror_standing_1.png"
+    }
+  },
+  {
+    "id": "pedestal_stone_1",
+    "name": "Stone Pedestal",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Plain stone pedestal.",
+    "modelPath": "assets/dungeon_defaults/models/pedestal_stone.glb",
+    "icon": {
+      "file": "pedestal_stone_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/pedestal_stone_1.png"
+    }
+  },
+  {
+    "id": "podium_with_book_1",
+    "name": "Podium with Book",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Wooden podium with an open book.",
+    "modelPath": "assets/dungeon_defaults/models/podium_with_book.glb",
+    "icon": {
+      "file": "podium_with_book_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/podium_with_book_1.png"
+    }
+  },
+  {
+    "id": "rack_jamon_1",
+    "name": "Ham Rack",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Wooden rack with hanging leg of ham.",
+    "modelPath": "assets/dungeon_defaults/models/rack_jamon.glb",
+    "icon": {
+      "file": "rack_jamon_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/rack_jamon_1.png"
+    }
+  },
+  {
+    "id": "sacks_potatoes_onions_1",
+    "name": "Sacks of Potatoes and Onions",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Burlap sacks filled with potatoes and onions.",
+    "modelPath": "assets/dungeon_defaults/models/sacks_potatoes_onions.glb",
+    "icon": {
+      "file": "sacks_potatoes_onions_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/sacks_potatoes_onions_1.png"
+    }
+  },
+  {
+    "id": "safe_metal_1",
+    "name": "Metal Safe",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Heavy metal safe for valuables.",
+    "modelPath": "assets/dungeon_defaults/models/safe_metal.glb",
+    "icon": {
+      "file": "safe_metal_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/safe_metal_1.png"
+    }
+  },
+  {
+    "id": "sewerdrain_stone_1",
+    "name": "Stone Sewer Drain",
+    "type": "Default Asset",
+    "category": "structure",
+    "description": "Stone sewer drain or grate.",
+    "modelPath": "assets/dungeon_defaults/models/sewerdrain_stone.glb",
+    "icon": {
+      "file": "sewerdrain_stone_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/sewerdrain_stone_1.png"
+    }
+  },
+  {
+    "id": "shelf_bread_1",
+    "name": "Bread Shelf",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Shelf filled with baked bread.",
+    "modelPath": "assets/dungeon_defaults/models/shelf_bread.glb",
+    "icon": {
+      "file": "shelf_bread_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/shelf_bread_1.png"
+    }
+  },
+  {
+    "id": "shelf_pantry_1",
+    "name": "Pantry Shelf",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Shelf with various small jars and barrels of food storage.",
+    "modelPath": "assets/dungeon_defaults/models/shelf_pantry.glb",
+    "icon": {
+      "file": "shelf_pantry_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/shelf_pantry_1.png"
+    }
+  },
+  {
+    "id": "statue_bronze_athlete_1",
+    "name": "Bronze Athlete Statue",
+    "type": "Default Asset",
+    "category": "statue",
+    "description": "Bronze statue of an athlete.",
+    "modelPath": "assets/dungeon_defaults/models/statue_bronze_athlete.glb",
+    "icon": {
+      "file": "statue_bronze_athlete_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/statue_bronze_athlete_1.png"
+    }
+  },
+  {
+    "id": "statue_gold_lion_1",
+    "name": "Golden Lion Statue",
+    "type": "Default Asset",
+    "category": "statue",
+    "description": "Golden statue of a lion.",
+    "modelPath": "assets/dungeon_defaults/models/statue_gold_lion.glb",
+    "icon": {
+      "file": "statue_gold_lion_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/statue_gold_lion_1.png"
+    }
+  },
+  {
+    "id": "statue_stone_warrior_1",
+    "name": "Stone Warrior Statue",
+    "type": "Default Asset",
+    "category": "statue",
+    "description": "Stone statue of a warrior.",
+    "modelPath": "assets/dungeon_defaults/models/statue_stone_warrior.glb",
+    "icon": {
+      "file": "statue_stone_warrior_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/statue_stone_warrior_1.png"
+    }
+  },
+  {
+    "id": "stool_ornate_1",
+    "name": "Ornate Stool",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Ornate decorative stool.",
+    "modelPath": "assets/dungeon_defaults/models/stool_ornate.glb",
+    "icon": {
+      "file": "stool_ornate_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/stool_ornate_1.png"
+    }
+  },
+  {
+    "id": "stool_wooden1_1",
+    "name": "Wooden Stool 1",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Simple wooden stool variant 1.",
+    "modelPath": "assets/dungeon_defaults/models/stool_wooden1.glb",
+    "icon": {
+      "file": "stool_wooden1_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/stool_wooden1_1.png"
+    }
+  },
+  {
+    "id": "stool_wooden2_1",
+    "name": "Wooden Stool 2",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Simple wooden stool variant 2.",
+    "modelPath": "assets/dungeon_defaults/models/stool_wooden2.glb",
+    "icon": {
+      "file": "stool_wooden2_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/stool_wooden2_1.png"
+    }
+  },
+  {
+    "id": "table_bedside_1",
+    "name": "Bedside Table",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Small bedside table.",
+    "modelPath": "assets/dungeon_defaults/models/table_bedside.glb",
+    "icon": {
+      "file": "table_bedside_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/table_bedside_1.png"
+    }
+  },
+  {
+    "id": "table_gramophone_1",
+    "name": "Gramophone Table",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Table with gramophone music player.",
+    "modelPath": "assets/dungeon_defaults/models/table_gramophone.glb",
+    "icon": {
+      "file": "table_gramophone_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/table_gramophone_1.png"
+    }
+  },
+  {
+    "id": "table_ornate_1",
+    "name": "Ornate Table",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Ornate decorative table.",
+    "modelPath": "assets/dungeon_defaults/models/table_ornate.glb",
+    "icon": {
+      "file": "table_ornate_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/table_ornate_1.png"
+    }
+  },
+  {
+    "id": "table_potionstand_1",
+    "name": "Potion Stand Table",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Table with various potions and vials on top.",
+    "modelPath": "assets/dungeon_defaults/models/table_potionstand.glb",
+    "icon": {
+      "file": "table_potionstand_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/table_potionstand_1.png"
+    }
+  },
+  {
+    "id": "table_square_wood_1",
+    "name": "Square Wooden Table",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Small square wooden table.",
+    "modelPath": "assets/dungeon_defaults/models/table_square_wood.glb",
+    "icon": {
+      "file": "table_square_wood_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/table_square_wood_1.png"
+    }
+  },
+  {
+    "id": "table_wooden_books_1",
+    "name": "Wooden Table with Books",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Wooden table with books on top.",
+    "modelPath": "assets/dungeon_defaults/models/table_wooden_books.glb",
+    "icon": {
+      "file": "table_wooden_books_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/table_wooden_books_1.png"
+    }
+  },
+  {
+    "id": "table_wooden_long_dark_1",
+    "name": "Long Dark Wooden Table",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Larger wooden table with dark finish.",
+    "modelPath": "assets/dungeon_defaults/models/table_wooden_long_dark.glb",
+    "icon": {
+      "file": "table_wooden_long_dark_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/table_wooden_long_dark_1.png"
+    }
+  },
+  {
+    "id": "table_wooden_long_light_1",
+    "name": "Long Light Wooden Table",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Larger wooden table with light finish.",
+    "modelPath": "assets/dungeon_defaults/models/table_wooden_long_light.glb",
+    "icon": {
+      "file": "table_wooden_long_light_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/table_wooden_long_light_1.png"
+    }
+  },
+  {
+    "id": "table_wooden_mugs_1",
+    "name": "Wooden Table with Mugs",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Wooden table with mugs on top.",
+    "modelPath": "assets/dungeon_defaults/models/table_wooden_mugs.glb",
+    "icon": {
+      "file": "table_wooden_mugs_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/table_wooden_mugs_1.png"
+    }
+  },
+  {
+    "id": "table_wooden_mutton_1",
+    "name": "Wooden Table with Mutton",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Wooden table with mutton on top.",
+    "modelPath": "assets/dungeon_defaults/models/table_wooden_mutton.glb",
+    "icon": {
+      "file": "table_wooden_mutton_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/table_wooden_mutton_1.png"
+    }
+  },
+  {
+    "id": "throne_marble_1",
+    "name": "Marble Throne",
+    "type": "Default Asset",
+    "category": "furniture",
+    "description": "Ornate marble throne chair.",
+    "modelPath": "assets/dungeon_defaults/models/throne_marble.glb",
+    "icon": {
+      "file": "throne_marble_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/throne_marble_1.png"
+    }
+  },
+  {
+    "id": "torch_stone_pedestal_1",
+    "name": "Stone Pedestal Torch",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Torch mounted on stone pedestal.",
+    "modelPath": "assets/dungeon_defaults/models/torch_stone_pedestal.glb",
+    "icon": {
+      "file": "torch_stone_pedestal_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/torch_stone_pedestal_1.png"
+    }
+  },
+  {
+    "id": "torch_wall_mount_1",
+    "name": "Wall-Mounted Torch",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Torch mounted on wall bracket.",
+    "modelPath": "assets/dungeon_defaults/models/torch_wall_mount.glb",
+    "icon": {
+      "file": "torch_wall_mount_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/torch_wall_mount_1.png"
+    }
+  },
+  {
+    "id": "trapdoor_wood_1",
+    "name": "Wooden Trapdoor",
+    "type": "Default Asset",
+    "category": "structure",
+    "description": "Wooden trapdoor for floor access.",
+    "modelPath": "assets/dungeon_defaults/models/trapdoor_wood.glb",
+    "icon": {
+      "file": "trapdoor_wood_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/trapdoor_wood_1.png"
+    }
+  },
+  {
+    "id": "vase_ornate_1",
+    "name": "Ornate Vase",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Decorative ornate vase.",
+    "modelPath": "assets/dungeon_defaults/models/vase_ornate.glb",
+    "icon": {
+      "file": "vase_ornate_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/vase_ornate_1.png"
+    }
+  },
+  {
+    "id": "weaponrack_bow_1",
+    "name": "Bow Weapon Rack",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Weapon rack displaying bows.",
+    "modelPath": "assets/dungeon_defaults/models/weaponrack_bow.glb",
+    "icon": {
+      "file": "weaponrack_bow_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/weaponrack_bow_1.png"
+    }
+  },
+  {
+    "id": "weaponrack_javelin_1",
+    "name": "Javelin Weapon Rack",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Weapon rack displaying javelins.",
+    "modelPath": "assets/dungeon_defaults/models/weaponrack_javelin.glb",
+    "icon": {
+      "file": "weaponrack_javelin_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/weaponrack_javelin_1.png"
+    }
+  },
+  {
+    "id": "weaponrack_sword_1",
+    "name": "Sword Weapon Rack",
+    "type": "Default Asset",
+    "category": "prop",
+    "description": "Weapon rack displaying swords.",
+    "modelPath": "assets/dungeon_defaults/models/weaponrack_sword.glb",
+    "icon": {
+      "file": "weaponrack_sword_1.png",
+      "path": "/assets/dungeon_defaults/model_icons/weaponrack_sword_1.png"
+    }
+  }
+]

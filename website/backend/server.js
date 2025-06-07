@@ -40,7 +40,10 @@ const ensureDirectoriesExist = () => {
     CONFIG.DIRECTORIES.TERRAINS,
     CONFIG.DIRECTORIES.TERRAIN_IMAGES,
     CONFIG.DIRECTORIES.TERRAIN_ICONS,
-    CONFIG.DIRECTORIES.DUNGEON
+    CONFIG.DIRECTORIES.DUNGEON,
+    CONFIG.DIRECTORIES.DUNGEON_DEFAULTS,
+    CONFIG.DIRECTORIES.DUNGEON_DEFAULT_MODELS,
+    CONFIG.DIRECTORIES.DUNGEON_DEFAULT_ICONS
   ];
 
   directories.forEach(dir => {
@@ -94,8 +97,8 @@ setupRouters(app, {
   debug: debugRouter
 });
 
-// Register the dungeon assets filter router
-app.use('/api/assets/dungeon', dungeonAssetsRouter);
+// Register the dungeon assets router
+app.use('/api/dungeon-assets', dungeonAssetsRouter);
 
 // Register the dungeon router for floor plans and asset mapping
 app.use('/api/dungeon', dungeonRouter);

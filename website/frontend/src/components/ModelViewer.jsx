@@ -574,6 +574,45 @@ const ModelViewer = ({
       setError("Could not download the GLB file.");
     }
   };
+
+  // Function to handle STL download
+  const handleDownloadSTL = async () => {
+    if (!modelId) {
+      return;
+    }
+    
+    try {
+      // Request STL conversion from the backend
+      const response = await fetch(`${CONFIG.API.BASE_URL}/api/models/${modelId}/download/stl`);
+      
+      if (!response.ok) {
+        throw new Error(`STL conversion failed: ${response.status}`);
+      }
+      
+      // Get the STL data as a blob
+      const blob = await response.blob();
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Extract model name and create STL filename
+      const modelFileName = modelUrl?.split('/').pop() || 'model.glb';
+      const baseName = modelFileName.replace(/\.glb$/i, '');
+      link.download = `${baseName}.stl`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the blob URL
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('STL download error:', err);
+      setError("Could not download the STL file. Please try again.");
+    }
+  };
   
   // Function to reset the camera view
   const resetView = () => {
@@ -877,6 +916,21 @@ const ModelViewer = ({
             title="Download GLB model file"
           >
             Download GLB
+          </button>
+          <button
+            onClick={handleDownloadSTL}
+            style={getActionButtonStyle(hoveredButton === 'stl', activeButton === 'stl')}
+            onMouseEnter={() => setHoveredButton('stl')}
+            onMouseLeave={() => setHoveredButton(null)}
+            onMouseDown={() => setActiveButton('stl')}
+            onMouseUp={() => setActiveButton(null)}
+            onBlur={() => {
+              setHoveredButton(null);
+              setActiveButton(null);
+            }}
+            title="Download STL model file"
+          >
+            Download STL
           </button>
         </div>
       )}

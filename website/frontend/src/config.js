@@ -23,6 +23,12 @@ const CONFIG = {
         FLOOR_PLAN: '/api/dungeon/floor_plan',
         ASSET_MAPPING: '/api/dungeon/asset_mapping'
       },
+      DUNGEON_ASSETS: {
+        BASE: '/api/dungeon-assets',
+        DEFAULTS: '/api/dungeon-assets/defaults',
+        FILTER: '/api/dungeon-assets/filter',
+        ICON: '/api/dungeon-assets/defaults/:id/icon'
+      },
       LAYOUT: {
         GENERATE: '/api/layout/generate',
         TEST: '/api/layout/test',
@@ -47,7 +53,10 @@ const CONFIG = {
       ASSET_VIDEOS: 'assets/asset_videos',
       TERRAINS: 'assets/terrains',
       TERRAIN_IMAGES: 'assets/terrain_images',
-      TERRAIN_ICONS: 'assets/terrain_icons'
+      TERRAIN_ICONS: 'assets/terrain_icons',
+      DUNGEON_DEFAULTS: 'assets/dungeon_defaults',
+      DUNGEON_DEFAULT_MODELS: 'assets/dungeon_defaults/models',
+      DUNGEON_DEFAULT_ICONS: 'assets/dungeon_defaults/model_icons'
     }
   }
 };

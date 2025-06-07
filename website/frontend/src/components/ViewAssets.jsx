@@ -7,34 +7,18 @@ import CONFIG from '../config';
 import styles, { getMobileStyles, MOBILE_BREAKPOINT, SINGLE_COLUMN_BREAKPOINT } from '../styles/ViewAssets';
 import addGlobalAnimations from '../styles/animations';
 import { Button } from './common';
+import NotificationToast from './ViewAssets/NotificationToast';
+import Pagination from './ViewAssets/Pagination';
+import TabHeader from './ViewAssets/TabHeader';
+import AssetGrid from './ViewAssets/AssetGrid';
+import GenerationProgress from './ViewAssets/GenerationProgress';
+import ModelPreviewPanel from './ViewAssets/ModelPreviewPanel';
+import useResponsiveGrid from '../hooks/useResponsiveGrid';
+import { formatFileName, getModelUrl, processAssetData, isValidAsset, formatVideoMapping } from '../utils/assetHelpers';
+import { fetchFromApi, uploadFile, updateModel } from '../utils/api';
+import { ASSETS_PER_PAGE, GENERATION_STEPS, PROGRESS_STEPS, MAJOR_STEPS } from '../utils/constants';
 
-// Constants
-const ASSETS_PER_PAGE = 9; // Number of assets to display per page
-
-// Constants for grid item dimensions (including gap)
-const GRID_ITEM_HEIGHT = 110; // Base height of each grid item (matching styles.assetItem.height)
-const GRID_ITEM_WIDTH = 120;  // Base width of each grid item (matching styles)
-const GRID_GAP = 12; // Gap between items (matching styles)
-const RESERVED_HEIGHT = 160; // Space reserved for header, pagination, and buttons (matching styles.assetListContainer.maxHeight)
-
-// Define the steps we'll use in this component
-const GENERATION_STEPS = [
-  { id: 'preprocessing', label: 'Preprocessing' },
-  { id: 'rendering_video', label: 'Rendering Video' },
-  { id: 'generating_model', label: 'Generating 3D Asset' }
-];
-
-// 1. Define granular steps for progress tracking
-const PROGRESS_STEPS = [
-  { id: 'preprocessing', label: 'Preprocessing' },
-  { id: 'rendering_video', label: 'Rendering Video' },
-  { id: 'generating_model', label: 'Generating 3D Asset' }
-];
-const MAJOR_STEPS = [
-  { id: 'preprocessing', label: 'Preprocessing', count: 1 },
-  { id: 'rendering_video', label: 'Rendering Video', count: 2 },
-  { id: 'generating_model', label: 'Generating GLB', count: 2 },
-];
+// Note: Constants moved to utils/constants.js
 
 const ViewAssets = () => {
   // Initialize global animations
@@ -53,8 +37,6 @@ const ViewAssets = () => {
   const [isCreationPopupOpen, setIsCreationPopupOpen] = useState(false);
   const fileInputRef = useRef(null);
   const gridContainerRef = useRef(null);
-  const [assetsPerPage, setAssetsPerPage] = useState(9);
-  const [gridMaxHeight, setGridMaxHeight] = useState(null);
   const [generationStatus, setGenerationStatus] = useState({
     inProgress: false,
     error: false,
@@ -70,6 +52,14 @@ const ViewAssets = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Tab state for switching between My Models and Default Models
+  const [activeTab, setActiveTab] = useState('my_models'); // 'my_models' or 'default_models'
+  const [defaultAssets, setDefaultAssets] = useState([]);
+  const [defaultAssetsLoading, setDefaultAssetsLoading] = useState(false);
+  const [defaultAssetsError, setDefaultAssetsError] = useState(null);
+  const [defaultCurrentPage, setDefaultCurrentPage] = useState(1);
+  const [defaultTotalPages, setDefaultTotalPages] = useState(1);
+
   // 2. Add a state to track the current sub-step index
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
@@ -79,136 +69,141 @@ const ViewAssets = () => {
   const [actionVideoUrl, setActionVideoUrl] = useState(null);
   const [actionModel, setActionModel] = useState(null);
 
-  // Calculate assets per page based on container size
-  const calculateAssetsPerPage = useCallback(() => {
-    if (!gridContainerRef.current) return;
+  // Use responsive grid hook (after all state declarations)
+  const { assetsPerPage, gridMaxHeight } = useResponsiveGrid(
+    gridContainerRef, 
+    assets.length, 
+    defaultAssets.length, 
+    activeTab
+  );
 
-    const container = gridContainerRef.current;
-    const containerPadding = 10; // 5px padding on each side
-    const containerWidth = container.clientWidth - containerPadding; 
-    const containerHeight = container.clientHeight - containerPadding;
-
-    // Calculate how many items can fit in a row, accounting for gaps
-    const columnsPerRow = Math.max(1, Math.floor((containerWidth + GRID_GAP) / (GRID_ITEM_WIDTH + GRID_GAP)));
-    
-    // Calculate how many rows can fit, accounting for gaps
-    // Be conservative to prevent overflow - leave some buffer space
-    const bufferSpace = 20; // Extra buffer to prevent scrollbars
-    const availableHeight = Math.max(GRID_ITEM_HEIGHT, containerHeight - bufferSpace);
-    const rowsPerPage = Math.max(1, Math.floor(availableHeight / (GRID_ITEM_HEIGHT + GRID_GAP)));
-
-    // Calculate total items that can fit
-    const itemsPerPage = columnsPerRow * rowsPerPage;
-    
-    // Calculate the exact height the grid should have to prevent overflow
-    const exactGridHeight = rowsPerPage * (GRID_ITEM_HEIGHT + GRID_GAP) - GRID_GAP;
-    
-    // Update assets per page if it's different
-    if (itemsPerPage !== assetsPerPage) {
-      setAssetsPerPage(itemsPerPage);
-      setGridMaxHeight(exactGridHeight);
-      // Adjust current page if necessary to keep items in view
-      const newTotalPages = Math.max(1, Math.ceil(assets.length / itemsPerPage));
-      if (currentPage > newTotalPages) {
-        setCurrentPage(newTotalPages);
-      }
-    }
-  }, [assetsPerPage, assets.length, currentPage]);
-
-  // Recalculate on window resize or container size change
+  // Window width tracking for mobile styles
   useEffect(() => {
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
-      calculateAssetsPerPage();
     };
 
     window.addEventListener('resize', handleResize);
-    
-    // Initial calculation
-    calculateAssetsPerPage();
-    
-    // Set up resize observer for container
-    const resizeObserver = new ResizeObserver(calculateAssetsPerPage);
-    if (gridContainerRef.current) {
-      resizeObserver.observe(gridContainerRef.current);
-    }
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      resizeObserver.disconnect();
-    };
-  }, [calculateAssetsPerPage]);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Get responsive styles
   const mobileStyles = getMobileStyles(windowWidth);
 
-  // Clear notifications after timeout
-  useEffect(() => {
-    if (notification) {
-      const timer = setTimeout(() => setNotification(null), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification]);
+  // Note: Notification timeout logic moved to NotificationToast component
 
-  // Generic API fetch function
-  const fetchFromApi = useCallback(async (endpoint, errorMsg) => {
-    try {
-      const response = await fetch(`${CONFIG.API.BASE_URL}${endpoint}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error: ${response.status}`);
-      }
-      return await response.json();
-    } catch (err) {
-      console.error(`${errorMsg}:`, err);
-      setError(`${errorMsg}: ${err.message}`);
-      return null;
-    }
-  }, []);
+  // Note: API functions moved to utils/api.js
 
   // Fetch videos for models
   const fetchModelVideos = useCallback(async () => {
-    const data = await fetchFromApi(
-      CONFIG.API.ENDPOINTS.MODELS.VIDEOS, 
-      'Failed to fetch model videos'
-    );
-    
-    if (data && data.videoMapping) {
-      // Ensure all video paths are properly formatted and use asset_videos
-      const formattedMapping = {};
+    try {
+      const data = await fetchFromApi(
+        CONFIG.API.ENDPOINTS.MODELS.VIDEOS, 
+        'Failed to fetch model videos'
+      );
       
-      // Process each video mapping entry
-      Object.entries(data.videoMapping).forEach(([modelId, videoPath]) => {
-        // Make sure the path starts with a slash
-        let normalizedPath = videoPath;
-        if (!normalizedPath.startsWith('/')) {
-          normalizedPath = `/${normalizedPath}`;
-        }
+      if (data && data.videoMapping) {
+        const formattedMapping = formatVideoMapping(data.videoMapping);
         
-        // Make sure we're using asset_videos path
-        if (!normalizedPath.includes('asset_videos')) {
-          const filename = normalizedPath.split('/').pop();
-          if (filename) {
-            normalizedPath = `/assets/asset_videos/${filename}`;
+        setAssets(prevAssets => 
+          prevAssets.map(asset => {
+            if (asset.id && formattedMapping[asset.id]) {
+              return {
+                ...asset,
+                videoUrl: formattedMapping[asset.id]
+              };
+            }
+            return asset;
+          })
+        );
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  }, []);
+
+  // Fetch default assets
+  const fetchDefaultAssets = useCallback(async (page = 1) => {
+    setDefaultAssetsLoading(true);
+    setDefaultAssetsError(null);
+    
+    try {
+      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.DUNGEON_ASSETS.DEFAULTS}?page=${page}&limit=${assetsPerPage}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch default assets: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setDefaultAssets(data.assets || []);
+      setDefaultTotalPages(data.pagination?.totalPages || Math.max(1, Math.ceil((data.totalCount || (data.assets || []).length) / assetsPerPage)));
+      setDefaultCurrentPage(data.pagination?.currentPage || page);
+      
+      // Generate icons for assets that don't have them in metadata
+      const assetsNeedingIcons = (data.assets || []).filter(asset => !asset.icon || !asset.icon.path);
+      
+      if (assetsNeedingIcons.length > 0) {
+        console.log(`Found ${assetsNeedingIcons.length} assets needing icons`);
+        
+        // Generate icons sequentially to avoid overwhelming the server
+        for (const asset of assetsNeedingIcons) {
+          try {
+            console.log(`Generating icon for ${asset.name} (${asset.id})`);
+            const generateResponse = await fetch(
+              `${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.DUNGEON_ASSETS.ICON.replace(':id', asset.id)}`
+            );
+            if (generateResponse.ok) {
+              const iconData = await generateResponse.json();
+              console.log(`✓ Generated icon for ${asset.name}: ${iconData.iconPath}`);
+            } else {
+              const errorData = await generateResponse.json().catch(() => ({}));
+              console.warn(`✗ Failed to generate icon for ${asset.name}: ${errorData.error || 'Unknown error'}`);
+            }
+            
+            // Small delay between requests to avoid overwhelming the server
+            await new Promise(resolve => setTimeout(resolve, 100));
+          } catch (err) {
+            console.warn(`✗ Error generating icon for ${asset.name}:`, err.message);
           }
         }
-        
-        // Store the normalized path
-        formattedMapping[modelId] = normalizedPath;
+      }
+    } catch (err) {
+      console.error('Error fetching default assets:', err);
+      setDefaultAssetsError(err.message);
+    } finally {
+      setDefaultAssetsLoading(false);
+    }
+  }, [assetsPerPage]);
+
+  // Update default asset metadata
+  const updateDefaultAsset = useCallback(async (assetId, updates) => {
+    try {
+      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.DUNGEON_ASSETS.DEFAULTS}/${assetId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
       });
       
-      setAssets(prevAssets => 
-        prevAssets.map(asset => {
-          if (asset.id && formattedMapping[asset.id]) {
-            return {
-              ...asset,
-              videoUrl: formattedMapping[asset.id]
-            };
-          }
-          return asset;
-        })
+      if (!response.ok) {
+        throw new Error(`Failed to update asset: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Update the asset in the local state
+      setDefaultAssets(prevAssets => 
+        prevAssets.map(asset => 
+          asset.id === assetId ? { ...asset, ...updates } : asset
+        )
       );
+      
+      return data;
+    } catch (err) {
+      console.error('Error updating default asset:', err);
+      throw err;
     }
-  }, [fetchFromApi]);
+  }, []);
 
   // Fetch all assets
   const fetchAssets = useCallback(async () => {
@@ -233,48 +228,9 @@ const ViewAssets = () => {
         return;
       }
       
-      // Filter out invalid assets (must have a GLB file)
-      const validAssets = assetArray.filter(asset => {
-        const hasGlbFile = asset.id?.toLowerCase().endsWith('.glb') || 
-                          asset.modelFile || 
-                          asset.modelPath?.includes('.glb');
-        
-        if (!hasGlbFile) {
-          console.warn(`Excluding invalid asset without GLB file:`, asset);
-        }
-        
-        return hasGlbFile;
-      });
-      
-      // Map assets with enhanced properties
-      const mapped = validAssets.map(asset => {
-        // Ensure icon paths are properly formatted
-        let thumbnailUrl = asset.icon;
-        if (thumbnailUrl && !thumbnailUrl.startsWith('http') && !thumbnailUrl.startsWith('/')) {
-          thumbnailUrl = `/${thumbnailUrl}`;
-        }
-        
-        // Ensure video paths are properly formatted
-        let videoUrl = asset.video?.path || asset.video;
-        if (videoUrl && !videoUrl.startsWith('http') && !videoUrl.startsWith('/')) {
-          videoUrl = `/${videoUrl}`;
-        }
-        
-        // Ensure we're not using asset_videos paths for icons
-        if (thumbnailUrl && thumbnailUrl.includes('asset_videos')) {
-          console.warn(`Found asset_videos in icon path: ${thumbnailUrl} - clearing it`);
-          thumbnailUrl = null;
-        }
-        
-        return {
-          ...asset,
-          id: asset.id || asset.name,
-          displayName: asset.displayName || formatFileName(asset.name || asset.id),
-          thumbnailUrl: thumbnailUrl,
-          videoUrl: videoUrl,
-          creationDate: asset.created
-        };
-      });
+      // Filter out invalid assets and process them
+      const validAssets = assetArray.filter(isValidAsset);
+      const mapped = validAssets.map(processAssetData);
       
       setAssets(mapped);
       
@@ -308,11 +264,11 @@ const ViewAssets = () => {
       });
     } catch (err) {
       console.error('Error in fetchAssets:', err);
-      setError(`Failed to fetch assets: ${err.message}`);
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
-  }, [fetchFromApi, assetsPerPage]);
+  }, [assetsPerPage]);
 
   // Initial fetch and reconnection attempts
   useEffect(() => {
@@ -332,17 +288,14 @@ const ViewAssets = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchModelVideos, isLoading]);
 
-  // Format filename without extension
-  const formatFileName = (fileName) => {
-    return fileName.replace(/\.glb$/i, '').replace(/_[a-f0-9]{8}$/i, '');
-  };
+  // Fetch default assets when tab changes to default models
+  useEffect(() => {
+    if (activeTab === 'default_models') {
+      fetchDefaultAssets(defaultCurrentPage);
+    }
+  }, [activeTab, defaultCurrentPage, fetchDefaultAssets]);
 
-  // Get URL for model
-  const getModelUrl = (asset) => {
-    const modelId = asset.id || asset.name;
-    const url = `${CONFIG.API.BASE_URL}/${CONFIG.API.ASSET_PATHS.MODELS}/${modelId}`;
-    return url;
-  };
+  // Note: Utility functions moved to utils/assetHelpers.js
 
   // Handle file upload
   const handleFileUpload = useCallback(async (file) => {
@@ -354,22 +307,8 @@ const ViewAssets = () => {
       return;
     }
 
-    // Create form data
-    const formData = new FormData();
-    formData.append('model', file);
-    
     try {
-      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.MODELS.UPLOAD}`, {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Upload failed: ${response.status}`);
-      }
-      
-      const data = await response.json();
+      const data = await uploadFile(file, CONFIG.API.ENDPOINTS.MODELS.UPLOAD);
       
       // After successful upload, trigger icon generation
       if (data.id) {
@@ -588,8 +527,31 @@ const ViewAssets = () => {
 
   // Handle page change
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
-      setCurrentPage(newPage);
+    if (activeTab === 'my_models') {
+      if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
+        setCurrentPage(newPage);
+      }
+    } else {
+      if (newPage >= 1 && newPage <= defaultTotalPages && newPage !== defaultCurrentPage) {
+        setDefaultCurrentPage(newPage);
+      }
+    }
+  };
+
+  // Handle tab switching
+  const handleTabSwitch = (tab) => {
+    setActiveTab(tab);
+    setSelectedModel(null); // Clear selected model when switching tabs
+  };
+
+  // Handle default asset name/description changes
+  const handleDefaultAssetUpdate = async (assetId, field, value) => {
+    try {
+      const updates = { [field]: value };
+      await updateDefaultAsset(assetId, updates);
+      setNotification({ type: 'success', message: `${field === 'name' ? 'Name' : 'Description'} updated successfully!` });
+    } catch (err) {
+      setNotification({ type: 'error', message: `Failed to update ${field}: ${err.message}` });
     }
   };
 
@@ -603,29 +565,28 @@ const ViewAssets = () => {
     return [];
   }, [assets, currentPage, assetsPerPage]);
 
+  // Get paginated assets for default models
+  const getPaginatedDefaultAssets = useMemo(() => {
+    if (Array.isArray(defaultAssets)) {
+      // If we have server-side pagination (indicated by defaultTotalPages > 1), return all assets
+      // Otherwise, handle client-side pagination
+      if (defaultTotalPages > 1) {
+        return defaultAssets; // Server already returned the correct page
+      } else {
+        const startIndex = (defaultCurrentPage - 1) * assetsPerPage;
+        const endIndex = startIndex + assetsPerPage;
+        return defaultAssets.slice(startIndex, endIndex);
+      }
+    }
+    return [];
+  }, [defaultAssets, defaultCurrentPage, assetsPerPage, defaultTotalPages]);
+
   // Update model name
   const handleModelNameChange = useCallback(async (newName) => {
     if (!selectedModel) return;
     
     try {
-      // Create update data
-      const updateData = {
-        name: newName
-      };
-      
-      // Send update to backend
-      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.MODELS.BASE}/${selectedModel.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updateData),
-      });
-      
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Update failed: ${response.status}`);
-      }
+      await updateModel(selectedModel.id, { name: newName });
       
       // Update the local state
       setAssets(prevAssets => 
@@ -655,44 +616,7 @@ const ViewAssets = () => {
     }
   }, [selectedModel]);
 
-  // Render asset thumbnail with explicit debugging
-  const renderAssetThumbnail = (asset) => { 
-    if (asset.thumbnailUrl) {
-      let thumbnailSrc;
-      if (asset.thumbnailUrl.startsWith('http') || asset.thumbnailUrl.startsWith('data:')) {
-        thumbnailSrc = asset.thumbnailUrl;
-      } else {
-        // Ensure leading slash for relative paths
-        thumbnailSrc = `${CONFIG.API.BASE_URL}${asset.thumbnailUrl.startsWith('/') ? '' : '/'}${asset.thumbnailUrl}`;
-      }
-      
-      return (
-        <div style={styles.assetThumbnail}>
-          <img 
-            src={thumbnailSrc}
-            alt={asset.displayName || asset.name || asset.id}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            onError={(e) => {
-              e.currentTarget.dataset.thumbnailError = 'true';
-              e.target.onerror = null; 
-              const parent = e.currentTarget.parentNode;
-              if (parent) {
-                parent.innerHTML = '<span style="font-size: 24px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">📦</span>';
-              }
-            }}
-          />
-        </div>
-      );
-    }
-
-    // Priority 2: Default placeholder icon if no image thumbnail is available
-    // Video is not used as a fallback for the static grid icon.
-    return (
-      <div style={styles.assetThumbnail}>
-        <span style={{ fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>📦</span>
-      </div>
-    );
-  };
+  // Note: Thumbnail rendering functions moved to AssetGridItem component
 
   // Show generated asset in preview when generation completes
   useEffect(() => {
@@ -737,8 +661,20 @@ const ViewAssets = () => {
 
   // Update pagination when assets or assetsPerPage changes
   useEffect(() => {
-    setTotalPages(Math.max(1, Math.ceil(assets.length / assetsPerPage)));
-  }, [assets.length, assetsPerPage]);
+    if (activeTab === 'my_models') {
+      setTotalPages(Math.max(1, Math.ceil(assets.length / assetsPerPage)));
+    }
+  }, [assets.length, assetsPerPage, activeTab]);
+
+  // Separate effect for default assets pagination - only when not relying on server pagination
+  useEffect(() => {
+    if (activeTab === 'default_models' && defaultAssets.length > 0) {
+      // Only update if we don't already have server-provided pagination info
+      if (defaultTotalPages <= 1) {
+        setDefaultTotalPages(Math.max(1, Math.ceil(defaultAssets.length / assetsPerPage)));
+      }
+    }
+  }, [defaultAssets.length, assetsPerPage, activeTab, defaultTotalPages]);
 
   // Handle model deletion
   const handleModelDeleted = useCallback((modelId, message) => {
@@ -759,252 +695,126 @@ const ViewAssets = () => {
     <div style={{...styles.container, ...mobileStyles.container}}>
       {/* Left panel - Visualization */}
       <div style={{...styles.visualizationPanel, ...mobileStyles.visualizationPanel}}>
-        {/* Notification message - now positioned in top right with fixed styling */}
-        {notification && (
-          <div style={{
-            ...styles.message, 
-            ...(notification.type === 'error' ? styles.error : styles.success),
-            position: 'absolute',
-            top: '15px',
-            right: '15px',
-            left: 'auto',
-            transform: 'none',
-            zIndex: 1000,
-            boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
-            maxWidth: '300px'
-          }}>
-            {notification.message}
-          </div>
-        )}
+        {/* Notification Toast */}
+        <NotificationToast 
+          notification={notification} 
+          onHide={() => setNotification(null)} 
+        />
 
-        {isLoading ? (
-          <div style={styles.loadingContainer}>
-            <div style={styles.spinner}></div>
-            <p style={styles.loadingText}>Loading assets...</p>
-          </div>
-        ) : generationStatus.inProgress || generationStatus.error ? (
-          /* Generation Progress Display */
-          <div style={styles.generationContainer}>
-            <div style={styles.generationHeader}>
-              {!generationStatus.error && <div style={styles.generationSpinner}></div>}
-              <h3 style={styles.generationTitle}>
-                {generationStatus.error ? 'Generation Failed' : 'Generating 3D Asset'}
-              </h3>
-            </div>
-            {generationStatus.error ? (
-              <>
-                <div style={styles.generationError}>
-                  {generationStatus.errorMessage || 'An error occurred during generation'}
-                </div>
-                <Button 
-                  variant="secondary"
-                  onClick={() => {
-                    setGenerationStatus({ 
-                      inProgress: false, error: false, errorMessage: '', 
-                      message: '', progress: 0, previewUrl: null, assetName: null 
-                    });
-                    setActionVideoUrl(null);
-                    setActionModel(null);
-                  }}
-                >
-                  Close
-                </Button>
-              </>
-            ) : (
-              <>
-                {/* Progress Bar */}
-                <div style={styles.progress.stepsContainer}>
-                  <div style={styles.progress.progressLine}></div>
-                  <div 
-                    style={{
-                      ...styles.progress.progressFill,
-                      width: `${(progressCount / 5) * 100}%`,
-                      transition: 'width 0.7s cubic-bezier(.4,1.4,.6,1)',
-                      boxShadow: '0 0 16px 2px #00aaff88',
-                    }}
-                  ></div>
-                </div>
-                <div style={styles.progress.statusMessage}>
-                  {generationStatus.message || 'Processing...'}
-                </div>
-                {/* Render video if available from action */}
-                {actionVideoUrl && !actionModel && (
-                  <div style={styles.generationPreviewContainer}>
-                    <div style={{position: 'relative', width: '100%', height: '100%'}}>
-                      <video 
-                        src={actionVideoUrl}
-                        style={styles.generationPreviewVideo}
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        controls
-                        onMouseOver={e => e.currentTarget.style.boxShadow = '0 0 32px 4px #00ffaa99'}
-                        onMouseOut={e => e.currentTarget.style.boxShadow = styles.generationPreviewVideo.boxShadow}
-                      />
-                      {/* Optional: Overlay play icon on hover */}
-                      {/* <div style={{position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', pointerEvents: 'none', opacity: 0.7, fontSize: 64, color: '#00ffaa'}}>▶</div> */}
-                    </div>
-                  </div>
-                )}
-                {/* Render model viewer if GLB saved and model data is available */}
-                {actionModel && (
-                  <ModelViewer 
-                    modelUrl={getModelUrl(actionModel)} // Use getModelUrl for consistency
-                    modelName={actionModel.displayName || actionModel.name}
-                    modelId={actionModel.id}
-                    videoUrl={actionModel.videoUrl}
-                    onError={handleActionModelError} // Use dedicated error handler
-                    hideControls={true}
-                    onModelDeleted={handleModelDeleted}
-                  />
-                )}
-                {/* Fallback to previewUrl if present and not overridden by action video or model */}
-                {!actionVideoUrl && !actionModel && generationStatus.previewUrl && (
-                  <div style={styles.generationPreviewContainer}>
-                    <video 
-                      src={generationStatus.previewUrl}
-                      style={styles.generationPreviewVideo}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      controls
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        ) : selectedModel ? (
-          /* 3D Model Viewer */
-          <ModelViewer 
-            modelUrl={getModelUrl(selectedModel)} 
-            modelName={selectedModel.displayName || selectedModel.name}
-            modelId={selectedModel.id}
-            videoUrl={selectedModel.videoUrl}
-            onError={handleModelError}
-            onModelNameChange={handleModelNameChange}
-            onModelDeleted={handleModelDeleted}
-          />
-        ) : (
-          /* Dropzone when no model is selected */
-          <div 
-            {...getRootProps()} 
-            style={{
-              ...styles.dropzone,
-              ...(isDragActive ? styles.dropzoneActive : {})
-            }}
-          >
-            <input {...getInputProps()} />
-            <div style={styles.uploadIcon}>📤</div>
-            {isDragActive ? (
-              <p style={styles.dropzoneText}>Drop the .glb file here ...</p>
-            ) : (
-              <>
-                <p style={styles.dropzoneText}>
-                  {assets.length > 0 ? "Click an asset or upload here" : "Upload some assets here!"}
-                </p>
-                <p style={styles.dropzoneSubText}>
-                  Drag & drop a .glb file or click to browse
-                </p>
-              </>
-            )}
-          </div>
-        )}
+        <ModelPreviewPanel
+          isLoading={isLoading}
+          generationStatus={generationStatus}
+          selectedModel={selectedModel}
+          assets={assets}
+          progressCount={progressCount}
+          actionVideoUrl={actionVideoUrl}
+          actionModel={actionModel}
+          onFileUpload={handleFileUpload}
+          onModelError={handleModelError}
+          onActionModelError={handleActionModelError}
+          onModelNameChange={handleModelNameChange}
+          onModelDeleted={handleModelDeleted}
+          onGenerationClose={() => {
+            setGenerationStatus({ 
+              inProgress: false, error: false, errorMessage: '', 
+              message: '', progress: 0, previewUrl: null, assetName: null 
+            });
+            setActionVideoUrl(null);
+            setActionModel(null);
+          }}
+          isDragActive={isDragActive}
+          getRootProps={getRootProps}
+          getInputProps={getInputProps}
+        />
       </div>
 
       {/* Right panel - Asset list */}
       <div style={{...styles.assetListPanel, ...mobileStyles.assetListPanel}} data-panel="asset-list">
-        <h3 style={styles.assetListHeader}>3D Models</h3>
+        {/* Tab Headers */}
+        <TabHeader 
+          activeTab={activeTab} 
+          onTabSwitch={handleTabSwitch} 
+        />
         
         {/* Pagination controls */}
-        {assets.length > 0 && !error && (
-          <div style={styles.paginationControls}>
-            <Button 
-              variant="icon"
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-            >
-              &lt;
-            </Button>
-            <span style={styles.pageIndicator}>
-              {currentPage} / {totalPages}
-            </span>
-            <Button 
-              variant="icon"
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-            >
-              &gt;
-            </Button>
-          </div>
+        {activeTab === 'my_models' && assets.length > 0 && !error && totalPages > 1 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        )}
+        {activeTab === 'default_models' && !defaultAssetsLoading && !defaultAssetsError && defaultTotalPages > 1 && (
+          <Pagination
+            currentPage={defaultCurrentPage}
+            totalPages={defaultTotalPages}
+            onPageChange={handlePageChange}
+          />
         )}
         
         {/* Scrollable asset grid */}
         <div style={styles.assetListContainer} ref={gridContainerRef}>
-          {error ? (
-            <div style={{...styles.message, ...styles.error}}>
-              {error}
-            </div>
-          ) : assets.length > 0 ? (
-            <div style={{
-              ...styles.assetGrid, 
-              ...mobileStyles.assetGrid,
-              ...(gridMaxHeight && { maxHeight: `${gridMaxHeight}px`, overflow: 'hidden' })
-            }}>
-              {getPaginatedAssets.map((asset, index) => (
-                <div 
-                  key={asset.id || index} 
-                  style={{
-                    ...styles.assetItem,
-                    ...(selectedModel && selectedModel.id === asset.id ? styles.assetItemSelected : {})
-                  }}
-                  onClick={() => setSelectedModel(asset)}
-                >
-                  {renderAssetThumbnail(asset)}
-                  <div style={{
-                    ...styles.assetName,
-                    color: '#fff', // Force white font
-                    fontSize: '11px', // Small font
-                    marginTop: '4px',
-                    lineHeight: '1.2',
-                    textShadow: '0 1px 2px #000a',
-                  }}>{asset.displayName || formatFileName(asset.name) || '(no name)'}</div>
-                </div>
-              ))}
-            </div>
+          {activeTab === 'my_models' ? (
+            <AssetGrid
+              assets={getPaginatedAssets}
+              selectedModel={selectedModel}
+              onAssetSelect={setSelectedModel}
+              error={error}
+              emptyMessage="No models available"
+              gridMaxHeight={gridMaxHeight}
+              mobileStyles={mobileStyles}
+              isDefault={false}
+            />
           ) : (
-            <p style={{ color: THEME.textSecondary }}>No models available</p>
+            <AssetGrid
+              assets={getPaginatedDefaultAssets}
+              selectedModel={selectedModel}
+              onAssetSelect={(asset) => setSelectedModel({
+                ...asset,
+                isDefault: true,
+                displayName: asset.name,
+                modelUrl: asset.modelPath?.startsWith('/') 
+                  ? `${CONFIG.API.BASE_URL}${asset.modelPath}`
+                  : `${CONFIG.API.BASE_URL}/${asset.modelPath}`
+              })}
+              loading={defaultAssetsLoading ? 'Loading default assets...' : null}
+              error={defaultAssetsError}
+              emptyMessage="No default models available"
+              gridMaxHeight={gridMaxHeight}
+              mobileStyles={mobileStyles}
+              isDefault={true}
+            />
           )}
         </div>
         
-        {/* Button Container with Upload and Create buttons */}
-        <div style={styles.buttonContainer}>
-          <Button
-            variant="secondary"
-            onClick={() => fileInputRef.current.click()}
-            style={{ 
-              width: '100%', 
-              padding: '12px 24px',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <span>Upload Model</span>
-            <span>+</span>
-          </Button>
-          
-          <Button
-            variant="primary"
-            onClick={() => setIsCreationPopupOpen(true)}
-            style={{ width: '100%', padding: '12px 24px', fontWeight: 'bold', fontSize: '1rem' }}
-          >
-            Create 3D Asset
-          </Button>
-        </div>
+        {/* Button Container with Upload and Create buttons - Only for My Models */}
+        {activeTab === 'my_models' && (
+          <div style={styles.buttonContainer}>
+            <Button
+              variant="secondary"
+              onClick={() => fileInputRef.current.click()}
+              style={{ 
+                width: '100%', 
+                padding: '12px 24px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <span>Upload Model</span>
+              <span>+</span>
+            </Button>
+            
+            <Button
+              variant="primary"
+              onClick={() => setIsCreationPopupOpen(true)}
+              style={{ width: '100%', padding: '12px 24px', fontWeight: 'bold', fontSize: '1rem' }}
+            >
+              Create 3D Asset
+            </Button>
+          </div>
+        )}
         
         <input 
           type="file" 

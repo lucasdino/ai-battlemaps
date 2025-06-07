@@ -69,6 +69,42 @@ const styles = {
     fontSize: '20px',
     fontWeight: 'bold',
   },
+  // Tab styles
+  tabContainer: {
+    display: 'flex',
+    marginBottom: '15px',
+    gap: '10px',
+    alignItems: 'center',
+    background: 'rgba(0, 0, 0, 0.8)',
+    padding: '15px',
+    borderRadius: '8px',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+  },
+  tabButton: {
+    background: 'none',
+    border: 'none',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'color 0.2s ease',
+    outline: 'none',
+    padding: '8px 12px',
+    borderRadius: '4px',
+    whiteSpace: 'nowrap',
+  },
+  tabButtonActive: {
+    color: '#fff',
+    backgroundColor: THEME.accentPrimary,
+    boxShadow: `0 2px 8px rgba(255, 94, 58, 0.3)`,
+  },
+  tabButtonInactive: {
+    color: '#ccc',
+    backgroundColor: 'transparent',
+  },
+  tabButtonInactiveHover: {
+    color: '#fff',
+    backgroundColor: 'rgba(255, 94, 58, 0.2)',
+  },
   assetListContainer: {
     overflowY: 'auto',
     overflowX: 'hidden',

@@ -4,8 +4,8 @@ const API_KEYS = require('./apiKeys'); // Re-added: API keys will come from this
 
 
 // External services configuration
-const TRELLIS_HOST = '64.62.194.198';
-const TRELLIS_PORT = 20760;
+const TRELLIS_HOST = '35.87.142.75';
+const TRELLIS_PORT = 27482;
 
 // Get the backend root directory (one level up from config folder)
 const BACKEND_ROOT = path.join(__dirname, '..');
@@ -30,7 +30,10 @@ const CONFIG = {
     TERRAIN_IMAGES: path.join(BACKEND_ROOT, 'assets', 'terrain_images'),
     TERRAIN_ICONS: path.join(BACKEND_ROOT, 'assets', 'terrain_icons'),
     DUNGEON: path.join(BACKEND_ROOT, 'assets', 'dungeon'),
-    DUNGEON_LAYOUTS: path.join(BACKEND_ROOT, 'assets', 'dungeon_layouts')
+    DUNGEON_LAYOUTS: path.join(BACKEND_ROOT, 'assets', 'dungeon_layouts'),
+    DUNGEON_DEFAULTS: path.join(BACKEND_ROOT, 'assets', 'dungeon_defaults'),
+    DUNGEON_DEFAULT_MODELS: path.join(BACKEND_ROOT, 'assets', 'dungeon_defaults', 'models'),
+    DUNGEON_DEFAULT_ICONS: path.join(BACKEND_ROOT, 'assets', 'dungeon_defaults', 'model_icons')
   },
   
   ENDPOINTS: {
@@ -42,6 +45,11 @@ const CONFIG = {
     // Terrain API endpoints
     TERRAINS: '/api/terrains',
     TERRAINS_UPLOAD: '/api/terrains/upload',
+    
+    // Dungeon assets API endpoints
+    DUNGEON_ASSETS: '/api/dungeon-assets',
+    DUNGEON_ASSETS_DEFAULTS: '/api/dungeon-assets/defaults',
+    DUNGEON_ASSETS_FILTER: '/api/dungeon-assets/filter',
     
     // AI generation endpoints
     TRELLIS: '/api/trellis',

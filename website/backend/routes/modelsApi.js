@@ -10,6 +10,7 @@ const { createModelUpload, createIconUpload, createVideoUpload } = require('../u
 const ModelMetadataUtil = require('../utils/modelMetadataUtil');
 const ModelThumbnailRenderer = require('../utils/modelThumbnailRenderer');
 
+
 const router = express.Router();
 const modelUpload = createModelUpload();
 const iconUpload = createIconUpload();
@@ -494,4 +495,36 @@ router.get('/models/:modelId/video', (req, res) => {
   }
 });
 
-module.exports = router; 
+/**
+ * Download model as STL
+ * GET /api/models/:modelId/download/stl
+ */
+router.get('/models/:modelId/download/stl', async (req, res) => {
+  try {
+    const { modelId } = req.params;
+
+    // Check if model exists
+    const metadata = ModelMetadataUtil.getModelMetadata(modelId);
+    if (!metadata) {
+      return res.status(404).json({ error: 'Model not found' });
+    }
+
+    const glbPath = path.join(CONFIG.DIRECTORIES.MODELS, modelId);
+    if (!fs.existsSync(glbPath)) {
+      return res.status(404).json({ error: 'Model file not found' });
+    }
+
+    // For now, return an error indicating that STL conversion will be handled by Python
+    return res.status(501).json({ 
+      error: 'STL conversion not implemented in Node.js backend. This will be handled by Python service.',
+      modelPath: glbPath,
+      modelId: modelId
+    });
+
+  } catch (err) {
+    console.error('Error processing STL download:', err);
+    res.status(500).json({ error: 'Server error processing STL download' });
+  }
+});
+
+module.exports = router;

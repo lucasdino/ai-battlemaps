@@ -24,7 +24,7 @@
     }
   },
   "chickenjockey_1746827381190_a21d8a9a.glb": {
-    "name": "chickenjockey_1746827381190_a21d8a9a",
+    "name": "Doby Wolf",
     "type": "image_to_3d",
     "source": "uploaded_image",
     "sourceImage": {
@@ -34,7 +34,7 @@
     },
     "status": "complete",
     "created": 1746827381478,
-    "updated": 1746827409128,
+    "updated": 1749279693338,
     "video": {
       "file": "chickenjockey_1746827381190-preview.mp4",
       "path": "/assets/asset_videos/chickenjockey_1746827381190-preview.mp4"
@@ -48,7 +48,7 @@
     }
   },
   "casettepunk_1746828534001_0d0de801.glb": {
-    "name": "casettepunk_1746828534001_0d0de801",
+    "name": "Cassette Punk",
     "type": "image_to_3d",
     "source": "uploaded_image",
     "sourceImage": {
@@ -58,7 +58,7 @@
     },
     "status": "complete",
     "created": 1746828534211,
-    "updated": 1746828564479,
+    "updated": 1749279704129,
     "video": {
       "file": "casettepunk_1746828534001-preview.mp4",
       "path": "/assets/asset_videos/casettepunk_1746828534001-preview.mp4"
@@ -72,7 +72,7 @@
     }
   },
   "grama_1746829370670_571296ed.glb": {
-    "name": "grama_1746829370670_571296ed",
+    "name": "Gramophone",
     "type": "image_to_3d",
     "source": "uploaded_image",
     "sourceImage": {
@@ -82,7 +82,7 @@
     },
     "status": "complete",
     "created": 1746829370836,
-    "updated": 1746829394192,
+    "updated": 1749279673902,
     "video": {
       "file": "grama_1746829370670-preview.mp4",
       "path": "/assets/asset_videos/grama_1746829370670-preview.mp4"
@@ -96,7 +96,7 @@
     }
   },
   "foxy_1746829444923_abe68611.glb": {
-    "name": "foxy_1746829444923_abe68611",
+    "name": "Foxy",
     "type": "image_to_3d",
     "source": "uploaded_image",
     "sourceImage": {
@@ -106,7 +106,7 @@
     },
     "status": "complete",
     "created": 1746829445131,
-    "updated": 1746829466423,
+    "updated": 1749279668182,
     "video": {
       "file": "foxy_1746829444923-preview.mp4",
       "path": "/assets/asset_videos/foxy_1746829444923-preview.mp4"
@@ -120,7 +120,7 @@
     }
   },
   "mecharaptor_1746829622494_53aef88f.glb": {
-    "name": "mecharaptor_1746829622494_53aef88f",
+    "name": "Mecha Raptor",
     "type": "image_to_3d",
     "source": "uploaded_image",
     "sourceImage": {
@@ -130,7 +130,7 @@
     },
     "status": "complete",
     "created": 1746829622696,
-    "updated": 1746829643015,
+    "updated": 1749279659311,
     "video": {
       "file": "mecharaptor_1746829622494-preview.mp4",
       "path": "/assets/asset_videos/mecharaptor_1746829622494-preview.mp4"
@@ -144,7 +144,7 @@
     }
   },
   "generated-1746829744994-299330_1746829764066_ae1a6e98.glb": {
-    "name": "generated-1746829744994-299330_1746829764066_ae1a6e98",
+    "name": "Cactus Jacko",
     "type": "image_to_3d",
     "source": "uploaded_image",
     "sourceImage": {
@@ -154,7 +154,7 @@
     },
     "status": "complete",
     "created": 1746829764362,
-    "updated": 1746829790232,
+    "updated": 1749279652479,
     "video": {
       "file": "generated-1746829744994-299330_1746829764066-preview.mp4",
       "path": "/assets/asset_videos/generated-1746829744994-299330_1746829764066-preview.mp4"
@@ -168,7 +168,7 @@
     }
   },
   "generated-1746832597913-99167_1746832605220_81e29b7c.glb": {
-    "name": "generated-1746832597913-99167_1746832605220_81e29b7c",
+    "name": "Plant Boss 1",
     "type": "image_to_3d",
     "source": "uploaded_image",
     "sourceImage": {
@@ -178,7 +178,7 @@
     },
     "status": "complete",
     "created": 1746832605545,
-    "updated": 1746832639002,
+    "updated": 1749279644936,
     "video": {
       "file": "generated-1746832597913-99167_1746832605220-preview.mp4",
       "path": "/assets/asset_videos/generated-1746832597913-99167_1746832605220-preview.mp4"
@@ -192,7 +192,7 @@
     }
   },
   "generated-1746832928396-155145_1746832937290_28d17120.glb": {
-    "name": "generated-1746832928396-155145_1746832937290_28d17120",
+    "name": "Plant Boss 2",
     "type": "image_to_3d",
     "source": "uploaded_image",
     "sourceImage": {
@@ -202,7 +202,7 @@
     },
     "status": "complete",
     "created": 1746832937585,
-    "updated": 1746832980049,
+    "updated": 1749279637003,
     "video": {
       "file": "generated-1746832928396-155145_1746832937290-preview.mp4",
       "path": "/assets/asset_videos/generated-1746832928396-155145_1746832937290-preview.mp4"
@@ -215,32 +215,8 @@
       "path": "/assets/3d_model_icons/generated-1746832928396-155145_1746832937290_28d17120.png"
     }
   },
-  "foxy_1747090714262_06aaa36a.glb": {
-    "name": "foxy_1747090714262_06aaa36a",
-    "type": "image_to_3d",
-    "source": "uploaded_image",
-    "sourceImage": {
-      "file": "image-1747090714277-183868186.png",
-      "path": "/assets/images/image-1747090714277-183868186.png",
-      "source": "uploaded_image"
-    },
-    "status": "complete",
-    "created": 1747090714719,
-    "updated": 1747090776903,
-    "video": {
-      "file": "foxy_1747090714262-preview.mp4",
-      "path": "/assets/asset_videos/foxy_1747090714262-preview.mp4"
-    },
-    "modelFile": "foxy_1747090714262_06aaa36a.glb",
-    "modelPath": "/assets/3d_models/foxy_1747090714262_06aaa36a.glb",
-    "completed": 1747090776902,
-    "icon": {
-      "file": "foxy_1747090714262_06aaa36a.png",
-      "path": "/assets/3d_model_icons/foxy_1747090714262_06aaa36a.png"
-    }
-  },
   "dwarfboi_1747090931945_c496af18.glb": {
-    "name": "dwarfboi_1747090931945_c496af18",
+    "name": "Dwarfboi",
     "type": "image_to_3d",
     "source": "uploaded_image",
     "sourceImage": {
@@ -250,7 +226,7 @@
     },
     "status": "complete",
     "created": 1747090932304,
-    "updated": 1747090960497,
+    "updated": 1749279627998,
     "video": {
       "file": "dwarfboi_1747090931945-preview.mp4",
       "path": "/assets/asset_videos/dwarfboi_1747090931945-preview.mp4"
@@ -288,91 +264,19 @@
     }
   },
   "rocco_test_56de0915_a3079cf7.glb": {
-    "name": "rocco_test_56de0915",
+    "name": "Rocco",
     "type": "uploaded_model",
     "source": "external",
     "originalFilename": "rocco_test_56de0915.glb",
     "created": 1747254968203,
-    "updated": 1747254970354,
+    "updated": 1749279615262,
     "icon": {
       "file": "rocco_test_56de0915_a3079cf7-1747254968204.png",
       "path": "/assets/3d_model_icons/rocco_test_56de0915_a3079cf7-1747254968204.png"
     }
   },
-  "mecharaptor_1747271691844_2fe39f7a.glb": {
-    "name": "mecharaptor_1747271691844_2fe39f7a",
-    "type": "image_to_3d",
-    "source": "uploaded_image",
-    "sourceImage": {
-      "file": "image-1747271691859-662754304.png",
-      "path": "/assets/images/image-1747271691859-662754304.png",
-      "source": "uploaded_image"
-    },
-    "status": "complete",
-    "created": 1747271692934,
-    "updated": 1747271751242,
-    "video": {
-      "file": "mecharaptor_1747271691844-preview.mp4",
-      "path": "/assets/asset_videos/mecharaptor_1747271691844-preview.mp4"
-    },
-    "modelFile": "mecharaptor_1747271691844_2fe39f7a.glb",
-    "modelPath": "/assets/3d_models/mecharaptor_1747271691844_2fe39f7a.glb",
-    "completed": 1747271751241,
-    "icon": {
-      "file": "mecharaptor_1747271691844_2fe39f7a.png",
-      "path": "/assets/3d_model_icons/mecharaptor_1747271691844_2fe39f7a.png"
-    }
-  },
-  "generated-1747272107444-771895_1747272129950_f17bedaa.glb": {
-    "name": "generated-1747272107444-771895_1747272129950_f17bedaa",
-    "type": "image_to_3d",
-    "source": "uploaded_image",
-    "sourceImage": {
-      "file": "image-1747272129960-808640076.png",
-      "path": "/assets/images/image-1747272129960-808640076.png",
-      "source": "uploaded_image"
-    },
-    "status": "complete",
-    "created": 1747272131573,
-    "updated": 1747272168316,
-    "video": {
-      "file": "generated-1747272107444-771895_1747272129950-preview.mp4",
-      "path": "/assets/asset_videos/generated-1747272107444-771895_1747272129950-preview.mp4"
-    },
-    "modelFile": "generated-1747272107444-771895_1747272129950_f17bedaa.glb",
-    "modelPath": "/assets/3d_models/generated-1747272107444-771895_1747272129950_f17bedaa.glb",
-    "completed": 1747272168315,
-    "icon": {
-      "file": "generated-1747272107444-771895_1747272129950_f17bedaa.png",
-      "path": "/assets/3d_model_icons/generated-1747272107444-771895_1747272129950_f17bedaa.png"
-    }
-  },
-  "generated-1747272252733-557818_1747272271003_d8a84c04.glb": {
-    "name": "generated-1747272252733-557818_1747272271003_d8a84c04",
-    "type": "image_to_3d",
-    "source": "uploaded_image",
-    "sourceImage": {
-      "file": "image-1747272271001-669718689.png",
-      "path": "/assets/images/image-1747272271001-669718689.png",
-      "source": "uploaded_image"
-    },
-    "status": "complete",
-    "created": 1747272272618,
-    "updated": 1747272317015,
-    "video": {
-      "file": "generated-1747272252733-557818_1747272271003-preview.mp4",
-      "path": "/assets/asset_videos/generated-1747272252733-557818_1747272271003-preview.mp4"
-    },
-    "modelFile": "generated-1747272252733-557818_1747272271003_d8a84c04.glb",
-    "modelPath": "/assets/3d_models/generated-1747272252733-557818_1747272271003_d8a84c04.glb",
-    "completed": 1747272317014,
-    "icon": {
-      "file": "generated-1747272252733-557818_1747272271003_d8a84c04.png",
-      "path": "/assets/3d_model_icons/generated-1747272252733-557818_1747272271003_d8a84c04.png"
-    }
-  },
   "wizard_dragon_1747769405175_a8ea3534.glb": {
-    "name": "wizard_dragon_1747769405175_a8ea3534",
+    "name": "Wiz Dragon",
     "type": "image_to_3d",
     "source": "uploaded_image",
     "sourceImage": {
@@ -382,7 +286,7 @@
     },
     "status": "complete",
     "created": 1747769405432,
-    "updated": 1747769526992,
+    "updated": 1749279607502,
     "video": {
       "file": "wizard_dragon_1747769405175-preview.mp4",
       "path": "/assets/asset_videos/wizard_dragon_1747769405175-preview.mp4"
@@ -396,7 +300,7 @@
     }
   },
   "funkopop_swanson_1747771324935_d59c54e0.glb": {
-    "name": "funkopop_swanson_1747771324935_d59c54e0",
+    "name": "Funko Swanson",
     "type": "image_to_3d",
     "source": "uploaded_image",
     "sourceImage": {
@@ -406,7 +310,7 @@
     },
     "status": "complete",
     "created": 1747771325203,
-    "updated": 1747771374581,
+    "updated": 1749279600794,
     "video": {
       "file": "funkopop_swanson_1747771324935-preview.mp4",
       "path": "/assets/asset_videos/funkopop_swanson_1747771324935-preview.mp4"
@@ -420,7 +324,7 @@
     }
   },
   "edited-1747771432094-386786_1747771466019_fe396e4e.glb": {
-    "name": "edited-1747771432094-386786_1747771466019_fe396e4e",
+    "name": "Silly Swanson",
     "type": "image_to_3d",
     "source": "uploaded_image",
     "sourceImage": {
@@ -430,7 +334,7 @@
     },
     "status": "complete",
     "created": 1747771466434,
-    "updated": 1747771519124,
+    "updated": 1749279592378,
     "video": {
       "file": "edited-1747771432094-386786_1747771466019-preview.mp4",
       "path": "/assets/asset_videos/edited-1747771432094-386786_1747771466019-preview.mp4"
@@ -441,6 +345,30 @@
     "icon": {
       "file": "edited-1747771432094-386786_1747771466019_fe396e4e.png",
       "path": "/assets/3d_model_icons/edited-1747771432094-386786_1747771466019_fe396e4e.png"
+    }
+  },
+  "anvil_asset_1749266897323_3da74833.glb": {
+    "name": "Anvil",
+    "type": "image_to_3d",
+    "source": "uploaded_image",
+    "sourceImage": {
+      "file": "image-1749266897339-608185575.png",
+      "path": "/assets/images/image-1749266897339-608185575.png",
+      "source": "uploaded_image"
+    },
+    "status": "complete",
+    "created": 1749266899056,
+    "updated": 1749279574727,
+    "video": {
+      "file": "anvil_asset_1749266897323-preview.mp4",
+      "path": "/assets/asset_videos/anvil_asset_1749266897323-preview.mp4"
+    },
+    "modelFile": "anvil_asset_1749266897323_3da74833.glb",
+    "modelPath": "/assets/3d_models/anvil_asset_1749266897323_3da74833.glb",
+    "completed": 1749266943931,
+    "icon": {
+      "file": "anvil_asset_1749266897323_3da74833.png",
+      "path": "/assets/3d_model_icons/anvil_asset_1749266897323_3da74833.png"
     }
   }
 }

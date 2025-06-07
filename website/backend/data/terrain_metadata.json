@@ -19,7 +19,7 @@
       "file": "throneroom_1749175996463_0wlizx_icon.png",
       "path": "/assets/terrain_icons/throneroom_1749175996463_0wlizx_icon.png"
     },
-    "updated": 1749191659569,
+    "updated": 1749275296856,
     "placedAssets": [
       {
         "id": "dragdrop-funkopop_swanson_1747771324935_d59c54e0.glb-1749176012176",
@@ -63,28 +63,6 @@
           "x": 1.9,
           "y": 1.9,
           "z": 1.9
-        }
-      },
-      {
-        "id": "dragdrop-foxy_1747090714262_06aaa36a.glb-1749176020119",
-        "modelUrl": "/assets/3d_models/foxy_1747090714262_06aaa36a.glb",
-        "name": "Foxy 1747090714262 06aaa36a",
-        "position": {
-          "x": -1.9911111111111115,
-          "y": 0.48849865794181824,
-          "z": 5.5
-        },
-        "rotation": {
-          "isEuler": true,
-          "_x": 0,
-          "_y": 1,
-          "_z": 0,
-          "_order": "XYZ"
-        },
-        "scale": {
-          "x": 1.5,
-          "y": 1.5,
-          "z": 1.5
         }
       },
       {
@@ -152,69 +130,8 @@
       "file": "forest_battlemap_1749181490779_qxm8er_icon.png",
       "path": "/assets/terrain_icons/forest_battlemap_1749181490779_qxm8er_icon.png"
     },
-    "updated": 1749229261465,
-    "placedAssets": [
-      {
-        "id": "dragdrop-wizard_dragon_1747769405175_a8ea3534.glb-1749190187249",
-        "modelUrl": "/assets/3d_models/wizard_dragon_1747769405175_a8ea3534.glb",
-        "name": "Wizard Dragon 1747769405175 A8ea3534",
-        "position": {
-          "x": -3,
-          "y": 0.4400364525616169,
-          "z": 3.0715754833401894
-        },
-        "rotation": {
-          "x": 0,
-          "y": 2.9,
-          "z": 0
-        },
-        "scale": {
-          "x": 0.9,
-          "y": 0.9,
-          "z": 0.9
-        }
-      },
-      {
-        "id": "dragdrop-edited-1747771432094-386786_1747771466019_fe396e4e.glb-1749190329261",
-        "modelUrl": "/assets/3d_models/edited-1747771432094-386786_1747771466019_fe396e4e.glb",
-        "name": "Edited 1747771432094 386786 1747771466019 Fe396e4e",
-        "position": {
-          "x": -2,
-          "y": 0.869660297781229,
-          "z": 4.095433977786919
-        },
-        "rotation": {
-          "x": 0,
-          "y": 2.5,
-          "z": 0
-        },
-        "scale": {
-          "x": 1.7,
-          "y": 1.7,
-          "z": 1.7
-        }
-      },
-      {
-        "id": "dragdrop-edited-1747771432094-386786_1747771466019_fe396e4e.glb-1749191388497",
-        "modelUrl": "/assets/3d_models/edited-1747771432094-386786_1747771466019_fe396e4e.glb",
-        "name": "Edited 1747771432094 386786 1747771466019 Fe396e4e",
-        "position": {
-          "x": 7,
-          "y": 0.46982015743851663,
-          "z": 4.095433977786919
-        },
-        "rotation": {
-          "x": 0,
-          "y": 0,
-          "z": 0
-        },
-        "scale": {
-          "x": 0.9,
-          "y": 0.9,
-          "z": 0.9214726450020567
-        }
-      }
-    ],
+    "updated": 1749275203619,
+    "placedAssets": [],
     "placed_dungeons": false
   },
   "dungeon_test_dungeon_1749194493341.glb": {
