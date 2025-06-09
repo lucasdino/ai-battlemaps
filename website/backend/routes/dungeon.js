@@ -72,26 +72,34 @@ router.post('/generate', async (req, res) => {
       const timestamp = Date.now();
       const sanitizedName = layout_name.replace(/[^a-zA-Z0-9]/g, '_');
       const dungeonFilename = `designed_dungeon_${sanitizedName}_${timestamp}.json`;
+      const initialLayoutFilename = `layout_${sanitizedName}_${timestamp}.json`;
       const terrainId = `dungeon_${sanitizedName}_${timestamp}`;
+      
+      // Save the initial layout to the dungeon_initial_layout folder
+      const initialLayoutPath = path.join(CONFIG.DIRECTORIES.DUNGEON_INITIAL_LAYOUT, initialLayoutFilename);
+      try {
+        await fs.mkdir(CONFIG.DIRECTORIES.DUNGEON_INITIAL_LAYOUT, { recursive: true });
+      } catch (mkdirError) {
+        // Directory already exists or creation failed, continue
+        console.log('Dungeon initial layout directory check:', mkdirError.code === 'EEXIST' ? 'exists' : mkdirError.message);
+      }
+      await fs.writeFile(initialLayoutPath, JSON.stringify(dungeon_data, null, 2));
+      console.log(`Initial layout saved to: ${initialLayoutPath}`);
       
       // Save the designed dungeon to the dungeon_designed_layout folder
       const dungeonPath = path.join(CONFIG.DIRECTORIES.DUNGEON_DESIGNED_LAYOUT, dungeonFilename);
-      
       const dungeonData = {
         ...flaskResponse.data,
         layout_name: layout_name.trim(),
         generated_at: new Date().toISOString(),
         filename: dungeonFilename
       };
-      
-      // Ensure the dungeon designed layout directory exists
       try {
         await fs.mkdir(CONFIG.DIRECTORIES.DUNGEON_DESIGNED_LAYOUT, { recursive: true });
       } catch (mkdirError) {
         // Directory already exists or creation failed, continue
         console.log('Dungeon designed layout directory check:', mkdirError.code === 'EEXIST' ? 'exists' : mkdirError.message);
       }
-      
       await fs.writeFile(dungeonPath, JSON.stringify(dungeonData, null, 2));
       console.log(`Dungeon data saved to: ${dungeonPath}`);
       
@@ -100,6 +108,10 @@ router.post('/generate', async (req, res) => {
         name: layout_name.trim(),
         type: 'dungeon_layout',
         originalFilename: dungeonFilename,
+        initialLayout: {
+          file: initialLayoutFilename,
+          path: `/assets/dungeon_initial_layout/${initialLayoutFilename}`
+        },
         designedLayout: {
           file: dungeonFilename,
           path: `/assets/dungeon_designed_layout/${dungeonFilename}`
@@ -114,24 +126,22 @@ router.post('/generate', async (req, res) => {
         isDungeonLayout: true,
         placed_dungeons: true // This is a designed dungeon with 3D assets
       };
-      
       // Update terrain metadata
       console.log(`Creating terrain metadata for: ${terrainId}`);
       const metadataSuccess = await TerrainMetadataUtil.updateTerrainMetadata(terrainId, terrainMetadata);
-      
       if (!metadataSuccess) {
         console.error('Failed to create terrain metadata for dungeon:', terrainId);
         // Don't fail the request, but log the error
       } else {
         console.log(`Terrain metadata created successfully for: ${terrainId}`);
       }
-      
       res.json({
         success: true,
         message: `Dungeon "${layout_name}" has been designed and saved successfully!`,
         filename: dungeonFilename,
         terrainId: terrainId,
         dungeonPath: `/assets/dungeon_designed_layout/${dungeonFilename}`,
+        initialLayoutPath: `/assets/dungeon_initial_layout/${initialLayoutFilename}`,
         ...flaskResponse.data
       });
     } else {

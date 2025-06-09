@@ -18,9 +18,9 @@ export const placeAssetsStyles = {
     background: THEME.bgLighter || '#3a3a3a',
     borderRadius: '12px',
     padding: '24px',
-    maxWidth: '800px',
-    maxHeight: '80vh',
-    width: '90%',
+    maxWidth: '1200px',
+    maxHeight: '85vh',
+    width: '95%',
     overflow: 'auto',
     border: `2px solid ${THEME.accent || '#007bff'}`,
     boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)'

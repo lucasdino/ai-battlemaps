@@ -4,6 +4,12 @@ import { loadAssetModel, disposeObject, snapToTerrain } from '../utils/threeScen
 import { eventBus, EVENTS } from '../events/eventBus';
 import CONFIG from '../config';
 
+// Constants for LOD distances
+const LOD_DISTANCES = {
+  HIGH: 12,   // High detail up to 12 units
+  MEDIUM: 25, // Medium detail up to 25 units
+};
+
 export const useAssets = ({ 
   sceneRef, 
   terrainModelRef, 
@@ -64,24 +70,58 @@ export const useAssets = ({
 
       const modelInstance = await loadAssetModel(fullUrl);
       
-      // Set position, rotation, scale
+      // --- NEW: Level of Detail (LOD) implementation ---
+      const lod = new THREE.LOD();
+
+      // For now, we use the same model for all levels.
+      // For real performance gains, you should provide simplified
+      // versions of the models for medium and low detail levels.
+      const highDetailModel = modelInstance;
+
+      // --- OPTIMIZATION: Use a cheaper material for the medium level ---
+      const mediumDetailModel = highDetailModel.clone();
+      mediumDetailModel.traverse(child => {
+        if (child.isMesh && child.material) {
+          // Swap to a cheaper material, keeping the texture but removing lighting calculations
+          const oldMaterial = child.material;
+          child.material = new THREE.MeshBasicMaterial({
+              map: oldMaterial.map,
+              color: oldMaterial.color,
+          });
+          oldMaterial.dispose();
+        }
+      });
+      
+      // For the lowest level, use a simple box to maximize performance
+      const box = new THREE.Box3().setFromObject(highDetailModel);
+      const size = box.getSize(new THREE.Vector3());
+      const lowDetailGeometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+      const lowDetailMaterial = new THREE.MeshBasicMaterial({ color: 0xcccccc, wireframe: true });
+      const lowDetailModel = new THREE.Mesh(lowDetailGeometry, lowDetailMaterial);
+
+      lod.addLevel(highDetailModel, 0);
+      lod.addLevel(mediumDetailModel, LOD_DISTANCES.HIGH);
+      lod.addLevel(lowDetailModel, LOD_DISTANCES.MEDIUM);
+      // Beyond the last level, the object won't be rendered.
+
+      // Set position, rotation, scale on the LOD object itself
       const posY = position.y !== null && position.y !== undefined ? position.y : 0;
-      modelInstance.position.set(position.x, posY, position.z);
+      lod.position.set(position.x, posY, position.z);
       
       if (rotation && typeof rotation._x !== 'undefined') {
-        modelInstance.rotation.set(rotation._x || 0, rotation._y || 0, rotation._z || 0);
+        lod.rotation.set(rotation._x || 0, rotation._y || 0, rotation._z || 0);
       } else if (rotation) {
-        modelInstance.rotation.set(rotation.x || 0, rotation.y || 0, rotation.z || 0);
+        lod.rotation.set(rotation.x || 0, rotation.y || 0, rotation.z || 0);
       }
       
       if (scale) {
-        modelInstance.scale.set(scale.x, scale.y, scale.z);
+        lod.scale.set(scale.x, scale.y, scale.z);
       }
       
-      modelInstance.userData = { assetId: id, name: name || id };
+      lod.userData = { assetId: id, name: name || id };
 
-      // Optimize for performance
-      modelInstance.traverse((child) => {
+      // Optimize for performance (applies to all levels)
+      lod.traverse((child) => {
         if (child.isMesh) {
           child.castShadow = false;
           child.receiveShadow = false;
@@ -91,11 +131,25 @@ export const useAssets = ({
 
       // Snap to terrain
       if (terrainModelRef.current) {
-        snapToTerrain(modelInstance, terrainModelRef.current, raycasterRef.current);
+        snapToTerrain(lod, terrainModelRef.current, raycasterRef.current);
+      } else {
+        // This is likely a dungeon layout. The floor top is at y=0.3.
+        // We need to snap the asset to this floor.
+        const floorTopY = 0.3;
+
+        // The logic from snapToTerrain can be adapted.
+        lod.updateMatrixWorld(true);
+        const bbox = new THREE.Box3().setFromObject(lod, true);
+        
+        const modelOriginY = lod.position.y;
+        const modelBottomY = bbox.min.y;
+        const offset = modelOriginY - modelBottomY;
+        
+        lod.position.y = floorTopY + offset;
       }
 
-      sceneRef.current.add(modelInstance);
-      assetInstancesRef.current[id] = modelInstance;
+      sceneRef.current.add(lod);
+      assetInstancesRef.current[id] = lod;
 
     } catch (error) {
       console.error(`Failed to load asset ${id}:`, error);

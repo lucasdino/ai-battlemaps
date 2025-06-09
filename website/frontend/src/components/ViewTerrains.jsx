@@ -10,115 +10,8 @@ import { Button } from './common';
 import styles, { getMobileStyles, KEYFRAMES } from '../styles/ViewTerrains';
 import CONFIG from '../config';
 import THEME from '../theme'; // <-- ADDED IMPORT
+import { parseDungeonGridToAssets } from '../utils/dungeonLayoutUtils';
 
-// Constants for grid item dimensions (4x ViewAssets size, single column)
-const GRID_ITEM_HEIGHT = 220; // 4x the size of ViewAssets cards
-const GRID_ITEM_WIDTH = 120;  // Full width (not used since single column)
-const GRID_GAP = 12; // Gap between items
-
-// Helper function to generate a display-friendly name from a model ID (filename)
-const cleanModelIdForDisplay = (originalName, modelId) => {
-  // PERMANENTLY IGNORE originalName as backend metadata for name is not reliable
-  // if (originalName && originalName.trim() !== '') {
-  //   return originalName.trim();
-  // }
-
-  let name = modelId.replace(/\.glb$/i, ''); // Remove .glb extension
-  let prefix = '';
-
-  // Check for common prefixes and extract them
-  const prefixPatterns = [
-    { pattern: /^edited-\d+-\d+_/, replacement: 'Edited' },
-    { pattern: /^funkopop_/, replacement: 'Funko Pop' },
-    { pattern: /^wizard_/, replacement: 'Wizard' },
-    { pattern: /^dragon_/, replacement: 'Dragon' },
-    { pattern: /^character_/, replacement: 'Character' },
-    { pattern: /^weapon_/, replacement: 'Weapon' },
-    { pattern: /^armor_/, replacement: 'Armor' },
-    { pattern: /^building_/, replacement: 'Building' },
-    { pattern: /^vehicle_/, replacement: 'Vehicle' },
-    { pattern: /^creature_/, replacement: 'Creature' },
-    { pattern: /^monster_/, replacement: 'Monster' },
-    { pattern: /^npc_/, replacement: 'NPC' },
-    { pattern: /^prop_/, replacement: 'Prop' },
-    { pattern: /^environment_/, replacement: 'Environment' },
-    { pattern: /^terrain_/, replacement: 'Terrain' },
-    { pattern: /^dungeon_/, replacement: 'Dungeon' },
-    { pattern: /^castle_/, replacement: 'Castle' },
-    { pattern: /^forest_/, replacement: 'Forest' },
-    { pattern: /^mountain_/, replacement: 'Mountain' },
-    { pattern: /^cave_/, replacement: 'Cave' },
-    { pattern: /^temple_/, replacement: 'Temple' },
-    { pattern: /^tower_/, replacement: 'Tower' },
-    { pattern: /^bridge_/, replacement: 'Bridge' },
-    { pattern: /^gate_/, replacement: 'Gate' },
-    { pattern: /^wall_/, replacement: 'Wall' },
-    { pattern: /^door_/, replacement: 'Door' },
-    { pattern: /^chest_/, replacement: 'Chest' },
-    { pattern: /^table_/, replacement: 'Table' },
-    { pattern: /^chair_/, replacement: 'Chair' },
-    { pattern: /^bed_/, replacement: 'Bed' },
-    { pattern: /^torch_/, replacement: 'Torch' },
-    { pattern: /^candle_/, replacement: 'Candle' },
-    { pattern: /^book_/, replacement: 'Book' },
-    { pattern: /^scroll_/, replacement: 'Scroll' },
-    { pattern: /^potion_/, replacement: 'Potion' },
-    { pattern: /^gem_/, replacement: 'Gem' },
-    { pattern: /^coin_/, replacement: 'Coin' },
-    { pattern: /^key_/, replacement: 'Key' },
-    { pattern: /^ring_/, replacement: 'Ring' },
-    { pattern: /^amulet_/, replacement: 'Amulet' },
-    { pattern: /^staff_/, replacement: 'Staff' },
-    { pattern: /^wand_/, replacement: 'Wand' },
-    { pattern: /^sword_/, replacement: 'Sword' },
-    { pattern: /^axe_/, replacement: 'Axe' },
-    { pattern: /^bow_/, replacement: 'Bow' },
-    { pattern: /^arrow_/, replacement: 'Arrow' },
-    { pattern: /^shield_/, replacement: 'Shield' },
-    { pattern: /^helmet_/, replacement: 'Helmet' },
-    { pattern: /^boots_/, replacement: 'Boots' },
-    { pattern: /^gloves_/, replacement: 'Gloves' },
-    { pattern: /^cloak_/, replacement: 'Cloak' },
-    { pattern: /^robe_/, replacement: 'Robe' },
-  ];
-
-  // Apply prefix patterns
-  for (const { pattern, replacement } of prefixPatterns) {
-    if (pattern.test(name)) {
-      name = name.replace(pattern, '');
-      prefix = replacement;
-      break;
-    }
-  }
-
-  // Clean up the remaining name
-  let cleanedName = name
-    .replace(/_\d{13}_[a-f0-9]{8}$/, '') // Remove timestamp and hash suffix
-    .replace(/_+/g, ' ') // Replace underscores with spaces
-    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-    .trim();
-
-  // Capitalize each word
-  cleanedName = cleanedName.split(' ').map(word => 
-    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-  ).join(' ');
-
-  if (prefix) {
-    cleanedName = cleanedName === '' ? `${prefix} Model` : `${prefix} ${cleanedName}`;
-  }
-  
-  return cleanedName.trim() === '' ? 'Unnamed Model' : cleanedName.trim();
-};
-
-// Helper function to estimate an asset's radius based on its scale
-const getAssetRadius = (asset) => {
-  if (!asset || !asset.scale) {
-    return 0.5; // Default small radius if scale is not available
-  }
-  // Use the largest dimension on the XZ plane as an estimate of diameter
-  const diameter = Math.max(asset.scale.x, asset.scale.z);
-  return diameter * 0.5; // Radius (can be adjusted with a factor if needed, e.g., * 0.6 for more spacing)
-};
 
 const ViewTerrains = () => {
   // State management
@@ -154,6 +47,7 @@ const ViewTerrains = () => {
   const [globallySelectedPlacedAssetId, setGloballySelectedPlacedAssetId] = useState(null);
   const [transformMode, setTransformMode] = useState('translate');
   const [terrainViewerMetrics, setTerrainViewerMetrics] = useState(null);
+  const [defaultAssetsMap, setDefaultAssetsMap] = useState(new Map());
   
   // Create a stable selected terrain object to prevent unnecessary re-renders
   const stableSelectedTerrain = useMemo(() => {
@@ -328,16 +222,31 @@ const ViewTerrains = () => {
 
       const data = await response.json();
       
+      let backendAssets = [];
       if (data && data.placedAssets && Array.isArray(data.placedAssets)) {
-        console.log(`✅ Loaded ${data.placedAssets.length} assets for terrain ${terrainId}`);
-        setTerrainAssets(prev => new Map(prev.set(terrainId, data.placedAssets)));
+        backendAssets = data.placedAssets;
+        console.log(`✅ Loaded ${backendAssets.length} assets for terrain ${terrainId} from backend`);
       } else {
-        console.log(`✅ No assets found for terrain ${terrainId}`);
-        setTerrainAssets(prev => new Map(prev.set(terrainId, [])));
+        console.log(`✅ No backend assets found for terrain ${terrainId}`);
       }
+
+      // Merge with any auto-placed assets we may already have in state
+      setTerrainAssets(prev => {
+        const existing = prev.get(terrainId) || [];
+        const merged = [...existing];
+        backendAssets.forEach(a => {
+          if (!merged.find(e => e.id === a.id)) {
+            merged.push(a);
+          }
+        });
+        const newMap = new Map(prev);
+        newMap.set(terrainId, merged);
+        return newMap;
+      });
+
     } catch (error) {
       console.error(`❌ Error loading assets for terrain ${terrainId}:`, error);
-      setTerrainAssets(prev => new Map(prev.set(terrainId, [])));
+      // Keep existing assets if any
     }
   }, []);
 
@@ -386,6 +295,10 @@ const ViewTerrains = () => {
         let layoutData = null;
         let layoutPath = null;
         
+        // Additional variables for dungeon grid and auto placed assets
+        let dungeonGrid = null;
+        let autoPlacedAssets = [];
+        
         if (terrain.icon) {
           // If icon starts with '/' it's a path to an image
           if (terrain.icon.startsWith('/')) {
@@ -406,15 +319,27 @@ const ViewTerrains = () => {
 
         // Load layout data if this is a dungeon layout
         if (terrain.isDungeonLayout) {
-          // Check for designedLayout first (completed dungeons), then initialLayout
-          if (terrain.designedLayout && terrain.designedLayout.path) {
-            layoutPath = terrain.designedLayout.path;
-          } else if (terrain.initialLayout && terrain.initialLayout.path) {
+          // 1. Initial layout for visualization (grid overview)
+          if (terrain.initialLayout && terrain.initialLayout.path) {
             layoutPath = terrain.initialLayout.path;
-          }
-          
-          if (layoutPath) {
             layoutData = await loadLayoutData(layoutPath);
+          }
+
+          // 2. Designed layout for final dungeon grid (assets, floors, walls)
+          if (terrain.designedLayout && terrain.designedLayout.path) {
+            try {
+              const designedData = await loadLayoutData(terrain.designedLayout.path);
+              if (designedData && designedData.final_dungeon) {
+                dungeonGrid = designedData.final_dungeon;
+
+                // Auto-generate placed assets if we have default asset metadata loaded
+                if (dungeonGrid && defaultAssetsMap && defaultAssetsMap.size > 0) {
+                  autoPlacedAssets = parseDungeonGridToAssets(dungeonGrid, defaultAssetsMap);
+                }
+              }
+            } catch (err) {
+              console.warn('Failed to load designed layout data:', err);
+            }
           }
         }
         
@@ -424,12 +349,26 @@ const ViewTerrains = () => {
           thumbnailUrl,
           iconEmoji,
           layoutData,
+          dungeonGrid,
+          autoPlacedAssets,
           type: terrain.isDungeonLayout ? 'dungeon_layout' : 'terrain',
           layoutLoadError: terrain.isDungeonLayout && layoutPath && !layoutData
         };
       }));
 
       setTerrains(terrainsData);
+
+      // Pre-populate terrainAssets map with any autoPlacedAssets we generated
+      setTerrainAssets(prev => {
+        const newMap = new Map(prev);
+        terrainsData.forEach(t => {
+          if (t.autoPlacedAssets && t.autoPlacedAssets.length > 0) {
+            newMap.set(t.id, t.autoPlacedAssets);
+          }
+        });
+        return newMap;
+      });
+
       setTotalPages(data.total_pages || Math.max(1, Math.ceil(terrainsData.length / terrainsPerPage)));
 
     } catch (err) {
@@ -438,7 +377,7 @@ const ViewTerrains = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, terrainsPerPage, loadLayoutData]);
+  }, [currentPage, terrainsPerPage, loadLayoutData, defaultAssetsMap]);
 
   // Load terrain assets when terrain is selected
   useEffect(() => {
@@ -764,6 +703,28 @@ const ViewTerrains = () => {
     };
   }, []);
 
+  // Load default assets metadata once
+  useEffect(() => {
+    const loadDefaultAssets = async () => {
+      try {
+        const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.DUNGEON_ASSETS.DEFAULTS}?limit=1000`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch default assets: ${response.status}`);
+        }
+        const data = await response.json();
+        const assetsArray = data.assets || data || [];
+        const map = new Map();
+        assetsArray.forEach(asset => {
+          map.set(asset.id, asset);
+        });
+        setDefaultAssetsMap(map);
+      } catch (err) {
+        console.error('Error loading default assets metadata:', err);
+      }
+    };
+    loadDefaultAssets();
+  }, []);
+
   return (
     <div style={styles.container}>
       {/* Left panel - Visualization */}
@@ -808,6 +769,7 @@ const ViewTerrains = () => {
             onTransformModeChange={setTransformMode}
             floorPlan={stableSelectedTerrain.layoutData}
             isDungeonLayout={stableSelectedTerrain.type === 'dungeon_layout'}
+            dungeonGrid={stableSelectedTerrain.dungeonGrid}
             layoutLoadError={stableSelectedTerrain.layoutLoadError}
             placedDungeons={currentTerrainAssets.length > 0}
           />

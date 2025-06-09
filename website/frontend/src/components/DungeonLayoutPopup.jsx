@@ -1,12 +1,9 @@
 import React, { useRef, useEffect } from 'react';
-import { terrainViewerStyles } from '../styles/TerrainViewer';
 
 const DungeonLayoutPopup = ({ 
   isOpen, 
   onClose, 
-  layoutVisualizationData, 
-  onPlaceAssets,
-  isPlacingAssets 
+  layoutVisualizationData
 }) => {
   const layoutCanvasRef = useRef(null);
 
@@ -30,13 +27,13 @@ const DungeonLayoutPopup = ({
     // Use the same color scheme as GenerateDungeonPopup
     const colors = {
       0: '#1a1a1a',  // Empty - dark
-      1: '#8B4513',  // Floor - brown
+      1: '#000000',  // Floor - white
       2: '#404040',  // Wall - gray
-      3: '#D2B48C',  // Corridor - tan
+      3: '#000000',  // Corridor - white
       4: '#FF6B35',  // Door - orange
-      5: '#FFD700',  // Treasure - gold
+      5: '#000000',  // Treasure - white
       6: '#32CD32',  // Entrance - green
-      7: '#DC143C'   // Boss - red
+      7: '#000000'   // Boss - white
     };
     
     grid.forEach((row, y) => {
@@ -84,92 +81,206 @@ const DungeonLayoutPopup = ({
     }
   };
 
+  // Standard popup styles matching other popups on the site
+  const styles = {
+    overlay: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+    },
+    
+    modal: {
+      backgroundColor: '#2a2a2a',
+      borderRadius: '12px',
+      width: '90vw',
+      maxWidth: '700px',
+      maxHeight: '90vh',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      border: '1px solid #444',
+    },
+    
+    header: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '20px',
+      borderBottom: '1px solid #444',
+      backgroundColor: '#333',
+    },
+    
+    title: {
+      color: '#fff',
+      margin: 0,
+      fontSize: '20px',
+      fontWeight: 'bold',
+    },
+    
+    closeButton: {
+      background: 'transparent',
+      border: 'none',
+      color: '#fff',
+      fontSize: '24px',
+      cursor: 'pointer',
+      padding: '0',
+      width: '30px',
+      height: '30px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: '4px',
+    },
+    
+    content: {
+      flex: 1,
+      padding: '20px',
+      overflowY: 'auto',
+      backgroundColor: '#1e1e1e',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+    },
+    
+    canvasContainer: {
+      display: 'flex',
+      justifyContent: 'center',
+      marginBottom: '20px',
+      backgroundColor: '#000',
+      borderRadius: '8px',
+      padding: '20px',
+      border: '1px solid #444',
+      minHeight: '300px',
+      minWidth: '400px',
+    },
+    
+    canvas: {
+      border: '1px solid #555',
+      borderRadius: '4px',
+      imageRendering: 'pixelated',
+    },
+    
+    canvasPlaceholder: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#ccc',
+      fontSize: '14px',
+      textAlign: 'center',
+      minHeight: '200px',
+    },
+    
+    canvasPlaceholderIcon: {
+      fontSize: '48px',
+      marginBottom: '15px',
+    },
+    
+    legend: {
+      backgroundColor: '#333',
+      borderRadius: '8px',
+      padding: '15px',
+      border: '1px solid #555',
+      width: '100%',
+      maxWidth: '400px',
+    },
+    
+    legendTitle: {
+      color: '#fff',
+      fontSize: '14px',
+      marginBottom: '10px',
+      fontWeight: 'bold',
+    },
+    
+    legendItems: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '8px',
+    },
+    
+    legendItem: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+    },
+    
+    legendColor: {
+      width: '16px',
+      height: '16px',
+      borderRadius: '2px',
+      border: '1px solid #666',
+    },
+    
+    legendText: {
+      color: '#fff',
+      fontSize: '12px',
+    },
+    
+    infoText: {
+      color: '#ccc',
+      marginBottom: '20px',
+      textAlign: 'center',
+      fontSize: '14px',
+    },
+    
+    errorText: {
+      color: '#ff6b6b',
+      marginBottom: '20px',
+      textAlign: 'center',
+      fontSize: '14px',
+    },
+  };
+
   return (
-    <div style={terrainViewerStyles.layoutVisualizationOverlay} onClick={handleOverlayClick}>
-      <div style={terrainViewerStyles.layoutVisualizationContainer}>
-        <h2 style={terrainViewerStyles.layoutVisualizationTitle}>
-          Dungeon Layout Visualization
-        </h2>
-        
-        {layoutVisualizationData ? (
-          <div style={terrainViewerStyles.layoutInfo}>
-            <p style={terrainViewerStyles.layoutInfoText}>
-              Layout: {layoutVisualizationData.params?.rooms || layoutVisualizationData.parameters?.rooms || 'Unknown'} rooms, 
-              {layoutVisualizationData.params?.graph_type || layoutVisualizationData.parameters?.graph_type || 'Unknown'} type
-            </p>
-            <p style={terrainViewerStyles.layoutInfoText}>
-              Generated in {((layoutVisualizationData.generation_time || 0) * 1000).toFixed(1)}ms
-            </p>
-            {layoutVisualizationData.rooms && (
-              <p style={terrainViewerStyles.layoutInfoText}>
-                {layoutVisualizationData.rooms.length} rooms with {layoutVisualizationData.doors?.length || 0} doors
-              </p>
+    <div style={styles.overlay} onClick={handleOverlayClick}>
+      <div style={styles.modal}>
+        <div style={styles.header}>
+          <h2 style={styles.title}>Dungeon Layout</h2>
+          <button style={styles.closeButton} onClick={onClose}>✕</button>
+        </div>
+
+        <div style={styles.content}>
+          <div style={styles.canvasContainer}>
+            {layoutVisualizationData && layoutVisualizationData.grid ? (
+              <canvas ref={layoutCanvasRef} style={styles.canvas} />
+            ) : layoutVisualizationData ? (
+              <div style={styles.canvasPlaceholder}>
+                <div style={styles.canvasPlaceholderIcon}>⚠️</div>
+                <p>Layout data found but missing grid</p>
+                <p>Available keys: {Object.keys(layoutVisualizationData).join(', ')}</p>
+              </div>
+            ) : (
+              <div style={styles.canvasPlaceholder}>
+                <div style={styles.canvasPlaceholderIcon}>🗺️</div>
+                <p>Layout visualization not available</p>
+              </div>
             )}
           </div>
-        ) : (
-          <div style={terrainViewerStyles.layoutInfo}>
-            <p style={terrainViewerStyles.layoutErrorText}>
-              ⚠️ Could not load layout data
-            </p>
-            <p style={terrainViewerStyles.layoutInfoText}>
-              The layout file may be missing or corrupted. You can still use the "Place Assets" feature.
-            </p>
-          </div>
-        )}
-        
-        <div style={terrainViewerStyles.canvasContainer}>
-          {layoutVisualizationData && layoutVisualizationData.grid ? (
-            <canvas ref={layoutCanvasRef} style={terrainViewerStyles.canvas} />
-          ) : layoutVisualizationData ? (
-            <div style={terrainViewerStyles.canvasPlaceholder}>
-              <div style={terrainViewerStyles.canvasPlaceholderIcon}>⚠️</div>
-              <p>Layout data found but missing grid</p>
-              <p>Available keys: {Object.keys(layoutVisualizationData).join(', ')}</p>
-            </div>
-          ) : (
-            <div style={terrainViewerStyles.canvasPlaceholder}>
-              <div style={terrainViewerStyles.canvasPlaceholderIcon}>🗺️</div>
-              <p>Layout visualization not available</p>
+
+          {/* Legend */}
+          {layoutVisualizationData && (
+            <div style={styles.legend}>
+              <h3 style={styles.legendTitle}>Legend:</h3>
+              <div style={styles.legendItems}>
+                <div style={styles.legendItem}>
+                  <div style={{...styles.legendColor, backgroundColor: '#32CD32'}}></div>
+                  <span style={styles.legendText}>Entrance Room</span>
+                </div>
+                <div style={styles.legendItem}>
+                  <div style={{...styles.legendColor, backgroundColor: '#FF6B35'}}></div>
+                  <span style={styles.legendText}>Door</span>
+                </div>
+              </div>
             </div>
           )}
         </div>
-        
-        <div style={terrainViewerStyles.buttonContainer}>
-          <button
-            onClick={onPlaceAssets}
-            disabled={isPlacingAssets}
-            style={{
-              ...terrainViewerStyles.placeAssetsButton,
-              ...(isPlacingAssets ? terrainViewerStyles.placeAssetsButtonDisabled : {})
-            }}
-          >
-            {isPlacingAssets ? 'Placing Assets...' : 'Place Assets 🤖'}
-          </button>
-          
-          <button
-            onClick={onClose}
-            style={terrainViewerStyles.backToViewButton}
-          >
-            Back to 3D View
-          </button>
-        </div>
-
-        {/* Legend - use the same format as GenerateDungeonPopup */}
-        {layoutVisualizationData && (
-          <div style={terrainViewerStyles.legend}>
-            <h3 style={terrainViewerStyles.legendTitle}>Legend:</h3>
-            <div style={terrainViewerStyles.legendItems}>
-              <div style={terrainViewerStyles.legendItem}>
-                <div style={{...terrainViewerStyles.legendColor, backgroundColor: '#32CD32'}}></div>
-                <span style={terrainViewerStyles.legendText}>Entrance Room</span>
-              </div>
-              <div style={terrainViewerStyles.legendItem}>
-                <div style={{...terrainViewerStyles.legendColor, backgroundColor: '#FF6B35'}}></div>
-                <span style={terrainViewerStyles.legendText}>Door</span>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

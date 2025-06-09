@@ -17,7 +17,11 @@ export const createScene = (mountElement, onError) => {
   camera.position.set(10, 10, 10);
 
   // Renderer
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  const renderer = new THREE.WebGLRenderer({ 
+    antialias: false,
+    alpha: true,
+    powerPreference: 'high-performance'
+  });
   renderer.setSize(width, height);
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.shadowMap.enabled = true;
@@ -44,8 +48,8 @@ export const createScene = (mountElement, onError) => {
   const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5);
   directionalLight.position.set(20, 30, 20);
   directionalLight.castShadow = true;
-  directionalLight.shadow.mapSize.width = 2048;
-  directionalLight.shadow.mapSize.height = 2048;
+  directionalLight.shadow.mapSize.width = 1024;
+  directionalLight.shadow.mapSize.height = 1024;
   directionalLight.shadow.camera.near = 0.5;
   directionalLight.shadow.camera.far = 100;
   directionalLight.shadow.camera.left = -30;
@@ -54,7 +58,8 @@ export const createScene = (mountElement, onError) => {
   directionalLight.shadow.camera.bottom = -30;
   scene.add(directionalLight);
 
-  // Fill lights
+  // Fill lights (REMOVED FOR PERFORMANCE)
+  /*
   const fillLight1 = new THREE.DirectionalLight(0xffffff, 1.0);
   fillLight1.position.set(-20, 20, -20);
   scene.add(fillLight1);
@@ -62,6 +67,7 @@ export const createScene = (mountElement, onError) => {
   const fillLight2 = new THREE.DirectionalLight(0xffffff, 0.8);
   fillLight2.position.set(0, 20, -30);
   scene.add(fillLight2);
+  */
 
   return {
     scene,

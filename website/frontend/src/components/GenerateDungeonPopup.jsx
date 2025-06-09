@@ -4,13 +4,13 @@ import styles from '../styles/GenerateDungeonPopup';
 
 const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
   const [params, setParams] = useState({
-    rooms: 8,
+    rooms: 6,
     graph_type: 'mesh',
-    room_scale: 5,
+    room_scale: 3,
     margin: 3,
     max_attempts: 100,
-    width: 50,
-    height: 50
+    width: 40,
+    height: 40
   });
   
   const [layoutResult, setLayoutResult] = useState(null);
@@ -81,6 +81,15 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
     };
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (!document.head.querySelector('style[data-generate-dungeon-spinner]')) {
+      const style = document.createElement('style');
+      style.setAttribute('data-generate-dungeon-spinner', 'true');
+      style.textContent = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
+      document.head.appendChild(style);
+    }
+  }, []);
+
   const handleParamChange = (key, value) => {
     // Handle numeric conversions with proper validation
     if (typeof value === 'string' && ['rooms', 'room_scale', 'width', 'height', 'margin', 'max_attempts'].includes(key)) {
@@ -110,9 +119,6 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
       if (data.success) {
         setLayoutResult(data);
         drawLayout(data.grid);
-        
-        // Auto-save the initial layout to the backend
-        await saveInitialLayout(data);
       } else {
         setError(data.error || 'Layout generation failed');
       }
@@ -277,8 +283,8 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
                 <input
                   type="range"
                   min="4"
-                  max="12"
-                  value={params.rooms || 8}
+                  max="10"
+                  value={params.rooms || 6}
                   onChange={(e) => handleParamChange('rooms', e.target.value)}
                   style={styles.slider}
                 />
@@ -301,9 +307,9 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
                 Room Scale: {params.room_scale}
                 <input
                   type="range"
-                  min="4"
-                  max="8"
-                  value={params.room_scale || 5}
+                  min="3"
+                  max="6"
+                  value={params.room_scale || 3}
                   onChange={(e) => handleParamChange('room_scale', e.target.value)}
                   style={styles.slider}
                 />
@@ -314,9 +320,9 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
                 <div style={styles.gridSizeControls}>
                   <input
                     type="number"
-                    min="40"
-                    max="75"
-                    value={params.width || 50}
+                    min="30"
+                    max="50"
+                    value={params.width || 40}
                     onChange={(e) => handleParamChange('width', e.target.value)}
                     style={styles.numberInput}
                     placeholder="Width"
@@ -324,9 +330,9 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
                   <span style={{color: '#fff', margin: '0 8px'}}>×</span>
                   <input
                     type="number"
-                    min="40"
+                    min="30"
                     max="75"
-                    value={params.height || 50}
+                    value={params.height || 40}
                     onChange={(e) => handleParamChange('height', e.target.value)}
                     style={styles.numberInput}
                     placeholder="Height"
@@ -413,7 +419,24 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
                   ...(isDesigning || !layoutName.trim() ? styles.designButtonDisabled : {})
                 }}
               >
-                {isDesigning ? 'Starting Design Process...' : 'Let AI Do Its Thing'}
+                {isDesigning ? (
+                  <>
+                    <span style={{
+                      display: 'inline-block',
+                      width: 18,
+                      height: 18,
+                      border: '3px solid #fff',
+                      borderTop: '3px solid #FF6B35',
+                      borderRadius: '50%',
+                      marginRight: 10,
+                      verticalAlign: 'middle',
+                      animation: 'spin 1s linear infinite',
+                    }} />
+                    Starting Design Process...
+                  </>
+                ) : (
+                  'Let AI Do Its Thing'
+                )}
               </button>
             </div>
             

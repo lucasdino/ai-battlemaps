@@ -142,7 +142,7 @@ class DungeonData:
                         continue
                     y, x = start_y + dy, start_x + dx
                     if 0 <= y < rows and 0 <= x < cols:
-                        grid[y][x] = val
+                        grid[y][x] = str(val)
 
         non_zero = [(y, x) for y in range(rows) for x in range(cols) if grid[y][x] != "0" and grid[y][x] != 0]
         if not non_zero:

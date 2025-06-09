@@ -14,6 +14,7 @@ import { useGridHighlight } from '../hooks/useGridHighlight';
 import { usePersistence } from '../hooks/usePersistence';
 import { useAssetSync } from '../hooks/useAssetSync';
 import { eventBus, EVENTS } from '../events/eventBus';
+import { useDungeonLayoutRenderer } from '../hooks/useDungeonLayoutRenderer';
 
 const TerrainViewer = ({ 
   terrainUrl, 
@@ -36,6 +37,7 @@ const TerrainViewer = ({
   onTransformModeChange,
   floorPlan,
   isDungeonLayout = false,
+  dungeonGrid = null,
   layoutLoadError = false,
   placedDungeons = false,
 }) => {
@@ -176,6 +178,12 @@ const TerrainViewer = ({
       if (onError) onError(`Failed to clear assets: ${error.message}`);
     }
   }, [clearAssetsFromUI, onError]);
+
+  // Render dungeon geometry when applicable
+  useDungeonLayoutRenderer({
+    sceneRef,
+    dungeonGrid: isDungeonLayout ? dungeonGrid : null,
+  });
 
   return (
     <div style={terrainViewerStyles.container}>

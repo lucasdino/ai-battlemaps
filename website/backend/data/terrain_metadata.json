@@ -19,7 +19,7 @@
       "file": "throneroom_1749175996463_0wlizx_icon.png",
       "path": "/assets/terrain_icons/throneroom_1749175996463_0wlizx_icon.png"
     },
-    "updated": 1749275296856,
+    "updated": 1749445730417,
     "placedAssets": [
       {
         "id": "dragdrop-funkopop_swanson_1747771324935_d59c54e0.glb-1749176012176",
@@ -27,20 +27,18 @@
         "name": "Funkopop Swanson 1747771324935 D59c54e0",
         "position": {
           "x": 0,
-          "y": 0.6498998492956162,
+          "y": 0.8198767371475697,
           "z": 4.5
         },
         "rotation": {
-          "isEuler": true,
-          "_x": 0,
-          "_y": 0.2,
-          "_z": 0,
-          "_order": "XYZ"
+          "x": 0,
+          "y": 0,
+          "z": 0
         },
         "scale": {
-          "x": 1.3,
-          "y": 1.3,
-          "z": 1.3
+          "x": 1.6,
+          "y": 1.6,
+          "z": 1.6
         }
       },
       {
@@ -53,11 +51,9 @@
           "z": 4.5
         },
         "rotation": {
-          "isEuler": true,
-          "_x": 0,
-          "_y": 5.1,
-          "_z": 0,
-          "_order": "XYZ"
+          "x": 0,
+          "y": 5.3,
+          "z": 0
         },
         "scale": {
           "x": 1.9,
@@ -71,20 +67,18 @@
         "name": "Generated 1746832597913 99167 1746832605220 81e29b7c",
         "position": {
           "x": 0,
-          "y": 0.6505995094776154,
+          "y": 0.6205533929169178,
           "z": 6.5
         },
         "rotation": {
-          "isEuler": true,
-          "_x": 0,
-          "_y": 3.1,
-          "_z": 0,
-          "_order": "XYZ"
+          "x": 0,
+          "y": 3.1,
+          "z": 0
         },
         "scale": {
-          "x": 1.3,
-          "y": 1.3,
-          "z": 1.3
+          "x": 1.2,
+          "y": 1.2,
+          "z": 1.2
         }
       },
       {
@@ -93,7 +87,7 @@
         "name": "Dwarfboi 1747090931945 C496af18",
         "position": {
           "x": 1.9911111111111115,
-          "y": 0.46988064125180246,
+          "y": 0.36990716531872747,
           "z": 6.5
         },
         "rotation": {
@@ -102,9 +96,9 @@
           "z": 0
         },
         "scale": {
-          "x": 0.9,
-          "y": 0.9,
-          "z": 0.9
+          "x": 0.7,
+          "y": 0.7,
+          "z": 0.7
         }
       }
     ],
@@ -130,8 +124,96 @@
       "file": "forest_battlemap_1749181490779_qxm8er_icon.png",
       "path": "/assets/terrain_icons/forest_battlemap_1749181490779_qxm8er_icon.png"
     },
-    "updated": 1749275203619,
-    "placedAssets": [],
+    "updated": 1749454941422,
+    "placedAssets": [
+      {
+        "id": "dragdrop-edited-1747771432094-386786_1747771466019_fe396e4e.glb-1749445747061",
+        "modelUrl": "/assets/3d_models/edited-1747771432094-386786_1747771466019_fe396e4e.glb",
+        "name": "Silly Swanson",
+        "position": {
+          "x": 5,
+          "y": 0.9196403153240681,
+          "z": 3.0715754833401894
+        },
+        "rotation": {
+          "x": 0,
+          "y": 5.2,
+          "z": 0
+        },
+        "scale": {
+          "x": 1.8,
+          "y": 1.8,
+          "z": 1.8
+        }
+      },
+      {
+        "id": "dragdrop-dwarfboi_1747090931945_c496af18.glb-1749454930207",
+        "modelUrl": "/assets/3d_models/dwarfboi_1747090931945_c496af18.glb",
+        "name": "Dwarfboi",
+        "position": {
+          "x": 3,
+          "y": 0.9697480209171772,
+          "z": 2.04771698889346
+        },
+        "rotation": {
+          "x": 0,
+          "y": 1.2,
+          "z": 0
+        },
+        "scale": {
+          "x": 1.9,
+          "y": 1.9,
+          "z": 1.9
+        }
+      }
+    ],
     "placed_dungeons": false
+  },
+  "dungeon_Bank_Dungeon_1749449325956": {
+    "created": 1749449325956,
+    "name": "Bank Dungeon",
+    "type": "dungeon_layout",
+    "originalFilename": "designed_dungeon_Bank_Dungeon_1749449325956.json",
+    "initialLayout": {
+      "file": "layout_Bank_Dungeon_1749449325956.json",
+      "path": "/assets/dungeon_initial_layout/layout_Bank_Dungeon_1749449325956.json"
+    },
+    "designedLayout": {
+      "file": "designed_dungeon_Bank_Dungeon_1749449325956.json",
+      "path": "/assets/dungeon_designed_layout/designed_dungeon_Bank_Dungeon_1749449325956.json"
+    },
+    "dimensions": {
+      "width": 50,
+      "height": 50,
+      "depth": 0.3
+    },
+    "scale": 1,
+    "isDungeonLayout": true,
+    "placed_dungeons": true,
+    "updated": 1749449325970
+  },
+  "dungeon_Vampire_Castle_1749452253635": {
+    "created": 1749452253635,
+    "name": "Vampire Castle",
+    "type": "dungeon_layout",
+    "originalFilename": "designed_dungeon_Vampire_Castle_1749452253635.json",
+    "initialLayout": {
+      "file": "layout_Vampire_Castle_1749452253635.json",
+      "path": "/assets/dungeon_initial_layout/layout_Vampire_Castle_1749452253635.json"
+    },
+    "designedLayout": {
+      "file": "designed_dungeon_Vampire_Castle_1749452253635.json",
+      "path": "/assets/dungeon_designed_layout/designed_dungeon_Vampire_Castle_1749452253635.json"
+    },
+    "dimensions": {
+      "width": 50,
+      "height": 50,
+      "depth": 0.3
+    },
+    "scale": 1,
+    "isDungeonLayout": true,
+    "placed_dungeons": true,
+    "updated": 1749453975158,
+    "placedAssets": []
   }
 }

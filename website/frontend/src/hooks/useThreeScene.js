@@ -65,7 +65,21 @@ export const useThreeScene = (mountRef, options = {}) => {
       // Animation loop
       const animate = () => {
         animationFrameIdRef.current = requestAnimationFrame(animate);
+        
+        // Pause rendering if the canvas is not visible to prevent crashes
+        if (renderer.domElement.clientHeight === 0) {
+          return;
+        }
+
         orbitControls.update();
+
+        // Update LODs
+        scene.traverse(object => {
+          if (object.isLOD) {
+            object.update(camera);
+          }
+        });
+
         renderer.render(scene, camera);
       };
       animate();

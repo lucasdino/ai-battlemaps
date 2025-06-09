@@ -296,7 +296,7 @@ class PolyominoLayoutGenerator(LayoutGenerator):
         for edge in graph.edges():
             if not self._place_door(grid, edge, room_cells):
                 door_placement_success = False
-                print(f"Warning: Failed to place door between rooms {edge[0]} and {edge[1]}")
+                # print(f"Warning: Failed to place door between rooms {edge[0]} and {edge[1]}")
         
         return grid
     

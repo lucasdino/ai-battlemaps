@@ -257,7 +257,7 @@ const styles = {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
     gap: '12px',
-    maxHeight: '300px',
+    maxHeight: '600px',
     overflowY: 'auto',
     padding: '5px',
   },
