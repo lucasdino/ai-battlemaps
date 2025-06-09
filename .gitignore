@@ -2,6 +2,11 @@
 lucas_windows/
 infinigen/
 
+# Agent specific folders to ignore
+engine/layoutgen/agent/__pycache__
+engine/layoutgen/agent/data
+engine/layoutgen/agent/figures
+
 # API Keys
 **/apiKeys.js
 
