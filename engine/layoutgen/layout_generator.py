@@ -33,10 +33,11 @@ class PolyominoLayoutGenerator(LayoutGenerator):
             graph = GraphBuilder.create_graph(layout_params.graph_type, layout_params.rooms)
             placed_rooms = self._place_rooms(layout_params, graph)
             
-            # Validate connectivity before creating grid
-            connectivity_valid = self._validate_connectivity(graph, placed_rooms)
-            
             grid = self._create_grid(placed_rooms, layout_params, graph)
+            
+            # Validate connectivity using the actual grid
+            connectivity_valid = self._validate_connectivity(graph, placed_rooms, grid, layout_params.room_scale)
+            
             rooms = self._convert_rooms(placed_rooms, layout_params.room_scale)
             
             return LayoutResult(
@@ -237,6 +238,26 @@ class PolyominoLayoutGenerator(LayoutGenerator):
         
         return True
     
+    def _place_door(self, grid: np.ndarray, edge: Tuple[int, int], room_cells: Dict[int, Set[Tuple[int, int]]]) -> bool:
+        """Place a door between two rooms and return success status"""
+        room1_cells = room_cells.get(edge[0], set())
+        room2_cells = room_cells.get(edge[1], set())
+        
+        if not room1_cells or not room2_cells:
+            return False
+        
+        for x1, y1 in room1_cells:
+            for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                wall_x, wall_y = x1 + dx, y1 + dy
+                room2_x, room2_y = wall_x + dx, wall_y + dy
+                
+                if ((room2_x, room2_y) in room2_cells and
+                    0 <= wall_x < self.width and 0 <= wall_y < self.height and
+                    grid[wall_y, wall_x] == 2):
+                    grid[wall_y, wall_x] = 4
+                    return True
+        return False
+
     def _create_grid(self, placed_rooms: List[Dict], params: LayoutParams, graph) -> np.ndarray:
         grid = np.zeros((self.height, self.width), dtype=int)
         room_cells = {}
@@ -270,8 +291,12 @@ class PolyominoLayoutGenerator(LayoutGenerator):
         for x, y in wall_cells:
             grid[y, x] = 2
         
+        # Track door placement success
+        door_placement_success = True
         for edge in graph.edges():
-            self._place_door(grid, edge, room_cells)
+            if not self._place_door(grid, edge, room_cells):
+                door_placement_success = False
+                print(f"Warning: Failed to place door between rooms {edge[0]} and {edge[1]}")
         
         return grid
     
@@ -283,24 +308,6 @@ class PolyominoLayoutGenerator(LayoutGenerator):
             "treasure": 5
         }
         return type_map.get(room_type, 1)
-    
-    def _place_door(self, grid: np.ndarray, edge: Tuple[int, int], room_cells: Dict[int, Set[Tuple[int, int]]]):
-        room1_cells = room_cells.get(edge[0], set())
-        room2_cells = room_cells.get(edge[1], set())
-        
-        if not room1_cells or not room2_cells:
-            return
-        
-        for x1, y1 in room1_cells:
-            for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-                wall_x, wall_y = x1 + dx, y1 + dy
-                room2_x, room2_y = wall_x + dx, wall_y + dy
-                
-                if ((room2_x, room2_y) in room2_cells and
-                    0 <= wall_x < self.width and 0 <= wall_y < self.height and
-                    grid[wall_y, wall_x] == 2):
-                    grid[wall_y, wall_x] = 4
-                    return
     
     def _convert_rooms(self, placed_rooms: List[Dict], room_scale: int) -> List[Room]:
         rooms = []
@@ -326,35 +333,83 @@ class PolyominoLayoutGenerator(LayoutGenerator):
         
         return rooms
     
-    def _validate_connectivity(self, graph, placed_rooms) -> bool:
-        """Validate that all placed rooms are reachable from the entrance"""
+    def _validate_connectivity(self, graph, placed_rooms, grid: np.ndarray, room_scale: int = 3) -> bool:
+        """Validate that all placed rooms are reachable via actual doors in the grid"""
         if not placed_rooms:
             return False
         
-        # Build adjacency list from actual placed rooms and graph edges
+        # Build room cell lookup
         placed_ids = {room['id'] for room in placed_rooms}
-        adjacency = {room_id: [] for room_id in placed_ids}
+        room_to_cells = {}
+        cell_to_room = {}
         
-        for edge in graph.edges():
-            room1, room2 = edge
-            if room1 in placed_ids and room2 in placed_ids:
-                adjacency[room1].append(room2)
-                adjacency[room2].append(room1)
+        for room in placed_rooms:
+            room_id = room['id']
+            if room_id not in placed_ids:
+                continue
+                
+            # Get room cells from the grid by finding cells with the room's type value
+            room_type = room['block'].room_type
+            expected_value = self._get_cell_value(room_type)
+            
+            room_cells = set()
+            for y in range(self.height):
+                for x in range(self.width):
+                    if grid[y, x] == expected_value:
+                        # Check if this cell is within the room's bounds
+                        room_x, room_y = room['x'], room['y']
+                        room_w = room['shape'].width * room_scale
+                        room_h = room['shape'].height * room_scale
+                        
+                        if (room_x <= x < room_x + room_w and 
+                            room_y <= y < room_y + room_h):
+                            room_cells.add((x, y))
+                            cell_to_room[(x, y)] = room_id
+            
+            room_to_cells[room_id] = room_cells
         
-        # BFS from entrance (room 0) to check reachability
-        visited = set()
-        queue = [0]  # Start from entrance
-        visited.add(0)
+        # BFS from entrance (room 0) through actual doors
+        if 0 not in room_to_cells:
+            return False
+            
+        visited_rooms = set()
+        visited_cells = set()
+        queue = list(room_to_cells[0])  # Start from all entrance cells
+        
+        for cell in queue:
+            visited_cells.add(cell)
+            visited_rooms.add(0)
         
         while queue:
-            current = queue.pop(0)
-            for neighbor in adjacency.get(current, []):
-                if neighbor not in visited:
-                    visited.add(neighbor)
-                    queue.append(neighbor)
+            x, y = queue.pop(0)
+            
+            # Check all 4 directions for doors or accessible cells
+            for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                nx, ny = x + dx, y + dy
+                
+                if (0 <= nx < self.width and 0 <= ny < self.height and 
+                    (nx, ny) not in visited_cells):
+                    
+                    cell_value = grid[ny, nx]
+                    
+                    # If it's a door (value 4), we can pass through
+                    if cell_value == 4:
+                        visited_cells.add((nx, ny))
+                        queue.append((nx, ny))
+                    
+                    # If it's a room cell, add it to visited
+                    elif (nx, ny) in cell_to_room:
+                        room_id = cell_to_room[(nx, ny)]
+                        if room_id not in visited_rooms:
+                            visited_rooms.add(room_id)
+                            # Add all cells of this room to the queue
+                            for room_cell in room_to_cells[room_id]:
+                                if room_cell not in visited_cells:
+                                    visited_cells.add(room_cell)
+                                    queue.append(room_cell)
         
         # All placed rooms should be reachable
-        return len(visited) == len(placed_ids)
+        return len(visited_rooms) == len(placed_ids)
     
     def _count_room_types(self, placed_rooms) -> Dict[str, int]:
         """Count occurrences of each room type"""

@@ -17,6 +17,17 @@ CORS(app)
 LAYOUT_DIR = os.path.join(os.path.dirname(__file__), 'output', 'api_layouts')
 os.makedirs(LAYOUT_DIR, exist_ok=True)
 
+# Global timeout tracking
+_generation_start_time = None
+GENERATION_TIMEOUT = 5.0  # 5 seconds
+
+def is_generation_timeout():
+    """Check if generation has exceeded the timeout"""
+    global _generation_start_time
+    if _generation_start_time is None:
+        return False
+    return time.time() - _generation_start_time > GENERATION_TIMEOUT
+
 def extract_doors_from_grid(grid):
     """Extract door positions from the grid where value is 4"""
     doors = []
@@ -261,6 +272,21 @@ def get_room_grid_value(room_type):
 
 @app.route('/api/layout/generate', methods=['POST'])
 def generate_layout():
+    global _generation_start_time
+    
+    # Initialize timeout on first call
+    if _generation_start_time is None:
+        _generation_start_time = time.time()
+    
+    # Check timeout before proceeding
+    if is_generation_timeout():
+        _generation_start_time = None  # Reset for next request
+        return jsonify({
+            'success': False,
+            'error': 'Layout generation timeout exceeded',
+            'details': f'Generation took longer than {GENERATION_TIMEOUT} seconds'
+        }), 408  # Request Timeout
+    
     try:
         data = request.get_json() or {}
         
@@ -273,7 +299,6 @@ def generate_layout():
         width = int(data.get('width', 50))
         height = int(data.get('height', 50))
         
-        # Generate layout using the direct Python code
         system = LayoutSystem(width=width, height=height)
         result = system.generate_layout(
             rooms=rooms,
@@ -284,11 +309,20 @@ def generate_layout():
         )
         
         if not result.success:
-            return jsonify({
-                'success': False,
-                'error': 'Layout generation failed',
-                'details': result.metadata.get('error', 'Unknown error')
-            }), 500
+            # Check timeout before recursing
+            if is_generation_timeout():
+                _generation_start_time = None  # Reset for next request
+                return jsonify({
+                    'success': False,
+                    'error': 'Layout generation timeout exceeded',
+                    'details': f'Multiple generation attempts exceeded {GENERATION_TIMEOUT} seconds'
+                }), 408
+            
+            # Recursive retry with timeout protection
+            return generate_layout()
+        
+        # Success - reset timeout tracker
+        _generation_start_time = None
         
         # Convert room data
         rooms_data = []
@@ -303,11 +337,9 @@ def generate_layout():
                 'metadata': room.metadata
             })
         
-        # Extract doors and outlines
         doors = extract_doors_from_grid(result.grid)
         room_outlines = extract_room_outlines_from_grid(result.grid, rooms_data)
         
-        # Add outline data to rooms
         for room in rooms_data:
             room_id = room['id']
             if room_id in room_outlines:
@@ -321,7 +353,6 @@ def generate_layout():
                     'is_rectangular': is_rectangular_room(outline_data['floor_cells']) if outline_data['floor_cells'] else False
                 }
         
-        # Validation info
         validation_info = {
             'has_entrance': any(room['room_type'] == 'entrance' for room in rooms_data),
             'entrance_count': sum(1 for room in rooms_data if room['room_type'] == 'entrance'),
@@ -353,11 +384,10 @@ def generate_layout():
             }
         }
         
-        # Note: Removed automatic saving - users can save via frontend when desired
-        
         return jsonify(response_data)
         
     except Exception as e:
+        _generation_start_time = None  # Reset on error
         import traceback
         return jsonify({
             'success': False,
