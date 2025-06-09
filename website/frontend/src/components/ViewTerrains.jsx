@@ -384,6 +384,7 @@ const ViewTerrains = () => {
         let thumbnailUrl = null;
         let iconEmoji = null;
         let layoutData = null;
+        let layoutPath = null;
         
         if (terrain.icon) {
           // If icon starts with '/' it's a path to an image
@@ -404,8 +405,17 @@ const ViewTerrains = () => {
         }
 
         // Load layout data if this is a dungeon layout
-        if (terrain.isDungeonLayout && terrain.layoutPath) {
-          layoutData = await loadLayoutData(terrain.layoutPath);
+        if (terrain.isDungeonLayout) {
+          // Check for designedLayout first (completed dungeons), then initialLayout
+          if (terrain.designedLayout && terrain.designedLayout.path) {
+            layoutPath = terrain.designedLayout.path;
+          } else if (terrain.initialLayout && terrain.initialLayout.path) {
+            layoutPath = terrain.initialLayout.path;
+          }
+          
+          if (layoutPath) {
+            layoutData = await loadLayoutData(layoutPath);
+          }
         }
         
         return {
@@ -415,7 +425,7 @@ const ViewTerrains = () => {
           iconEmoji,
           layoutData,
           type: terrain.isDungeonLayout ? 'dungeon_layout' : 'terrain',
-          layoutLoadError: terrain.isDungeonLayout && terrain.layoutPath && !layoutData
+          layoutLoadError: terrain.isDungeonLayout && layoutPath && !layoutData
         };
       }));
 

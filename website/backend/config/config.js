@@ -29,8 +29,8 @@ const CONFIG = {
     TERRAINS: path.join(BACKEND_ROOT, 'assets', 'terrains'),
     TERRAIN_IMAGES: path.join(BACKEND_ROOT, 'assets', 'terrain_images'),
     TERRAIN_ICONS: path.join(BACKEND_ROOT, 'assets', 'terrain_icons'),
-    DUNGEON: path.join(BACKEND_ROOT, 'assets', 'dungeon'),
-    DUNGEON_LAYOUTS: path.join(BACKEND_ROOT, 'assets', 'dungeon_layouts'),
+    DUNGEON_DESIGNED_LAYOUT: path.join(BACKEND_ROOT, 'assets', 'dungeon_designed_layout'),
+    DUNGEON_INITIAL_LAYOUT: path.join(BACKEND_ROOT, 'assets', 'dungeon_initial_layout'),
     DUNGEON_DEFAULTS: path.join(BACKEND_ROOT, 'assets', 'dungeon_defaults'),
     DUNGEON_DEFAULT_MODELS: path.join(BACKEND_ROOT, 'assets', 'dungeon_defaults', 'models'),
     DUNGEON_DEFAULT_ICONS: path.join(BACKEND_ROOT, 'assets', 'dungeon_defaults', 'model_icons')
@@ -50,6 +50,9 @@ const CONFIG = {
     DUNGEON_ASSETS: '/api/dungeon-assets',
     DUNGEON_ASSETS_DEFAULTS: '/api/dungeon-assets/defaults',
     DUNGEON_ASSETS_FILTER: '/api/dungeon-assets/filter',
+    
+    // Dungeon generation endpoints
+    DUNGEON_GENERATE: '/api/dungeon/generate',
     
     // AI generation endpoints
     TRELLIS: '/api/trellis',

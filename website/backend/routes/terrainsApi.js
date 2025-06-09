@@ -67,7 +67,9 @@ router.get('/terrains', (req, res) => {
         dimensions: metadata.dimensions || { width: 10, height: 10, depth: 0.1 },
         scale: typeof metadata.scale === 'number' ? metadata.scale : 1.0,
         placedAssets: metadata.placedAssets || [],
-        layoutPath: metadata.layoutPath || null,
+        layoutPath: metadata.initialLayout?.path || metadata.designedLayout?.path || null,
+        initialLayout: metadata.initialLayout || null,
+        designedLayout: metadata.designedLayout || null,
         isDungeonLayout: metadata.isDungeonLayout || false,
         placed_dungeons: metadata.placed_dungeons || false
       };
@@ -338,7 +340,14 @@ router.delete('/terrains/:terrainId', async (req, res) => {
     
     // Check if this is a dungeon layout and get the layout file path
     if (metadata.isDungeonLayout && metadata.layoutFile) {
-      layoutPath = path.join(CONFIG.DIRECTORIES.DUNGEON_LAYOUTS, metadata.layoutFile);
+      // Determine which directory based on whether it's a designed dungeon or initial layout
+      if (metadata.placed_dungeons) {
+        // This is a designed dungeon with 3D assets - stored in dungeon_designed_layout
+        layoutPath = path.join(CONFIG.DIRECTORIES.DUNGEON_DESIGNED_LAYOUT, metadata.layoutFile);
+      } else {
+        // This is an initial layout - stored in dungeon_initial_layout
+        layoutPath = path.join(CONFIG.DIRECTORIES.DUNGEON_INITIAL_LAYOUT, metadata.layoutFile);
+      }
     }
     
     // Delete the terrain GLB file (only exists for regular terrains, not dungeon layouts)
@@ -459,26 +468,27 @@ router.post('/terrains/save-layout', async (req, res) => {
     const timestamp = Date.now();
     const sanitizedName = layoutName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
     const layoutFilename = `${sanitizedName}_${timestamp}.json`;
-    const layoutPath = path.join(CONFIG.DIRECTORIES.DUNGEON_LAYOUTS, layoutFilename);
+    const layoutPath = path.join(CONFIG.DIRECTORIES.DUNGEON_INITIAL_LAYOUT, layoutFilename);
 
     // Save the layout data to file
     fs.writeFileSync(layoutPath, JSON.stringify(layoutData, null, 2));
 
     // Create terrain metadata for the dungeon layout
-    const terrainId = `dungeon_${sanitizedName}_${timestamp}.glb`; // Even though it's not a real GLB
+    const terrainId = `dungeon_${sanitizedName}_${timestamp}`;
     const metadata = {
       name: layoutName,
       type: 'dungeon_layout',
       originalFilename: layoutFilename,
-      layoutFile: layoutFilename,
-      layoutPath: `/assets/dungeon_layouts/${layoutFilename}`,
+      initialLayout: {
+        file: layoutFilename,
+        path: `/assets/dungeon_initial_layout/${layoutFilename}`
+      },
       dimensions: {
         width: layoutData.params?.width || 50,
         height: layoutData.params?.height || 50,
-        depth: 0.1
+        depth: 0.3
       },
       scale: 1.0,
-      icon: '🏰', // Default dungeon emoji
       created: timestamp,
       isDungeonLayout: true,
       placed_dungeons: false // This is a saved layout, not a placed dungeon with 3D assets
@@ -491,7 +501,7 @@ router.post('/terrains/save-layout', async (req, res) => {
       res.json({ 
         message: 'Layout saved and terrain created successfully',
         terrainId: terrainId,
-        layoutPath: `/assets/dungeon_layouts/${layoutFilename}`,
+        layoutPath: `/assets/dungeon_initial_layout/${layoutFilename}`,
         metadata: metadata
       });
     } else {
@@ -569,7 +579,9 @@ router.get('/terrains/layouts', (req, res) => {
         id: terrainId,
         name: metadata.name,
         created: metadata.created,
-        layoutPath: metadata.layoutPath,
+        layoutPath: metadata.initialLayout?.path || metadata.designedLayout?.path || null,
+        initialLayout: metadata.initialLayout || null,
+        designedLayout: metadata.designedLayout || null,
         icon: metadata.icon || '🏰'
       }));
     

@@ -41,13 +41,13 @@ const setupStaticServing = (app) => {
   app.use('/assets/terrain_images', express.static(CONFIG.DIRECTORIES.TERRAIN_IMAGES));
   app.use('/assets/terrain_icons', express.static(CONFIG.DIRECTORIES.TERRAIN_ICONS));
   
-  // Dungeon assets directory
-  console.log(`[DEBUG] Serving dungeon assets from physical path: ${CONFIG.DIRECTORIES.DUNGEON}`);
-  app.use('/assets/dungeon', express.static(CONFIG.DIRECTORIES.DUNGEON));
+  // Dungeon designed layouts directory (for serving designed dungeon JSON files)
+  console.log(`[DEBUG] Serving dungeon designed layouts from physical path: ${CONFIG.DIRECTORIES.DUNGEON_DESIGNED_LAYOUT}`);
+  app.use('/assets/dungeon_designed_layout', express.static(CONFIG.DIRECTORIES.DUNGEON_DESIGNED_LAYOUT));
   
-  // Dungeon layouts directory (for serving layout JSON files)
-  console.log(`[DEBUG] Serving dungeon layouts from physical path: ${CONFIG.DIRECTORIES.DUNGEON_LAYOUTS}`);
-  app.use('/assets/dungeon_layouts', express.static(CONFIG.DIRECTORIES.DUNGEON_LAYOUTS));
+  // Dungeon initial layouts directory (for serving initial layout JSON files)
+  console.log(`[DEBUG] Serving dungeon initial layouts from physical path: ${CONFIG.DIRECTORIES.DUNGEON_INITIAL_LAYOUT}`);
+  app.use('/assets/dungeon_initial_layout', express.static(CONFIG.DIRECTORIES.DUNGEON_INITIAL_LAYOUT));
   
   // Dungeon defaults directory (for serving default models and icons)
   console.log(`[DEBUG] Serving dungeon defaults from physical path: ${CONFIG.DIRECTORIES.DUNGEON_DEFAULTS}`);
@@ -62,8 +62,8 @@ const setupStaticServing = (app) => {
   console.log(`- ${CONFIG.DIRECTORIES.TERRAINS} at /assets/terrains`);
   console.log(`- ${CONFIG.DIRECTORIES.TERRAIN_IMAGES} at /assets/terrain_images`);
   console.log(`- ${CONFIG.DIRECTORIES.TERRAIN_ICONS} at /assets/terrain_icons`);
-  console.log(`- ${CONFIG.DIRECTORIES.DUNGEON} at /assets/dungeon`);
-  console.log(`- ${CONFIG.DIRECTORIES.DUNGEON_LAYOUTS} at /assets/dungeon_layouts`);
+  console.log(`- ${CONFIG.DIRECTORIES.DUNGEON_DESIGNED_LAYOUT} at /assets/dungeon_designed_layout`);
+  console.log(`- ${CONFIG.DIRECTORIES.DUNGEON_INITIAL_LAYOUT} at /assets/dungeon_initial_layout`);
   console.log(`- ${CONFIG.DIRECTORIES.DUNGEON_DEFAULTS} at /assets/dungeon_defaults`);
 };
 

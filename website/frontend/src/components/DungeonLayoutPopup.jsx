@@ -160,28 +160,12 @@ const DungeonLayoutPopup = ({
             <h3 style={terrainViewerStyles.legendTitle}>Legend:</h3>
             <div style={terrainViewerStyles.legendItems}>
               <div style={terrainViewerStyles.legendItem}>
-                <div style={{...terrainViewerStyles.legendColor, backgroundColor: '#8B4513'}}></div>
-                <span style={terrainViewerStyles.legendText}>Floor</span>
-              </div>
-              <div style={terrainViewerStyles.legendItem}>
-                <div style={{...terrainViewerStyles.legendColor, backgroundColor: '#404040'}}></div>
-                <span style={terrainViewerStyles.legendText}>Wall</span>
+                <div style={{...terrainViewerStyles.legendColor, backgroundColor: '#32CD32'}}></div>
+                <span style={terrainViewerStyles.legendText}>Entrance Room</span>
               </div>
               <div style={terrainViewerStyles.legendItem}>
                 <div style={{...terrainViewerStyles.legendColor, backgroundColor: '#FF6B35'}}></div>
                 <span style={terrainViewerStyles.legendText}>Door</span>
-              </div>
-              <div style={terrainViewerStyles.legendItem}>
-                <div style={{...terrainViewerStyles.legendColor, backgroundColor: '#32CD32'}}></div>
-                <span style={terrainViewerStyles.legendText}>Entrance</span>
-              </div>
-              <div style={terrainViewerStyles.legendItem}>
-                <div style={{...terrainViewerStyles.legendColor, backgroundColor: '#DC143C'}}></div>
-                <span style={terrainViewerStyles.legendText}>Boss Room</span>
-              </div>
-              <div style={terrainViewerStyles.legendItem}>
-                <div style={{...terrainViewerStyles.legendColor, backgroundColor: '#FFD700'}}></div>
-                <span style={terrainViewerStyles.legendText}>Treasure</span>
               </div>
             </div>
           </div>

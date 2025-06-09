@@ -9,6 +9,7 @@ import numpy as np
 
 # Direct imports since we're in the same folder
 from layout_system import LayoutSystem
+import agent
 
 app = Flask(__name__)
 CORS(app)
@@ -453,6 +454,80 @@ def health():
         'service': 'AI Battlemap Layout Generator API',
         'version': '1.0.0'
     })
+
+@app.route('/api/dungeon/generate', methods=['POST'])
+def generate_dungeon():
+    """
+    Generate a complete dungeon using the DungeonAgent, similar to test_async.py functionality.
+    Accepts dungeon_data and default_assets from the frontend.
+    Returns the final assembled dungeon.
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No JSON data provided'
+            }), 400
+        
+        # Extract required parameters
+        dungeon_data = data.get('dungeon_data')
+        default_assets = data.get('default_assets')
+        dungeon_design_prompt = data.get('dungeon_design_prompt', None)
+        
+        if not dungeon_data:
+            return jsonify({
+                'success': False,
+                'error': 'dungeon_data is required'
+            }), 400
+            
+        if not default_assets:
+            return jsonify({
+                'success': False,
+                'error': 'default_assets is required'
+            }), 400
+        
+        # Initialize DungeonAgent with fixed parameters (editable in code but not from API)
+        dungeon_agent = agent.DungeonAgent(
+            dungeon_data=dungeon_data,
+            default_assets=default_assets,
+            max_generation_attempts=2,
+            max_concurrent_requests=2,
+            delay_between_requests=0.0,
+            default_model_endpoint="Claude 4 Sonnet"
+        )
+        
+        # Generate the dungeon using async processing
+        room_placement_dicts = dungeon_agent.design_dungeon(
+            dungeon_design_prompt=dungeon_design_prompt,
+            use_async=True
+        )
+        
+        # Assemble the final dungeon
+        final_dungeon = dungeon_agent.dungeon_data.assemble_dungeon(room_placement_dicts)
+        
+        return jsonify({
+            'success': True,
+            'final_dungeon': final_dungeon,
+            'room_placement_dicts': room_placement_dicts,
+            'num_rooms': len(room_placement_dicts),
+            'dungeon_design_prompt': dungeon_design_prompt,
+            'metadata': {
+                'model_endpoint': "Claude Sonnet 4",
+                'max_generation_attempts': 2,
+                'max_concurrent_requests': 2,
+                'delay_between_requests': 0.0
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 if __name__ == '__main__':
     print("Starting AI Battlemap Layout Generator API on port 3000...")

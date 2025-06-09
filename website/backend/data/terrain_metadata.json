@@ -133,41 +133,5 @@
     "updated": 1749275203619,
     "placedAssets": [],
     "placed_dungeons": false
-  },
-  "dungeon_test_dungeon_1749194493341.glb": {
-    "created": 1749194493341,
-    "name": "Test Dungeon",
-    "type": "dungeon_layout",
-    "originalFilename": "test_dungeon_1749194493341.json",
-    "layoutFile": "test_dungeon_1749194493341.json",
-    "layoutPath": "/assets/dungeon_layouts/test_dungeon_1749194493341.json",
-    "dimensions": {
-      "width": 50,
-      "height": 50,
-      "depth": 0.1
-    },
-    "scale": 1,
-    "icon": "🏰",
-    "isDungeonLayout": true,
-    "placed_dungeons": false,
-    "updated": 1749194493343
-  },
-  "dungeon_dungeon_2_1749195697305.glb": {
-    "created": 1749195697305,
-    "name": "Dungeon 2",
-    "type": "dungeon_layout",
-    "originalFilename": "dungeon_2_1749195697305.json",
-    "layoutFile": "dungeon_2_1749195697305.json",
-    "layoutPath": "/assets/dungeon_layouts/dungeon_2_1749195697305.json",
-    "dimensions": {
-      "width": 50,
-      "height": 50,
-      "depth": 0.1
-    },
-    "scale": 1,
-    "icon": "🏰",
-    "isDungeonLayout": true,
-    "placed_dungeons": false,
-    "updated": 1749195697307
   }
 }

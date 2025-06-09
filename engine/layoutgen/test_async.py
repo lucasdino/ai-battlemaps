@@ -24,6 +24,9 @@ room_placement_dicts = dungeon_agent.design_dungeon(
     dungeon_design_prompt=dungeon_design_prompt,
     use_async=True
 )
+final_dungeon = dungeon_agent.dungeon_data.assemble_dungeon(room_placement_dicts)
+
+
 
 # Save my data down
 output_file = Path('./generated_dungeon_data.json')

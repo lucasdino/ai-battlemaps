@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import CONFIG from '../config';
+import styles from '../styles/GenerateDungeonPopup';
 
 const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
   const [params, setParams] = useState({
     rooms: 8,
-    graph_type: 'linear',
-    room_scale: 3,
+    graph_type: 'mesh',
+    room_scale: 5,
     margin: 3,
     max_attempts: 100,
     width: 50,
@@ -15,9 +16,11 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
   const [layoutResult, setLayoutResult] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(null);
+  const [isDesigning, setIsDesigning] = useState(false);
+  const [designSuccess, setDesignSuccess] = useState(null);
   const [layoutName, setLayoutName] = useState('');
+  const [dungeonPrompt, setDungeonPrompt] = useState('');
+  const [isGenerateHovered, setIsGenerateHovered] = useState(false);
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -29,8 +32,53 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
       }
     };
 
+    // Add custom CSS for slider styling
+    const style = document.createElement('style');
+    style.textContent = `
+      input[type="range"]::-webkit-slider-track {
+        background: #444;
+        height: 6px;
+        border-radius: 3px;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        appearance: none;
+        background: #FF6B35;
+        height: 18px;
+        width: 18px;
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid #fff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      }
+      input[type="range"]::-webkit-slider-thumb:hover {
+        background: #E55A2B;
+      }
+      input[type="range"]::-moz-range-track {
+        background: #444;
+        height: 6px;
+        border-radius: 3px;
+        border: none;
+      }
+      input[type="range"]::-moz-range-thumb {
+        background: #FF6B35;
+        height: 18px;
+        width: 18px;
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid #fff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      }
+      input[type="range"]::-moz-range-thumb:hover {
+        background: #E55A2B;
+      }
+    `;
+    document.head.appendChild(style);
+
     document.addEventListener('keydown', handleEscapeKey);
-    return () => document.removeEventListener('keydown', handleEscapeKey);
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+      document.head.removeChild(style);
+    };
   }, [isOpen, onClose]);
 
   const handleParamChange = (key, value) => {
@@ -62,6 +110,9 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
       if (data.success) {
         setLayoutResult(data);
         drawLayout(data.grid);
+        
+        // Auto-save the initial layout to the backend
+        await saveInitialLayout(data);
       } else {
         setError(data.error || 'Layout generation failed');
       }
@@ -73,75 +124,112 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
     }
   };
 
-  const drawLayout = (grid) => {
-    const canvas = canvasRef.current;
-    if (!canvas || !grid) return;
-    
-    const ctx = canvas.getContext('2d');
-    const cellSize = 6; // Smaller for popup
-    
-    canvas.width = grid[0].length * cellSize;
-    canvas.height = grid.length * cellSize;
-    
-    const colors = {
-      0: '#1a1a1a',  // Empty - dark
-      1: '#8B4513',  // Floor - brown
-      2: '#404040',  // Wall - gray
-      3: '#D2B48C',  // Corridor - tan
-      4: '#FF6B35',  // Door - orange
-      5: '#FFD700',  // Treasure - gold
-      6: '#32CD32',  // Entrance - green
-      7: '#DC143C'   // Boss - red
-    };
-    
-    grid.forEach((row, y) => {
-      row.forEach((cell, x) => {
-        ctx.fillStyle = colors[cell] || '#000000';
-        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-        
-        // Add grid lines for better visibility
-        if (cell !== 0) {
-          ctx.strokeStyle = '#333333';
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
-        }
-      });
-    });
-  };
-
-  const saveLayout = async () => {
-    if (!layoutResult || !layoutName.trim()) {
-      setError('Please generate a layout and enter a name before saving');
-      return;
-    }
-
-    setIsSaving(true);
-    setError(null);
-    setSaveSuccess(null);
-
+  const saveInitialLayout = async (layoutData) => {
     try {
-      const layoutData = {
-        ...layoutResult,
-        params: params,
-        savedAt: new Date().toISOString()
-      };
-
-      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.TERRAINS.SAVE_LAYOUT}`, {
+      // Generate a unique name for the initial layout
+      const timestamp = Date.now();
+      const layoutName = `Layout_${timestamp}`;
+      
+      const response = await fetch(`${CONFIG.API.BASE_URL}/api/terrains/save-layout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           layoutData: layoutData,
-          layoutName: layoutName.trim()
+          layoutName: layoutName
         })
       });
       
       const data = await response.json();
       
-      if (response.ok) {
-        setSaveSuccess(`Layout "${layoutName}" saved successfully as dungeon!`);
+      if (response.ok && data.message) {
+        console.log('Initial layout saved successfully:', data);
+        // Call the callback to refresh the terrain list
+        if (onDungeonGenerated) {
+          onDungeonGenerated();
+        }
+      } else {
+        console.warn('Failed to save initial layout:', data.error);
+      }
+    } catch (err) {
+      console.warn('Error saving initial layout:', err);
+      // Don't show error to user as this is a background operation
+    }
+  };
+
+  const drawLayout = (grid) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !grid) return;
+    
+    const ctx = canvas.getContext('2d');
+    // Fixed canvas size regardless of grid dimensions
+    const canvasWidth = 300;
+    const canvasHeight = 300;
+    const cellWidth = canvasWidth / grid[0].length;
+    const cellHeight = canvasHeight / grid.length;
+    
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    
+    // Not splitting out these specifically since agent will plan the dungeon
+    const colors = {
+      0: '#1a1a1a',  // Empty - dark
+      1: '#000000',  // Floor - white
+      2: '#404040',  // Wall - gray
+      3: '#000000',  // Corridor - white
+      4: '#FF6B35',  // Door - orange
+      5: '#000000',  // Treasure - white
+      6: '#32CD32',  // Entrance - green
+      7: '#000000'   // Boss - white
+    };
+    
+    grid.forEach((row, y) => {
+      row.forEach((cell, x) => {
+        ctx.fillStyle = colors[cell] || '#000000';
+        ctx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
+        
+        // Add grid lines for better visibility
+        if (cell !== 0) {
+          ctx.strokeStyle = '#333333';
+          ctx.lineWidth = 0.5;
+          ctx.strokeRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
+        }
+      });
+    });
+  };
+
+  const designDungeon = async () => {
+    if (!layoutResult || !layoutName.trim()) {
+      setError('Please generate a layout and enter a name before designing the dungeon');
+      return;
+    }
+
+    setIsDesigning(true);
+    setError(null);
+    setDesignSuccess(null);
+
+    try {
+      const requestPayload = {
+        dungeon_data: layoutResult,
+        dungeon_design_prompt: dungeonPrompt.trim() || null,
+        layout_name: layoutName.trim()
+      };
+
+      const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.DUNGEON.GENERATE}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestPayload)
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setDesignSuccess(`Dungeon "${layoutName}" is being designed in the background! You'll find it in your dungeon library once complete.`);
         setLayoutName(''); // Clear the name input
+        setDungeonPrompt(''); // Clear the prompt input
         
         // Call the callback to refresh the terrain list
         if (onDungeonGenerated) {
@@ -149,17 +237,17 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
         }
         
         setTimeout(() => {
-          setSaveSuccess(null);
-          onClose(); // Close popup after successful save
-        }, 2000);
+          setDesignSuccess(null);
+          onClose(); // Close popup after successful submission
+        }, 3000);
       } else {
-        setError(data.error || 'Failed to save layout');
+        setError(data.error || 'Failed to start dungeon design');
       }
     } catch (err) {
       setError('Failed to connect to server');
-      console.error('Layout save error:', err);
+      console.error('Dungeon design error:', err);
     } finally {
-      setIsSaving(false);
+      setIsDesigning(false);
     }
   };
 
@@ -188,8 +276,8 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
                 Rooms: {params.rooms}
                 <input
                   type="range"
-                  min="3"
-                  max="15"
+                  min="4"
+                  max="12"
                   value={params.rooms || 8}
                   onChange={(e) => handleParamChange('rooms', e.target.value)}
                   style={styles.slider}
@@ -213,9 +301,9 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
                 Room Scale: {params.room_scale}
                 <input
                   type="range"
-                  min="1"
-                  max="10"
-                  value={params.room_scale || 3}
+                  min="4"
+                  max="8"
+                  value={params.room_scale || 5}
                   onChange={(e) => handleParamChange('room_scale', e.target.value)}
                   style={styles.slider}
                 />
@@ -226,6 +314,8 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
                 <div style={styles.gridSizeControls}>
                   <input
                     type="number"
+                    min="40"
+                    max="75"
                     value={params.width || 50}
                     onChange={(e) => handleParamChange('width', e.target.value)}
                     style={styles.numberInput}
@@ -234,6 +324,8 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
                   <span style={{color: '#fff', margin: '0 8px'}}>×</span>
                   <input
                     type="number"
+                    min="40"
+                    max="75"
                     value={params.height || 50}
                     onChange={(e) => handleParamChange('height', e.target.value)}
                     style={styles.numberInput}
@@ -246,69 +338,20 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
             <button
               onClick={generateLayout}
               disabled={isGenerating}
+              onMouseEnter={() => setIsGenerateHovered(true)}
+              onMouseLeave={() => setIsGenerateHovered(false)}
               style={{
                 ...styles.generateButton,
-                ...(isGenerating ? styles.generateButtonDisabled : {})
+                ...(isGenerating ? styles.generateButtonDisabled : {}),
+                ...(isGenerateHovered && !isGenerating ? { backgroundColor: '#E55A2B' } : {})
               }}
             >
               {isGenerating ? 'Generating...' : 'Generate Layout'}
             </button>
-            
-            {layoutResult && (
-              <div style={styles.saveSection}>
-                <h4 style={styles.saveTitle}>Save Layout</h4>
-                <label style={styles.label}>
-                  Layout Name:
-                  <input
-                    type="text"
-                    value={layoutName}
-                    onChange={(e) => setLayoutName(e.target.value)}
-                    placeholder="Enter layout name..."
-                    style={styles.nameInput}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && layoutName.trim() && !isSaving) {
-                        saveLayout();
-                      }
-                    }}
-                  />
-                </label>
-                <button
-                  onClick={saveLayout}
-                  disabled={isSaving || !layoutName.trim()}
-                  style={{
-                    ...styles.saveButton,
-                    ...(isSaving || !layoutName.trim() ? styles.saveButtonDisabled : {})
-                  }}
-                >
-                  {isSaving ? 'Saving...' : 'Save as Dungeon 🏰'}
-                </button>
-              </div>
-            )}
-            
-            {error && (
-              <div style={styles.error}>
-                Error: {error}
-              </div>
-            )}
-            
-            {saveSuccess && (
-              <div style={styles.success}>
-                {saveSuccess}
-              </div>
-            )}
           </div>
           
           <div style={styles.rightPanel}>
             <h3 style={styles.sectionTitle}>Preview</h3>
-            
-            {layoutResult && (
-              <div style={styles.resultInfo}>
-                <p style={styles.infoText}>
-                  Generated {layoutResult.rooms?.length || 0} rooms with {layoutResult.doors?.length || 0} doors 
-                  in {(layoutResult.generation_time * 1000).toFixed(1)}ms
-                </p>
-              </div>
-            )}
             
             <div style={styles.canvasContainer}>
               <canvas ref={canvasRef} style={styles.canvas} />
@@ -319,313 +362,77 @@ const GenerateDungeonPopup = ({ isOpen, onClose, onDungeonGenerated }) => {
                 <h4 style={styles.legendTitle}>Legend:</h4>
                 <div style={styles.legendItems}>
                   <div style={styles.legendItem}>
-                    <div style={{...styles.legendColor, backgroundColor: '#8B4513'}}></div>
-                    <span>Floor</span>
-                  </div>
-                  <div style={styles.legendItem}>
-                    <div style={{...styles.legendColor, backgroundColor: '#404040'}}></div>
-                    <span>Wall</span>
+                    <div style={{...styles.legendColor, backgroundColor: '#32CD32'}}></div>
+                    <span>Entrance Room</span>
                   </div>
                   <div style={styles.legendItem}>
                     <div style={{...styles.legendColor, backgroundColor: '#FF6B35'}}></div>
                     <span>Door</span>
-                  </div>
-                  <div style={styles.legendItem}>
-                    <div style={{...styles.legendColor, backgroundColor: '#32CD32'}}></div>
-                    <span>Entrance</span>
-                  </div>
-                  <div style={styles.legendItem}>
-                    <div style={{...styles.legendColor, backgroundColor: '#DC143C'}}></div>
-                    <span>Boss Room</span>
-                  </div>
-                  <div style={styles.legendItem}>
-                    <div style={{...styles.legendColor, backgroundColor: '#FFD700'}}></div>
-                    <span>Treasure</span>
                   </div>
                 </div>
               </div>
             )}
           </div>
         </div>
+        
+        {/* Design Dungeon Section - Now at bottom with full width */}
+        {layoutResult && (
+          <div style={styles.designSection}>
+            <div style={styles.designControls}>
+              <div style={styles.inputGroup}>
+                <label style={styles.inputLabel}>
+                  Name
+                  <input
+                    type="text"
+                    value={layoutName}
+                    onChange={(e) => setLayoutName(e.target.value)}
+                    placeholder="My Dungeon"
+                    style={styles.nameInput}
+                  />
+                </label>
+              </div>
+              
+              <div style={styles.inputGroup}>
+                <label style={styles.inputLabel}>
+                  Theme (Optional)
+                  <input
+                    type="text"
+                    value={dungeonPrompt}
+                    onChange={(e) => setDungeonPrompt(e.target.value)}
+                    placeholder="Basement of a wealthy vampire's castle"
+                    style={styles.promptInput}
+                  />
+                </label>
+              </div>
+              
+              <button
+                onClick={designDungeon}
+                disabled={isDesigning || !layoutName.trim()}
+                style={{
+                  ...styles.designButton,
+                  ...(isDesigning || !layoutName.trim() ? styles.designButtonDisabled : {})
+                }}
+              >
+                {isDesigning ? 'Starting Design Process...' : 'Let AI Do Its Thing'}
+              </button>
+            </div>
+            
+            {error && (
+              <div style={styles.error}>
+                Error: {error}
+              </div>
+            )}
+            
+            {designSuccess && (
+              <div style={styles.success}>
+                {designSuccess}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
-};
-
-const styles = {
-  overlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-  },
-  
-  modal: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: '12px',
-    width: '90vw',
-    maxWidth: '900px',
-    height: '80vh',
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-    border: '1px solid #444',
-  },
-  
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '20px',
-    borderBottom: '1px solid #444',
-    backgroundColor: '#333',
-  },
-  
-  title: {
-    color: '#fff',
-    margin: 0,
-    fontSize: '20px',
-    fontWeight: 'bold',
-  },
-  
-  closeButton: {
-    background: 'transparent',
-    border: 'none',
-    color: '#fff',
-    fontSize: '24px',
-    cursor: 'pointer',
-    padding: '0',
-    width: '30px',
-    height: '30px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: '4px',
-  },
-  
-  content: {
-    display: 'flex',
-    flex: 1,
-    overflow: 'hidden',
-  },
-  
-  leftPanel: {
-    width: '300px',
-    padding: '20px',
-    borderRight: '1px solid #444',
-    overflowY: 'auto',
-    backgroundColor: '#2a2a2a',
-  },
-  
-  rightPanel: {
-    flex: 1,
-    padding: '20px',
-    overflowY: 'auto',
-    backgroundColor: '#1e1e1e',
-  },
-  
-  sectionTitle: {
-    color: '#fff',
-    fontSize: '16px',
-    marginBottom: '15px',
-    fontWeight: 'bold',
-  },
-  
-  paramGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '15px',
-    marginBottom: '20px',
-  },
-  
-  label: {
-    color: '#fff',
-    fontSize: '14px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '5px',
-  },
-  
-  slider: {
-    width: '100%',
-    height: '6px',
-    backgroundColor: '#444',
-    borderRadius: '3px',
-    outline: 'none',
-  },
-  
-  select: {
-    backgroundColor: '#333',
-    color: '#fff',
-    border: '1px solid #555',
-    borderRadius: '4px',
-    padding: '8px',
-    fontSize: '14px',
-    outline: 'none',
-  },
-  
-  gridSizeControls: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-  },
-  
-  numberInput: {
-    backgroundColor: '#333',
-    color: '#fff',
-    border: '1px solid #555',
-    borderRadius: '4px',
-    padding: '8px',
-    fontSize: '14px',
-    outline: 'none',
-    width: '80px',
-  },
-  
-  generateButton: {
-    backgroundColor: '#007bff',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '6px',
-    padding: '12px 20px',
-    fontSize: '14px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-    width: '100%',
-  },
-  
-  generateButtonDisabled: {
-    backgroundColor: '#555',
-    cursor: 'not-allowed',
-  },
-  
-  saveSection: {
-    marginTop: '20px',
-    padding: '15px',
-    backgroundColor: '#333',
-    borderRadius: '8px',
-    border: '1px solid #555',
-  },
-  
-  saveTitle: {
-    color: '#fff',
-    fontSize: '14px',
-    marginBottom: '10px',
-    fontWeight: 'bold',
-  },
-  
-  nameInput: {
-    backgroundColor: '#2a2a2a',
-    color: '#fff',
-    border: '1px solid #555',
-    borderRadius: '4px',
-    padding: '8px',
-    fontSize: '14px',
-    outline: 'none',
-    width: '100%',
-  },
-  
-  saveButton: {
-    backgroundColor: '#28a745',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '6px',
-    padding: '10px 16px',
-    fontSize: '13px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-    width: '100%',
-    marginTop: '10px',
-  },
-  
-  saveButtonDisabled: {
-    backgroundColor: '#555',
-    cursor: 'not-allowed',
-  },
-  
-  error: {
-    marginTop: '10px',
-    padding: '10px',
-    backgroundColor: '#dc3545',
-    color: '#fff',
-    borderRadius: '4px',
-    fontSize: '14px',
-  },
-  
-  success: {
-    marginTop: '10px',
-    padding: '10px',
-    backgroundColor: '#28a745',
-    color: '#fff',
-    borderRadius: '4px',
-    fontSize: '14px',
-  },
-  
-  resultInfo: {
-    marginBottom: '15px',
-  },
-  
-  infoText: {
-    color: '#ccc',
-    fontSize: '13px',
-    margin: 0,
-  },
-  
-  canvasContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginBottom: '20px',
-    backgroundColor: '#000',
-    borderRadius: '8px',
-    padding: '10px',
-    border: '1px solid #444',
-  },
-  
-  canvas: {
-    maxWidth: '100%',
-    maxHeight: '300px',
-    border: '1px solid #555',
-  },
-  
-  legend: {
-    backgroundColor: '#333',
-    borderRadius: '8px',
-    padding: '15px',
-    border: '1px solid #555',
-  },
-  
-  legendTitle: {
-    color: '#fff',
-    fontSize: '14px',
-    marginBottom: '10px',
-    fontWeight: 'bold',
-  },
-  
-  legendItems: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '8px',
-  },
-  
-  legendItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-  },
-  
-  legendColor: {
-    width: '16px',
-    height: '16px',
-    borderRadius: '2px',
-    border: '1px solid #666',
-  },
 };
 
 export default GenerateDungeonPopup; 

@@ -21,7 +21,8 @@ const CONFIG = {
       },
       DUNGEON: {
         FLOOR_PLAN: '/api/dungeon/floor_plan',
-        ASSET_MAPPING: '/api/dungeon/asset_mapping'
+        ASSET_MAPPING: '/api/dungeon/asset_mapping',
+        GENERATE: '/api/dungeon/generate'
       },
       DUNGEON_ASSETS: {
         BASE: '/api/dungeon-assets',
@@ -33,7 +34,8 @@ const CONFIG = {
         GENERATE: '/api/layout/generate',
         TEST: '/api/layout/test',
         SAVED: '/api/layout/saved',
-        LOAD: '/api/layout/load'
+        LOAD: '/api/layout/load',
+        DUNGEON_GENERATE: '/api/dungeon/generate'
       },
       TRELLIS: '/api/trellis', // 3D asset generation endpoint that connects to external service
       GENERATE_IMAGE: '/api/generate-image', // Endpoint to generate images with AI
