@@ -2,29 +2,29 @@
 
 This is a project for CS 252D: Advanced Computer Vision @ UCSD. It's a web application that allows users to generate and manage 3D models for Dungeons & Dragons battle maps.
 
-oh, btw we'll be totally abusing AI coding tools to assist with building the UI. The more interesting challenge will be building the agentic pipeline, systems, and backend :)
-
 ## Project Structure
 
 ```
-| website/                 # Where the final external interface will live
-├── backend/               # Node.js server
-│   ├── assets/            # Default 3D models
-│   ├── uploads/           # User uploaded models
-│   └── server.js          # Express server implementation
-│
-└── frontend/              # React SPA
-    ├── public/            # Static assets
-    └── src/
-        ├── components/    # React components
-        │   ├── ModelViewer.jsx           # 3D model viewer component
-        │   ├── ThumbnailRenderer.jsx     # Thumbnail generator for 3D models
-        │   └── ViewAssets.jsx            # Asset management UI
-        ├── theme.js       # UI theme configuration
-        └── App.jsx        # Main application component
+website/                 # Where the final external interface will live
+├── backend/             # Node.js server
+│   ├── assets/          # Default 3D models
+│   ├── uploads/         # User uploaded models
+│   └── server.js        # Express server implementation
+├── frontend/            # React SPA
+│   ├── public/          # Static assets
+│   └── src/
+│       ├── components/  # React components
+│       │   ├── ModelViewer.jsx       # 3D model viewer component
+│       │   ├── ThumbnailRenderer.jsx # Thumbnail generator for 3D models
+│       │   └── ViewAssets.jsx        # Asset management UI
+│       ├── theme.js     # UI theme configuration
+│       └── App.jsx      # Main application component
+└── …                    # other top-level items if any
 
-| engine/                  # Main folder where we'll have various python notebooks / functions related to building / testing the system
-
+engine/
+└── layoutgen/           # Layout Generation
+    ├── App.py           # Flask server for generating layouts
+    └── requirements.txt # Python dependencies
 ```
 
 ## Getting Started
@@ -48,8 +48,16 @@ To set up the project locally, follow these steps:
    cd ../frontend
    npm install
    ```
+4. **Setup the Layoutgen server:**
+   ```bash
+   cd ../engine/layoutgen
+   python -m venv venv
+   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+   pip install -r requirements.txt
+   python App.py
+   ```
 
-4. **Run the Application:**
+5. **Run the Application:**
    * **Start the Backend:**
      ```bash
      cd website/backend
@@ -62,3 +70,10 @@ To set up the project locally, follow these steps:
      npm run dev
      ```
      (The frontend will be accessible at the URL provided by Vite, usually http://localhost:5173)
+   * **Start the Layoutgen server (in a separate terminal):**
+     ```bash
+     cd engine/layoutgen
+     source venv/bin/activate  # Activate the virtual environment
+     python App.py
+     ```
+     (The Layoutgen server will run on http://localhost:3000)
