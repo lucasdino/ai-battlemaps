@@ -2,15 +2,24 @@
 generate_image.model_id = "runwayml/stable-diffusion-v1-5"
 generate_image.num_inference_steps = 50
 generate_image.device = "auto"
+generate_image.output_dir = "outputs/images"
 
 # Configuration for label_image
-label_image.labels = ["forest", "river", "cliff", "valley"]
+label_image.output_dir = "outputs/labels"
+label_image.sam_checkpoint = "sam_vit_b_01ec64.pth"
+label_image.model_type = "vit_b"
 
-# Configuration for structure_extraction
-structure_extraction.contour_level = 0.5
+# Configuration for extract_structure
+extract_structure.output_dir = "outputs/structures"
+extract_structure.contour_level = 0.5
 
-# Configuration for mesh_synthesis
-mesh_synthesis.output_format = "obj"
+# Configuration for synthesize_mesh
+synthesize_mesh.output_dir = "outputs/meshes"
+synthesize_mesh.output_format = "obj"
 
 # Configuration for wfc_tiling
-wfc_tiling.pattern_size = 3 
+wfc_tiling.output_dir = "outputs/tiles"
+wfc_tiling.pattern_size = 3
+
+# Configuration for export_scene
+export_scene.output_dir = "outputs/scene" 

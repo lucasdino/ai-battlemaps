@@ -24,7 +24,7 @@ def generate_image(
         device (str, optional): The device to run the model on ('auto', 'cpu', or 'cuda'). Defaults to 'auto'.
 
     Returns:
-        None: The function saves the generated image to the specified output directory.
+        str: The path to the generated image.
     """
     print(f"Generating image for prompt: {prompt}")
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -39,8 +39,10 @@ def generate_image(
     image = pipe(prompt).images[0]
 
     # Save the generated image
-    image.save(f"{output_dir}/SD_input_image.png")
+    image_path = f"{output_dir}/SD_input_image.png"
+    image.save(image_path)
     print(f"Saved SD_input_image.png to {output_dir}")
+    return image_path
 
 
 if __name__ == "__main__":
