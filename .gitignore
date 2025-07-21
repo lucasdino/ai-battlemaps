@@ -10,6 +10,9 @@ engine/layoutgen/agent/figures
 # API Keys
 **/apiKeys.js
 
+# Project Documentation (exclude report, keep slides)
+CSE_252D_Project_report.pdf
+
 # Logs
 /log
 /logs/
