@@ -262,7 +262,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👥 Contributors
 
-- **Lucas Dionisopoulos** - Custom TRELLIS Docker container, Flask API, full-stack web application, default asset library, agentic LLM backend
+- **Lucas Dionisopoulos** - Full-stack development lead, custom TRELLIS endpoint, default asset library, agentic LLM backend and agentic LLM studies
 - **Matthew O'Malley-Nichols** - Layout generation Flask server, image scene synthesis, terrain generation, frontend/backend components
 - **Ryosuke Matsuzawa** - 3D map asset placement API, perspective conversion, Blender geometry node studies
 - **Wei-Han Tu** - Asset drag movement, 3D map asset component library, related work comparison
